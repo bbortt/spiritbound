@@ -16,7 +16,7 @@ jobs:
     if: github.event_name != 'pull_request'
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
       - name: Check if PR exists
         uses: 8BitJonny/gh-get-current-pr@4.0.0
         id: check
