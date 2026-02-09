@@ -1,8 +1,0 @@
-@import 'tailwindcss';
-@import 'tailwindcss/preflight';
-
-@config '@repo/ui/tailwind.config';
-
-button {
-  @apply rounded-none;
-}

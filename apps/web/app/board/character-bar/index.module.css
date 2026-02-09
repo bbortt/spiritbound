@@ -1,9 +1,0 @@
-@reference "../../globals.css";
-
-.characterCard {
-  @apply fixed bottom-0 left-0 right-0 pb-2 pt-2 bg-background z-10 border-t;
-}
-
-.characterCardContent {
-  @apply flex items-center justify-center h-full gap-8 px-4;
-}

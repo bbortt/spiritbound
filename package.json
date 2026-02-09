@@ -1,30 +1,35 @@
 {
   "name": "eldoria",
-  "version": "1.9.0",
   "private": true,
+  "version": "0.0.0",
+  "type": "module",
   "scripts": {
-    "build": "turbo build",
-    "dev": "turbo dev",
-    "lint": "turbo lint",
-    "prepare": "husky",
-    "prettier:check": "prettier --config .prettierrc.js --check \"{,{.github,apps,packages}/**/}*.{css,(m|)js,json,md,s(a|c)ss,ts(x|),y(a|)ml}\"",
-    "prettier:format": "prettier --config .prettierrc.js --write \"{,{.github,apps,packages}/**/}*.{css,(m|)js,json,md,s(a|c)ss,ts(x|),y(a|)ml}\"",
-    "test": "turbo run test"
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "lint": "eslint .",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
   },
   "devDependencies": {
-    "@commitlint/config-conventional": "19.8.0",
-    "commitlint": "19.8.0",
-    "gh-pages": "6.3.0",
-    "husky": "9.1.7",
-    "lint-staged": "15.5.0",
-    "prettier": "3.5.3",
-    "prettier-plugin-organize-imports": "4.1.0",
-    "prettier-plugin-packagejson": "2.5.10",
-    "turbo": "2.4.4",
-    "typescript": "5.8.2"
+    "@eslint/js": "^9.39.1",
+    "@types/node": "^24.10.1",
+    "@types/react": "^19.2.5",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.1",
+    "eslint": "^9.39.1",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-refresh": "^0.4.24",
+    "globals": "^16.5.0",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.46.4",
+    "vite": "npm:rolldown-vite@7.2.5"
   },
-  "packageManager": "pnpm@9.15.3",
-  "engines": {
-    "node": ">=23.4.0"
+  "pnpm": {
+    "overrides": {
+      "vite": "npm:rolldown-vite@7.2.5"
+    }
   }
 }
