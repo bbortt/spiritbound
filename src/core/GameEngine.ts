@@ -1,5 +1,8 @@
-import {type GameState, initialGameState } from './types.ts';
-import { tick } from './TickSystem';
+import type {BuildingType, GameState, PopulationType,} from './types.ts';
+import  { initialGameState } from './types.ts';
+import { tick } from '../TickSystem.ts';
+import { DefenseTower } from './buildings/DefenseTower.ts';
+import { v4 as uuidv4 } from 'uuid';
 
 type GameStateSubscriber = (state: GameState) => void;
 
@@ -10,8 +13,8 @@ class GameEngine {
 
   constructor() {
     this.gameState = initialGameState;
-    // Distribute initial population into idle workers
-    this.gameState.idle = this.gameState.population - this.gameState.defenders - this.gameState.gatherers;
+    // Distribute initial population into idle workers, accounting for builders
+    this.gameState.idle = this.gameState.population - this.gameState.defenders - this.gameState.gatherers - this.gameState.builders;
   }
 
   public getGameState(): GameState {
@@ -63,7 +66,7 @@ class GameEngine {
    * Adjusts the number of workers in a specific category.
    * Ensures that workers are moved from/to 'idle' and total population is respected.
    */
-  public assignWorkers(type: 'defenders' | 'gatherers', delta: number): void {
+  public assignWorkers(type: PopulationType, delta: number): void {
     const currentIdle = this.gameState.idle;
     const currentType = this.gameState[type];
 
@@ -85,7 +88,7 @@ class GameEngine {
   }
 
   // Allow re-assigning population to idle if they are in other roles
-  public movePopulationToIdle(type: 'defenders' | 'gatherers', amount: number): void {
+  public movePopulationToIdle(type: PopulationType, amount: number): void {
     const currentType = this.gameState[type];
     const canMove = Math.min(amount, currentType);
     if (canMove > 0) {
@@ -95,13 +98,42 @@ class GameEngine {
     }
   }
   
-  public moveIdleToPopulation(type: 'defenders' | 'gatherers', amount: number): void {
+  public moveIdleToPopulation(type: PopulationType, amount: number): void {
     const currentIdle = this.gameState.idle;
     const canMove = Math.min(amount, currentIdle);
     if (canMove > 0) {
       this.gameState[type] += canMove;
       this.gameState.idle -= canMove;
       this.notifySubscribers();
+    }
+  }
+
+  public startConstruction(buildingType: BuildingType): void {
+    if (this.gameState.buildingAddedInTick) {
+      // Don't allow adding multiple buildings in same tick
+      return;
+    }
+
+    // For now, only DefenseTower is available, but this could be expanded
+    if (buildingType === 'DefenseTower') {
+      const newBuildingId = `building-${uuidv4()}`; // Simple unique ID
+      const newTower = new DefenseTower(newBuildingId);
+
+      // Directly apply the action to the current gameState
+      // In a more complex scenario, this might go into an 'action queue' for the next tick
+      // For simplicity, we'll process it immediately here
+      this.gameState.buildings.push(newTower);
+      this.gameState.constructionQueue.push({
+        buildingId: newTower.id,
+        buildingType: newTower.type,
+        constructionPointsCurrent: 0,
+        constructionPointsRequired: newTower.constructionPointsRequired,
+      });
+      this.gameState.buildingAddedInTick=true;
+      this.gameState.lastCombatResults.push(`Construction started on ${newTower.name}!`);
+      this.notifySubscribers();
+    } else {
+      console.warn(`Unknown building type: ${buildingType}`);
     }
   }
 }
