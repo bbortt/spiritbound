@@ -1,8 +1,8 @@
-import type {BuildingType, GameState, PopulationType,} from './types.ts';
-import  { initialGameState } from './types.ts';
-import { tick } from '../TickSystem.ts';
-import { DefenseTower } from './buildings/DefenseTower.ts';
-import { v4 as uuidv4 } from 'uuid';
+import type { BuildingType, GameState, PopulationType } from "./types.ts";
+import { initialGameState } from "./types.ts";
+import { tick } from "../TickSystem.ts";
+import { DefenseTower } from "./buildings/DefenseTower.ts";
+import { v4 as uuidv4 } from "uuid";
 
 type GameStateSubscriber = (state: GameState) => void;
 
@@ -14,7 +14,11 @@ class GameEngine {
   constructor() {
     this.gameState = initialGameState;
     // Distribute initial population into idle workers, accounting for builders
-    this.gameState.idle = this.gameState.population - this.gameState.defenders - this.gameState.gatherers - this.gameState.builders;
+    this.gameState.idle =
+      this.gameState.population -
+      this.gameState.defenders -
+      this.gameState.gatherers -
+      this.gameState.builders;
   }
 
   public getGameState(): GameState {
@@ -41,7 +45,7 @@ class GameEngine {
 
   public start(): void {
     if (this.intervalId) {
-      console.warn('GameEngine is already running.');
+      console.warn("GameEngine is already running.");
       return;
     }
 
@@ -49,16 +53,16 @@ class GameEngine {
       this.gameState = tick(this.gameState);
       this.notifySubscribers();
     }, 1000) as unknown as number; // setInterval returns a number in Node.js, but a Node.js.Timeout in browser typings. Casting to number for broader compatibility.
-    console.log('GameEngine started.');
+    console.log("GameEngine started.");
   }
 
   public stop(): void {
     if (this.intervalId) {
       clearInterval(this.intervalId);
       this.intervalId = undefined;
-      console.log('GameEngine stopped.');
+      console.log("GameEngine stopped.");
     } else {
-      console.warn('GameEngine is not running.');
+      console.warn("GameEngine is not running.");
     }
   }
 
@@ -70,14 +74,16 @@ class GameEngine {
     const currentIdle = this.gameState.idle;
     const currentType = this.gameState[type];
 
-    if (delta > 0) { // Assigning more workers to a role
+    if (delta > 0) {
+      // Assigning more workers to a role
       const canAssign = Math.min(delta, currentIdle);
       if (canAssign > 0) {
         this.gameState[type] += canAssign;
         this.gameState.idle -= canAssign;
         this.notifySubscribers();
       }
-    } else if (delta < 0) { // Removing workers from a role
+    } else if (delta < 0) {
+      // Removing workers from a role
       const canRemove = Math.min(Math.abs(delta), currentType);
       if (canRemove > 0) {
         this.gameState[type] -= canRemove;
@@ -97,7 +103,7 @@ class GameEngine {
       this.notifySubscribers();
     }
   }
-  
+
   public moveIdleToPopulation(type: PopulationType, amount: number): void {
     const currentIdle = this.gameState.idle;
     const canMove = Math.min(amount, currentIdle);
@@ -115,7 +121,7 @@ class GameEngine {
     }
 
     // For now, only DefenseTower is available, but this could be expanded
-    if (buildingType === 'DefenseTower') {
+    if (buildingType === "DefenseTower") {
       const newBuildingId = `building-${uuidv4()}`; // Simple unique ID
       const newTower = new DefenseTower(newBuildingId);
 
@@ -129,8 +135,10 @@ class GameEngine {
         constructionPointsCurrent: 0,
         constructionPointsRequired: newTower.constructionPointsRequired,
       });
-      this.gameState.buildingAddedInTick=true;
-      this.gameState.lastCombatResults.push(`Construction started on ${newTower.name}!`);
+      this.gameState.buildingAddedInTick = true;
+      this.gameState.lastCombatResults.push(
+        `Construction started on ${newTower.name}!`,
+      );
       this.notifySubscribers();
     } else {
       console.warn(`Unknown building type: ${buildingType}`);

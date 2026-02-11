@@ -1,5 +1,5 @@
-import type { GameState, IAction, ConstructionJob } from './core/types.ts';
-import { DefenseTower } from './core/buildings/DefenseTower.ts';
+import type { GameState, IAction, ConstructionJob } from "./core/types.ts";
+import { DefenseTower } from "./core/buildings/DefenseTower.ts";
 
 // --- Game Constants ---
 const GATHERER_PRODUCTION_RATE = 1;
@@ -31,70 +31,77 @@ function applyAction(state: GameState, action: IAction): GameState {
   const newState = { ...state };
 
   switch (action.type) {
-    case 'ADD_FOOD':
+    case "ADD_FOOD":
       newState.food += action.payload;
       break;
-    case 'ADD_WOOD':
+    case "ADD_WOOD":
       newState.wood += action.payload;
       break;
-    case 'ADD_STONE':
+    case "ADD_STONE":
       newState.stone += action.payload;
       break;
-    case 'ADD_POPULATION':
+    case "ADD_POPULATION":
       newState.population += action.payload;
       break;
-    case 'REMOVE_POPULATION':
+    case "REMOVE_POPULATION":
       newState.population = Math.max(0, newState.population - action.payload);
       break;
-    case 'ADD_DEFENDER':
+    case "ADD_DEFENDER":
       newState.defenders += action.payload;
       break;
-    case 'REMOVE_DEFENDER':
+    case "REMOVE_DEFENDER":
       newState.defenders = Math.max(0, newState.defenders - action.payload);
       break;
-    case 'ADD_GATHERER':
+    case "ADD_GATHERER":
       newState.gatherers += action.payload;
       break;
-    case 'REMOVE_GATHERER':
+    case "REMOVE_GATHERER":
       newState.gatherers = Math.max(0, newState.gatherers - action.payload);
       break;
-    case 'ADD_BUILDER':
+    case "ADD_BUILDER":
       newState.builders += action.payload;
       break;
-    case 'REMOVE_BUILDER':
+    case "REMOVE_BUILDER":
       newState.builders = Math.max(0, newState.builders - action.payload);
       break;
-    case 'ADD_IDLE':
+    case "ADD_IDLE":
       newState.idle += action.payload;
       break;
-    case 'REMOVE_IDLE':
+    case "REMOVE_IDLE":
       newState.idle = Math.max(0, newState.idle - action.payload);
       break;
-    case 'SET_NEXT_WAVE_TIMER':
+    case "SET_NEXT_WAVE_TIMER":
       newState.nextWaveInSeconds = action.payload;
       break;
-    case 'INCREMENT_WAVE':
+    case "INCREMENT_WAVE":
       newState.currentWave++;
       break;
-    case 'ADD_COMBAT_LOG':
+    case "ADD_COMBAT_LOG":
       newState.lastCombatResults.push(action.payload);
-      if (newState.lastCombatResults.length > 5) { // Keep log concise
+      if (newState.lastCombatResults.length > 5) {
+        // Keep log concise
         newState.lastCombatResults.shift();
       }
       break;
-    case 'ADD_CONSTRUCTION_POINTS':
+    case "ADD_CONSTRUCTION_POINTS":
       {
-        const jobIndex = newState.constructionQueue.findIndex(job => job.buildingId === action.payload.buildingId);
+        const jobIndex = newState.constructionQueue.findIndex(
+          (job) => job.buildingId === action.payload.buildingId,
+        );
         if (jobIndex !== -1) {
           const job = { ...newState.constructionQueue[jobIndex] };
           job.constructionPointsCurrent += action.payload.points;
           if (job.constructionPointsCurrent >= job.constructionPointsRequired) {
             job.constructionPointsCurrent = job.constructionPointsRequired;
             // Mark for completion
-            const buildingToComplete = newState.buildings.find(b => b.id === job.buildingId);
+            const buildingToComplete = newState.buildings.find(
+              (b) => b.id === job.buildingId,
+            );
             if (buildingToComplete) {
               buildingToComplete.isConstructed = true;
-              newState.lastCombatResults.push(`${buildingToComplete.name} completed!`);
+              newState.lastCombatResults.push(
+                `${buildingToComplete.name} completed!`,
+              );
             }
           }
           newState.constructionQueue = [
@@ -105,16 +112,16 @@ function applyAction(state: GameState, action: IAction): GameState {
         }
       }
       break;
-    case 'COMPLETE_BUILDING':
+    case "COMPLETE_BUILDING":
       {
         newState.constructionQueue = newState.constructionQueue.filter(
-          job => job.buildingId !== action.payload.buildingId
+          (job) => job.buildingId !== action.payload.buildingId,
         );
         // The building was already marked as constructed in ADD_CONSTRUCTION_POINTS action
         // This action primarily removes it from the queue.
       }
       break;
-    case 'START_CONSTRUCTION':
+    case "START_CONSTRUCTION":
       {
         const newBuilding = action.payload.building;
         const newJob: ConstructionJob = {
@@ -125,7 +132,9 @@ function applyAction(state: GameState, action: IAction): GameState {
         };
         newState.buildings.push(newBuilding); // Add building to list, initially unconstructed
         newState.constructionQueue.push(newJob);
-        newState.lastCombatResults.push(`Construction started on ${newBuilding.name}!`);
+        newState.lastCombatResults.push(
+          `Construction started on ${newBuilding.name}!`,
+        );
       }
       break;
     default:
@@ -147,31 +156,45 @@ export function tick(state: GameState): GameState {
     // Deep clone arrays
     lastCombatResults: [...state.lastCombatResults],
     buildings: [...state.buildings], // Shallow copy array, references to Building objects remain the same
-    constructionQueue: state.constructionQueue.map(cq => ({ ...cq })),
+    constructionQueue: state.constructionQueue.map((cq) => ({ ...cq })),
   };
 
   const allActions: IAction[] = [];
 
   // --- 1. Resource Gathering (as entity-like actions) ---
   const totalGatheringPower = newState.gatherers * GATHERER_PRODUCTION_RATE;
-  allActions.push({ type: 'ADD_FOOD', payload: totalGatheringPower * FOOD_GATHER_CHANCE });
-  allActions.push({ type: 'ADD_WOOD', payload: totalGatheringPower * WOOD_GATHER_CHANCE });
-  allActions.push({ type: 'ADD_STONE', payload: totalGatheringPower * STONE_GATHER_CHANCE });
+  allActions.push({
+    type: "ADD_FOOD",
+    payload: totalGatheringPower * FOOD_GATHER_CHANCE,
+  });
+  allActions.push({
+    type: "ADD_WOOD",
+    payload: totalGatheringPower * WOOD_GATHER_CHANCE,
+  });
+  allActions.push({
+    type: "ADD_STONE",
+    payload: totalGatheringPower * STONE_GATHER_CHANCE,
+  });
 
   // --- 2. Population Dynamics (as entity-like actions) ---
-  const totalPopulation = newState.defenders + newState.gatherers + newState.idle + newState.builders;
+  const totalPopulation =
+    newState.defenders + newState.gatherers + newState.idle + newState.builders;
 
   // Food consumption
-  const foodConsumed = totalPopulation * FOOD_CONSUMPTION_PER_POPULATION_PER_TICK;
-  allActions.push({ type: 'ADD_FOOD', payload: -foodConsumed });
+  const foodConsumed =
+    totalPopulation * FOOD_CONSUMPTION_PER_POPULATION_PER_TICK;
+  allActions.push({ type: "ADD_FOOD", payload: -foodConsumed });
 
   // Handle starvation (if food goes negative after applying actions, it will be handled by cleanup)
   // For now, starvation logic remains in the post-action application phase for simplicity.
 
   // Population growth (deterministic based on food surplus)
-  if (newState.food > totalPopulation * 2 && newState.population < MAX_POPULATION) {
-    allActions.push({ type: 'ADD_POPULATION', payload: 1 });
-    allActions.push({ type: 'ADD_IDLE', payload: 1 });
+  if (
+    newState.food > totalPopulation * 2 &&
+    newState.population < MAX_POPULATION
+  ) {
+    allActions.push({ type: "ADD_POPULATION", payload: 1 });
+    allActions.push({ type: "ADD_IDLE", payload: 1 });
   }
 
   // --- 3. Builder Actions: Distribute construction points ---
@@ -179,20 +202,22 @@ export function tick(state: GameState): GameState {
     const totalCPProduced = newState.builders * BUILDER_CP_RATE;
     const cpPerJob = totalCPProduced / newState.constructionQueue.length;
 
-    newState.constructionQueue.forEach(job => {
+    newState.constructionQueue.forEach((job) => {
       allActions.push({
-        type: 'ADD_CONSTRUCTION_POINTS',
+        type: "ADD_CONSTRUCTION_POINTS",
         payload: { buildingId: job.buildingId, points: cpPerJob },
       });
     });
   }
 
   // --- 4. Building onTick calls ---
-  newState.buildings.forEach(building => {
+  newState.buildings.forEach((building) => {
     const buildingTickResult = building.onTick(newState);
     allActions.push(...buildingTickResult.actions);
     if (buildingTickResult.logs) {
-      buildingTickResult.logs.forEach(log => allActions.push({ type: 'ADD_COMBAT_LOG', payload: log }));
+      buildingTickResult.logs.forEach((log) =>
+        allActions.push({ type: "ADD_COMBAT_LOG", payload: log }),
+      );
     }
   });
 
@@ -204,24 +229,32 @@ export function tick(state: GameState): GameState {
   // --- 5. Combat & Wave Timer ---
   newState.nextWaveInSeconds--;
   if (newState.nextWaveInSeconds <= 0) {
-    newState = applyAction(newState, { type: 'INCREMENT_WAVE' });
-    newState = applyAction(newState, { type: 'SET_NEXT_WAVE_TIMER', payload: WAVE_RESET_TIME });
+    newState = applyAction(newState, { type: "INCREMENT_WAVE" });
+    newState = applyAction(newState, {
+      type: "SET_NEXT_WAVE_TIMER",
+      payload: WAVE_RESET_TIME,
+    });
 
     // Combat Resolution
     // Calculate total defense power from defenders and constructed DefenseTowers
     let totalDefensePower = newState.defenders * DEFENSE_MULTIPLICATOR;
-    newState.buildings.forEach(building => {
-      if (building.isConstructed && building.type === 'DefenseTower') {
+    newState.buildings.forEach((building) => {
+      if (building.isConstructed && building.type === "DefenseTower") {
         totalDefensePower += (building as DefenseTower).defenseBonus;
       }
     });
 
-    let monsterPower = Math.floor(WAVE_BASE_SIZE * (WAVE_GROWTH ** newState.currentWave));
+    let monsterPower = Math.floor(
+      WAVE_BASE_SIZE * WAVE_GROWTH ** newState.currentWave,
+    );
     if (newState.currentWave > 3) {
       monsterPower *= randIndBetween(0.8, 1.2);
     }
 
-    newState = applyAction(newState, { type: 'ADD_COMBAT_LOG', payload: `Wave ${newState.currentWave}: Hit with strength ${monsterPower}.` });
+    newState = applyAction(newState, {
+      type: "ADD_COMBAT_LOG",
+      payload: `Wave ${newState.currentWave}: Hit with strength ${monsterPower}.`,
+    });
     if (monsterPower > totalDefensePower) {
       const villagersLost = monsterPower - totalDefensePower;
       let remainingLosses = villagersLost;
@@ -229,36 +262,57 @@ export function tick(state: GameState): GameState {
       // Remove from idle first
       const idleLost = Math.min(newState.idle, remainingLosses);
       if (idleLost > 0) {
-        newState = applyAction(newState, { type: 'REMOVE_IDLE', payload: idleLost });
+        newState = applyAction(newState, {
+          type: "REMOVE_IDLE",
+          payload: idleLost,
+        });
         remainingLosses -= idleLost;
       }
 
       // Then from gatherers
       const gatherersLost = Math.min(newState.gatherers, remainingLosses);
       if (gatherersLost > 0) {
-        newState = applyAction(newState, { type: 'REMOVE_GATHERER', payload: gatherersLost });
+        newState = applyAction(newState, {
+          type: "REMOVE_GATHERER",
+          payload: gatherersLost,
+        });
         remainingLosses -= gatherersLost;
       }
 
       // Then from builders
       const buildersLost = Math.min(newState.builders, remainingLosses);
       if (buildersLost > 0) {
-        newState = applyAction(newState, { type: 'REMOVE_BUILDER', payload: buildersLost });
+        newState = applyAction(newState, {
+          type: "REMOVE_BUILDER",
+          payload: buildersLost,
+        });
         remainingLosses -= buildersLost;
       }
-      
+
       // Finally from defenders
       const defendersLost = Math.min(newState.defenders, remainingLosses);
       if (defendersLost > 0) {
-        newState = applyAction(newState, { type: 'REMOVE_DEFENDER', payload: defendersLost });
+        newState = applyAction(newState, {
+          type: "REMOVE_DEFENDER",
+          payload: defendersLost,
+        });
       }
 
-      newState = applyAction(newState, { type: 'ADD_COMBAT_LOG', payload: `The monsters broke through! You lost ${villagersLost} villagers.` });
+      newState = applyAction(newState, {
+        type: "ADD_COMBAT_LOG",
+        payload: `The monsters broke through! You lost ${villagersLost} villagers.`,
+      });
     } else {
-      newState = applyAction(newState, { type: 'ADD_COMBAT_LOG', payload: `Your defenders held off the attack!` });
+      newState = applyAction(newState, {
+        type: "ADD_COMBAT_LOG",
+        payload: `Your defenders held off the attack!`,
+      });
     }
 
-    newState = applyAction(newState, { type: 'ADD_COMBAT_LOG', payload: 'The next wave is approaching. Prepare your defenses!' });
+    newState = applyAction(newState, {
+      type: "ADD_COMBAT_LOG",
+      payload: "The next wave is approaching. Prepare your defenses!",
+    });
   }
 
   // --- 6. State Cleanup ---
@@ -274,36 +328,56 @@ export function tick(state: GameState): GameState {
 
   // Handle starvation (now that food might be negative after actions)
   if (newState.food <= 0 && newState.population > 0) {
-    const peopleToLose = Math.min(newState.population, Math.ceil(Math.abs(newState.food) / FOOD_CONSUMPTION_PER_POPULATION_PER_TICK));
-    newState = applyAction(newState, { type: 'ADD_COMBAT_LOG', payload: `Starvation! You lost ${peopleToLose} villagers.` });
-    
+    const peopleToLose = Math.min(
+      newState.population,
+      Math.ceil(
+        Math.abs(newState.food) / FOOD_CONSUMPTION_PER_POPULATION_PER_TICK,
+      ),
+    );
+    newState = applyAction(newState, {
+      type: "ADD_COMBAT_LOG",
+      payload: `Starvation! You lost ${peopleToLose} villagers.`,
+    });
+
     let remainingLosses = peopleToLose;
 
     // Remove from idle first
     const idleLost = Math.min(newState.idle, remainingLosses);
     if (idleLost > 0) {
-      newState = applyAction(newState, { type: 'REMOVE_IDLE', payload: idleLost });
+      newState = applyAction(newState, {
+        type: "REMOVE_IDLE",
+        payload: idleLost,
+      });
       remainingLosses -= idleLost;
     }
 
     // Then from gatherers
     const gatherersLost = Math.min(newState.gatherers, remainingLosses);
     if (gatherersLost > 0) {
-      newState = applyAction(newState, { type: 'REMOVE_GATHERER', payload: gatherersLost });
+      newState = applyAction(newState, {
+        type: "REMOVE_GATHERER",
+        payload: gatherersLost,
+      });
       remainingLosses -= gatherersLost;
     }
-    
+
     // Then from builders
     const buildersLost = Math.min(newState.builders, remainingLosses);
     if (buildersLost > 0) {
-      newState = applyAction(newState, { type: 'REMOVE_BUILDER', payload: buildersLost });
+      newState = applyAction(newState, {
+        type: "REMOVE_BUILDER",
+        payload: buildersLost,
+      });
       remainingLosses -= buildersLost;
     }
 
     // Finally from defenders
     const defendersLost = Math.min(newState.defenders, remainingLosses);
     if (defendersLost > 0) {
-      newState = applyAction(newState, { type: 'REMOVE_DEFENDER', payload: defendersLost });
+      newState = applyAction(newState, {
+        type: "REMOVE_DEFENDER",
+        payload: defendersLost,
+      });
     }
   }
 
@@ -312,14 +386,15 @@ export function tick(state: GameState): GameState {
   newState.gatherers = Math.max(0, newState.gatherers);
   newState.builders = Math.max(0, newState.builders);
   newState.defenders = Math.max(0, newState.defenders);
-  
+
   // Recalculate total population
-  newState.population = newState.defenders + newState.gatherers + newState.idle + newState.builders;
+  newState.population =
+    newState.defenders + newState.gatherers + newState.idle + newState.builders;
 
   // Filter out completed construction jobs from the queue (done in applyAction but re-check for safety)
- newState.buildingAddedInTick=false;
-  newState.constructionQueue = newState.constructionQueue.filter(job => {
-    const building = newState.buildings.find(b => b.id === job.buildingId);
+  newState.buildingAddedInTick = false;
+  newState.constructionQueue = newState.constructionQueue.filter((job) => {
+    const building = newState.buildings.find((b) => b.id === job.buildingId);
     return building ? !building.isConstructed : false;
   });
 

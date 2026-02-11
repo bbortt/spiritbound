@@ -1,11 +1,12 @@
-import { Building } from './Building.ts';
-import type { GameState, TickResult, IAction } from '../types.ts';
+import { Building } from "./Building.ts";
+import type { GameState, TickResult, IAction } from "../types.ts";
 
 export class DefenseTower extends Building {
   defenseBonus: number;
 
-  constructor(id: string, defenseBonus: number = 5) { // Default defense bonus
-    super(id, `Defense Tower ${id.substring(0, 4)}`, 'DefenseTower', 20); // 20 construction points for now
+  constructor(id: string, defenseBonus: number = 5) {
+    // Default defense bonus
+    super(id, `Defense Tower ${id.substring(0, 4)}`, "DefenseTower", 20); // 20 construction points for now
     this.defenseBonus = defenseBonus;
   }
 
@@ -16,7 +17,8 @@ export class DefenseTower extends Building {
    * @param state The current GameState.
    * @returns A TickResult containing actions related to its effect.
    */
-  onTick(_state: GameState): TickResult { // state is not used here, so prefix with _
+  onTick(_state: GameState): TickResult {
+    // state is not used here, so prefix with _
     const actions: IAction[] = [];
 
     if (this.isConstructed) {

@@ -1,4 +1,4 @@
-import type { IEntity, TickResult, IAction, GameState } from '../types.ts';
+import type { IEntity, TickResult, IAction, GameState } from "../types.ts";
 
 export class Building implements IEntity {
   id: string;
@@ -8,7 +8,12 @@ export class Building implements IEntity {
   constructionPointsCurrent: number;
   constructionPointsRequired: number;
 
-  constructor(id: string, name: string, type: string, constructionPointsRequired: number) {
+  constructor(
+    id: string,
+    name: string,
+    type: string,
+    constructionPointsRequired: number,
+  ) {
     this.id = id;
     this.name = name;
     this.type = type;
@@ -17,7 +22,8 @@ export class Building implements IEntity {
     this.constructionPointsRequired = constructionPointsRequired;
   }
 
-  onTick(_state: GameState): TickResult { // state is not used here, so prefix with _
+  onTick(_state: GameState): TickResult {
+    // state is not used here, so prefix with _
     const actions: IAction[] = [];
 
     // Buildings primarily contribute to state once constructed or manage their own construction

@@ -1,14 +1,29 @@
 import { Building } from "./buildings/Building";
 
-export type PopulationType = 'defenders'| 'gatherers'| 'builders';
-export type BuildingType = 'DefenseTower';
+export type PopulationType = "defenders" | "gatherers" | "builders";
+export type BuildingType = "DefenseTower";
 
 export interface IAction {
-  type: 'ADD_FOOD' | 'ADD_WOOD' | 'ADD_STONE' | 'ADD_POPULATION' | 'REMOVE_POPULATION' |
-        'ADD_DEFENDER' | 'REMOVE_DEFENDER' | 'ADD_GATHERER' | 'REMOVE_GATHERER' |
-        'ADD_BUILDER' | 'REMOVE_BUILDER' | 'ADD_IDLE' | 'REMOVE_IDLE' |
-        'SET_NEXT_WAVE_TIMER' | 'INCREMENT_WAVE' | 'ADD_COMBAT_LOG' |
-        'ADD_CONSTRUCTION_POINTS' | 'COMPLETE_BUILDING' | 'START_CONSTRUCTION';
+  type:
+    | "ADD_FOOD"
+    | "ADD_WOOD"
+    | "ADD_STONE"
+    | "ADD_POPULATION"
+    | "REMOVE_POPULATION"
+    | "ADD_DEFENDER"
+    | "REMOVE_DEFENDER"
+    | "ADD_GATHERER"
+    | "REMOVE_GATHERER"
+    | "ADD_BUILDER"
+    | "REMOVE_BUILDER"
+    | "ADD_IDLE"
+    | "REMOVE_IDLE"
+    | "SET_NEXT_WAVE_TIMER"
+    | "INCREMENT_WAVE"
+    | "ADD_COMBAT_LOG"
+    | "ADD_CONSTRUCTION_POINTS"
+    | "COMPLETE_BUILDING"
+    | "START_CONSTRUCTION";
   payload?: any;
 }
 
@@ -57,7 +72,7 @@ export const initialGameState: GameState = {
   idle: 10,
   currentWave: 0,
   nextWaveInSeconds: 30,
-  lastCombatResults: ['The first wave is approaching. Prepare your defenses!'],
+  lastCombatResults: ["The first wave is approaching. Prepare your defenses!"],
   buildings: [],
   buildingAddedInTick: false,
   constructionQueue: [],
