@@ -24,7 +24,7 @@ export interface IAction {
     | "ADD_CONSTRUCTION_POINTS"
     | "COMPLETE_BUILDING"
     | "START_CONSTRUCTION";
-  payload?: any;
+  payload?: unknown;
 }
 
 export interface TickResult {

@@ -17,6 +17,7 @@ export class DefenseTower extends Building {
    * @param state The current GameState.
    * @returns A TickResult containing actions related to its effect.
    */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   onTick(_state: GameState): TickResult {
     // state is not used here, so prefix with _
     const actions: IAction[] = [];

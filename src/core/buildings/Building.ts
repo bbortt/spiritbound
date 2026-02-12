@@ -22,6 +22,7 @@ export class Building implements IEntity {
     this.constructionPointsRequired = constructionPointsRequired;
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   onTick(_state: GameState): TickResult {
     // state is not used here, so prefix with _
     const actions: IAction[] = [];
