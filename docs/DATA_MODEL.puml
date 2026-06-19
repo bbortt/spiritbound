@@ -1,0 +1,410 @@
+@startuml Spiritbound-Core-Data-Model
+' Spiritbound — Core Data Model
+' Source of truth for SpacetimeDB tables. Diagram is human-readable;
+' the same entities map ~1:1 to SpacetimeDB tables (TS server module).
+'
+' Conventions:
+'   {PK} primary key      {FK} foreign key      {derived} computed in rules/, NOT stored
+'   Types are illustrative (SpacetimeDB/TS): Identity, u32, u64, f32, bool, String, Timestamp, enum
+'
+' Layering (see architect skill): tables hold STATE only. All rules
+' (scaling, merge results, retention rolls, attunement limits) live in pure
+' rules/ functions and are shown here as {derived} or in notes.
+
+skinparam linetype ortho
+skinparam classAttributeIconSize 0
+hide circle
+title Spiritbound — Core Data Model
+!theme vibrant
+
+' ============================================================
+' ENUMS
+' ============================================================
+package "Enums" <<Frame>> {
+  enum Rarity {
+    COMMON
+    UNCOMMON
+    RARE
+    EPIC
+    LEGENDARY
+  }
+  enum CardType {
+    ACTIVE
+    PASSIVE
+  }
+  enum PassiveKind {
+    WARD       ' protective: mitigation / shield / resist
+    TRIGGERED  ' fires on a condition, e.g. every 3rd hit
+  }
+  enum StatType {
+    PHYSICAL_ATTACK
+    MAGIC_ATTACK
+    ' extensible: e.g. a HEALING tag scaling off magic_attack x healing_boost
+  }
+  enum EquipSlot {
+    HEAD
+    CHEST
+    HANDS
+    LEGS
+    BOOTS
+    MAIN_HAND
+    OFF_HAND
+    NECKLACE
+    RING       ' 2 ring slots
+    EARRING    ' 2 earring slots
+  }
+  enum ItemCategory {
+    EQUIPMENT
+    CONSUMABLE ' potions
+    QUEST
+    MATERIAL   ' crafting / merge fuel
+  }
+  enum ShapeType {
+    CONE       ' dagger = short + skinny
+    LINE       ' spear / bow = long + thin
+    ARC        ' sword = medium width
+    CIRCLE     ' staff = large area
+  }
+  enum ArmorWeight {
+    CLOTH      ' biases magic_def
+    CHAIN      ' balanced
+    PLATE      ' biases physical_def
+    ' bias telegraph only; anyone can wear anything (full-plate mage is legal)
+  }
+}
+
+' ============================================================
+' VALUE OBJECT
+' ============================================================
+package "Value Objects" <<Frame>> {
+  class StatBlock <<value object>> {
+    ' --- Primary attributes (race-seeded; the only innate lean) ---
+    power : i32          ' -> physical_attack
+    knowledge : i32      ' -> magic_attack
+    health : i32         ' -> max_hp, hp_regen
+    will : i32           ' -> max_mp, mp_regen, magic_resist, healing_boost
+    agility : i32        ' -> evasion, parry, attack_speed
+    precision : i32      ' -> accuracy, magic_accuracy, crit
+    ' --- Resource maxes (current HP/MP live on Character) ---
+    max_hp : i32
+    hp_regen : f32
+    max_mp : i32
+    mp_regen : f32
+    move_speed : f32     ' multiplier; 1.0 = base
+    ' --- Offensive ---
+    weapon_damage : i32  ' WEAPON-ONLY; base for basic attacks
+    physical_attack : i32 ' boosts physical-tag cards
+    magic_attack : i32    ' boosts magic-tag cards (and healing)
+    attack_speed : f32    ' multiplier, higher = faster (NOT Aion's inverted convention)
+    casting_speed : f32   ' multiplier, higher = faster
+    physical_crit : f32
+    magic_crit : f32
+    accuracy : i32        ' counters target evasion / parry
+    magic_accuracy : i32  ' counters target magic_resist
+    healing_boost : f32   ' scales healing-card output
+    ' --- Defensive ---
+    physical_def : i32    ' mitigation (plate > chain > cloth)
+    magic_def : i32       ' mitigation (cloth highest)
+    evasion : f32         ' glancing blow = partial dmg reduction on a connected hit, low cap ~15-20% (NOT full negation)
+    parry : f32           ' reduce a connected physical hit, capped
+    block : f32           ' off-hand shield reduce
+    magic_resist : f32    ' negate connected magic hit / resist 2ndary effects, capped
+    ' sources stack additively; any field may be 0
+  }
+}
+
+' ============================================================
+' LOGIN / ACCOUNT  (login server owns credentials; module trusts identity)
+' ============================================================
+package "Account & Identity" <<Frame>> {
+  class Account {
+    identity : Identity {PK}   ' issued by login server
+    display_name : String
+    created_at : Timestamp
+  }
+}
+
+' ============================================================
+' CONTENT / DEFINITIONS  (static-ish design content)
+' ============================================================
+package "Definitions (content)" <<Frame>> {
+  class Race {
+    race_id : u32 {PK}
+    name : String
+    base_stats : StatBlock
+    description : String
+  }
+
+  class CardDefinition {
+    card_def_id : u32 {PK}
+    name : String
+    rarity : Rarity
+    card_type : CardType
+    passive_kind : PassiveKind   ' null when ACTIVE
+    scaling_tag : StatType       ' which stat its power reads from
+    base_shape : ShapeType       ' weapon then MODIFIES this geometry
+    base_power : f32             ' scaled by character level {see note}
+    base_cooldown : f32
+    mp_cost : i32
+    min_character_level : u32    ' level gate to EQUIP (kept thru death, re-earned)
+    flavor : String              ' lore-keeper domain
+  }
+
+  class ItemDefinition {
+    item_def_id : u32 {PK}
+    name : String
+    rarity : Rarity
+    category : ItemCategory
+    slot : EquipSlot             ' null unless EQUIPMENT
+    armor_weight : ArmorWeight   ' armor pieces only; bias telegraph, NOT a wear gate
+    stat_modifiers : StatBlock   ' additive stats granted
+    ' weapon-only (MAIN_HAND):
+    weapon_stat_type : StatType  ' what stat it feeds to cards (PHYSICAL/MAGIC)
+    geometry_modifier : ShapeType ' how it bends a card's base_shape
+    geometry_width : f32         ' wider = more area, less focus
+    geometry_range : f32         ' also bends reach (melee swing on a staff reaches further)
+    consumable_effect : String   ' null unless CONSUMABLE
+    set_id : u32 {FK}            ' null unless part of a set (see Sets)
+  }
+
+  class SpiritDefinition {
+    spirit_def_id : u32 {PK}
+    name : String
+    level : u32
+    rarity_ceiling : Rarity      ' max card rarity it can swap
+    allows_merge : bool
+    zone_id : u32 {FK}           ' location spirits are world-placed
+    flavor : String              ' lore-keeper domain
+  }
+
+  class Zone {
+    zone_id : u32 {PK}
+    name : String
+    min_level : u32              ' soft/hard gating = open question
+    max_level : u32
+    description : String
+  }
+}
+
+' ============================================================
+' RUNTIME / INSTANCES  (per-account & per-life state)
+' ============================================================
+package "Runtime (instances)" <<Frame>> {
+
+  class PersonalSpirit {
+    spirit_id : u64 {PK}
+    account_identity : Identity {FK}  ' 1:1 with Account, PERSISTS across deaths
+    name : String
+    level : u32
+    bond_xp : u64                     ' grows by sacrificing cards
+    active_slots : u32 {derived}      ' hand active-card slots (start 2), from level
+    passive_slots : u32 {derived}     ' hand passive-card slots (start 1), from level
+    attunement_by_rarity : map<Rarity,u32> {derived} ' rarity-tiered death-save slots
+    ' e.g. {COMMON:3, RARE:1, LEGENDARY:0} at low level -> can't hoard 10 legendaries
+  }
+
+  class Character {
+    character_id : u64 {PK}
+    account_identity : Identity {FK}
+    race_id : u32 {FK}
+    level : u32
+    xp : u64
+    zone_id : u32 {FK}
+    pos_x : f32
+    pos_y : f32
+    current_hp : i32
+    current_mp : i32                  ' active cards cost MP; can't pay => won't fire
+    alive : bool                      ' false = permadeath; new Character created
+    created_at : Timestamp
+    died_at : Timestamp               ' null while alive
+    effective_stats : StatBlock {derived} ' race base + equipped gear, in rules/
+  }
+
+  class CardInstance {
+    card_instance_id : u64 {PK}
+    owner_identity : Identity {FK}    ' ACCOUNT-owned -> survives death, tradeable
+    card_def_id : u32 {FK}
+    merge_level : u32                 ' adds EFFECTS, not raw numbers
+    attuned : bool                    ' guaranteed-survive; count <= spirit slots
+    scaled_power : f32 {derived}      ' base_power x char level curve, in rules/
+  }
+
+  class EquippedCard {
+    character_id : u64 {FK}           ' the current life's HAND (the "deck")
+    card_instance_id : u64 {FK}
+    slot_type : CardType              ' ACTIVE (max 10) or PASSIVE (max 5)
+    slot_index : u32
+    ' separate from inventory; changed only at a spirit
+  }
+
+  class ItemInstance {
+    item_instance_id : u64 {PK}
+    owner_character_id : u64 {FK}     ' CHARACTER-owned -> LOST on death (body)
+    item_def_id : u32 {FK}
+    quantity : u32                    ' for stackables (potions, materials)
+    rolled_modifiers : StatBlock      ' optional per-instance variance
+  }
+
+  class EquippedItem {
+    character_id : u64 {FK}
+    item_instance_id : u64 {FK}
+    slot : EquipSlot
+    slot_ordinal : u32               ' 0/1 for the two rings & two earrings
+  }
+}
+
+' ============================================================
+' SOCIAL  (groups & alliances; over ACTIVE characters)
+' Build order: deferred — not needed for the vertical slice.
+' ============================================================
+package "Social" <<Frame>> {
+  class Group {
+    group_id : u64 {PK}
+    leader_character_id : u64 {FK}
+    created_at : Timestamp
+    ' size 2..6 enforced in rules
+  }
+  class GroupMember {
+    group_id : u64 {FK}
+    character_id : u64 {FK}           ' active life; dead char leaves, re-invite new one
+  }
+  class Alliance {
+    alliance_id : u64 {PK}
+    created_at : Timestamp
+    ' up to 6 Groups (<=36 players). OPEN: transient coalition vs persistent guild;
+    ' persistent social identity should live at ACCOUNT level, not here.
+  }
+  class AllianceGroup {
+    alliance_id : u64 {FK}
+    group_id : u64 {FK}
+  }
+}
+
+' ============================================================
+' SETS  (item set bonuses)
+' ============================================================
+package "Sets (content)" <<Frame>> {
+  class SetDefinition {
+    set_id : u32 {PK}
+    name : String
+    description : String
+  }
+  class SetBonus {
+    set_id : u32 {FK}
+    pieces_required : u32             ' 2 / 4 / 6 ... tiered
+    bonus_stats : StatBlock           ' feeds cards -> item-balancer seam
+    bonus_effect : String             ' non-stat effects
+  }
+}
+
+' ============================================================
+' CARD GRAPH  (combos + evolution = "skill-tree depth" without point-buy)
+' ============================================================
+package "Card Graph (content)" <<Frame>> {
+  class CardChainLink {
+    predecessor_def_id : u32 {FK}     ' the opener
+    successor_def_id : u32 {FK}       ' the follow-up
+    window_seconds : f32              ' time after opener to land the chain
+    combo_bonus : String              ' bonus when cast in-chain
+    ' multiple successors off one opener = branching combos
+  }
+  class CardEvolution {
+    from_def_id : u32 {FK}
+    to_def_id : u32 {FK}              ' merge/upgrade target
+    branch_label : String             ' e.g. "fire" vs "frost"
+    requirement : String              ' catalyst / merge condition
+    ' multiple branches off one card = an emergent evolution tree
+  }
+}
+
+' ============================================================
+' RELATIONSHIPS
+' ============================================================
+Account "1" -- "1" PersonalSpirit : owns >
+Account "1" -- "0..*" Character : has (1 alive) >
+Account "1" -- "0..*" CardInstance : collection >
+
+Character "*" -- "1" Race : is a >
+Character "1" -- "0..15" EquippedCard : hand (cap 10A/5P; slots from spirit) >
+Character "1" -- "0..*" ItemInstance : inventory (lost on death) >
+Character "1" -- "0..*" EquippedItem : equipped gear >
+Character "*" -- "1" Zone : located in >
+
+PersonalSpirit ..> EquippedCard : grants slot counts
+
+EquippedCard "*" -- "1" CardInstance : references >
+EquippedItem "*" -- "1" ItemInstance : references >
+
+CardInstance "*" -- "1" CardDefinition : instance of >
+ItemInstance "*" -- "1" ItemDefinition : instance of >
+
+SpiritDefinition "*" -- "1" Zone : placed in >
+
+' Social
+Group "1" -- "2..6" GroupMember : has >
+GroupMember "*" -- "1" Character : is >
+Alliance "1" -- "0..6" AllianceGroup : federates >
+AllianceGroup "*" -- "1" Group : is >
+
+' Sets
+SetDefinition "1" -- "1..*" SetBonus : tiers >
+ItemDefinition "*" -- "0..1" SetDefinition : belongs to >
+
+' Card graph (self-referential over CardDefinition)
+CardDefinition "1" -- "0..*" CardChainLink : opener >
+CardChainLink "*" -- "1" CardDefinition : successor >
+CardDefinition "1" -- "0..*" CardEvolution : evolves from >
+CardEvolution "*" -- "1" CardDefinition : evolves to >
+
+Race ..> StatBlock : base_stats
+ItemDefinition ..> StatBlock : stat_modifiers
+ItemInstance ..> StatBlock : rolled_modifiers
+Character ..> StatBlock : effective_stats
+SetBonus ..> StatBlock : bonus_stats
+
+' ============================================================
+' NOTES — rules & mechanics that are NOT columns
+' ============================================================
+note bottom of CardInstance
+  **Damage in play** = scaled_power(card, character.level)
+  evaluated against weapon.weapon_stat_type matching
+  card.scaling_tag, with shape = base_shape bent by
+  weapon geometry_modifier / geometry_width / geometry_range.
+  Same card: sword = narrow+strong, staff = wide+far+weak.
+  Balance rule (ability-balancer): no weapon gives both
+  high damage AND wide shape on one card.
+end note
+
+note bottom of PersonalSpirit
+  **On death (rules/):** all ItemInstances destroyed.
+  CardInstances: attuned cards survive, limited by
+  attunement_by_rarity (rarity-tiered, so no hoarding
+  10 legendaries). Un-attuned cards are lost. No RNG.
+  Spirit is the only thing that crosses the death boundary.
+end note
+
+note top of EquippedCard
+  The "deck". Swapping cards happens ONLY at a spirit
+  (location spirit for high rarity; personal spirit for
+  minor cards while travelling). Rarity gate = spirit.rarity_ceiling.
+end note
+
+note as N_Reducers
+  **Reducers (thin) act on these tables:**
+  move, cast_ability, basic_attack, take_damage, die,
+  pick_up_item, equip_item, equip_card (at spirit),
+  merge_cards (3->1), evolve_card (branch), sacrifice_card_to_spirit,
+  trade_cards, group_invite/join/leave, alliance_form/join.
+  Each: validate -> call pure rules fn -> write rows.
+end note
+
+note as N_Derived
+  **Computed in rules/, not stored:**
+  effective_stats = race base + equipped gear + active SET BONUSES
+  (count equipped items sharing set_id vs SetBonus.pieces_required)
+  + ward-passive cards. Sets re-form each life (gear lost on death),
+  so they must be repeatably attainable. CHAIN/EVOLUTION are content
+  graphs over CardDefinition, giving skill-tree depth without point-buy.
+end note
+
+@enduml
