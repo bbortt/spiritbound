@@ -56,8 +56,10 @@ package "Enums" <<Frame>> {
   enum ItemCategory {
     EQUIPMENT
     CONSUMABLE ' potions
+    REVIVAL    ' Soul Ember — non-tradeable, prevents next death
     QUEST
     MATERIAL   ' crafting / merge fuel
+    DUNGEON_KEY ' Hollow Keys for endgame dungeon tiers
   }
   enum ShapeType {
     CONE       ' dagger = short + skinny
@@ -184,12 +186,41 @@ package "Definitions (content)" <<Frame>> {
     max_level : u32
     description : String
   }
+
+  class DungeonDefinition {
+    dungeon_id : u32 {PK}
+    name : String
+    tier : u32                   ' 1=Delve 2=Vault 3=Abyss 4=Hollow
+    hollow_subtier : u32         ' 0 unless tier=4; HollowI=1, HollowII=2 ...
+    recommended_level : u32
+    min_players : u32            ' 1 = soloable
+    max_players : u32
+    requires_key : bool          ' Hollow tiers need a DungeonKey item
+    zone_id : u32 {FK}           ' where the entrance lives in the world
+  }
+
+  class AccountMilestone {
+    milestone_id : u32 {PK}
+    name : String
+    threshold_account_xp : u64   ' total XP across all lives to unlock
+    reward_type : String         ' TUTORIAL_SKIP / RACE_UNLOCK / VAULT_SLOT / COSMETIC
+    reward_ref : String          ' e.g. race_id, cosmetic_id, or "vault+1"
+  }
 }
 
 ' ============================================================
 ' RUNTIME / INSTANCES  (per-account & per-life state)
 ' ============================================================
 package "Runtime (instances)" <<Frame>> {
+
+  class AccountProgress {
+    account_identity : Identity {FK} {PK}
+    total_xp_all_lives : u64          ' accumulates across every character death
+    tutorial_completed : bool         ' gates the level-10 skip on next life
+    unlocked_milestone_ids : u32[]    ' which AccountMilestones are claimed
+    ' NOTE: no legacy vault — personal spirit is the SOLE cross-death card
+    ' retention mechanism. bond_xp never resets; spirit grows across all lives.
+  }
 
   class PersonalSpirit {
     spirit_id : u64 {PK}
@@ -288,6 +319,9 @@ package "Sets (content)" <<Frame>> {
     set_id : u32 {PK}
     name : String
     description : String
+    soulbound : bool             ' if true: full set survives death (held by spirit)
+    ' Whisp Sets: extremely rare; the only gear exception to "all gear lost on death"
+    ' Only triggers if ALL set pieces are equipped at time of death
   }
   class SetBonus {
     set_id : u32 {FK}
@@ -323,6 +357,7 @@ package "Card Graph (content)" <<Frame>> {
 Account "1" -- "1" PersonalSpirit : owns >
 Account "1" -- "0..*" Character : has (1 alive) >
 Account "1" -- "0..*" CardInstance : collection >
+Account "1" -- "1" AccountProgress : tracks >
 
 Character "*" -- "1" Race : is a >
 Character "1" -- "0..15" EquippedCard : hand (cap 10A/5P; slots from spirit) >
@@ -339,6 +374,7 @@ CardInstance "*" -- "1" CardDefinition : instance of >
 ItemInstance "*" -- "1" ItemDefinition : instance of >
 
 SpiritDefinition "*" -- "1" Zone : placed in >
+DungeonDefinition "*" -- "1" Zone : entrance in >
 
 ' Social
 Group "1" -- "2..6" GroupMember : has >
@@ -394,8 +430,21 @@ note as N_Reducers
   move, cast_ability, basic_attack, take_damage, die,
   pick_up_item, equip_item, equip_card (at spirit),
   merge_cards (3->1), evolve_card (branch), sacrifice_card_to_spirit,
-  trade_cards, group_invite/join/leave, alliance_form/join.
+  trade_cards, group_invite/join/leave, alliance_form/join,
+  enter_dungeon, use_soul_ember, claim_milestone.
   Each: validate -> call pure rules fn -> write rows.
+end note
+
+note as N_Leveling
+  **Leveling rules (rules/):**
+  XP gained -> character.xp; on threshold -> level up.
+  account_progress.total_xp_all_lives += XP always (never resets).
+  On death: check AccountMilestone thresholds -> auto-claim new milestones.
+  tutorial_completed at level 10 -> unlocks level-10 start for next char.
+  Soul Ember (REVIVAL item): on take_damage -> if would_die and ember in
+  inventory -> consume ember, set hp=1. Non-tradeable enforced in rules.
+  Revive card (TRIGGERED passive): fires on group member death IN dungeon
+  only; once per dungeon instance; cannot target self.
 end note
 
 note as N_Derived

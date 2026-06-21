@@ -253,18 +253,124 @@ No amnesia trope. Instead:
   see emergent classes). Gear trading rules TBD. No card *drops* on death (loss
   only, mitigated by spirit retention).
 
+## Leveling & Progression
+
+### Philosophy
+Permadeath is only fun if *getting back* is fast. The frustration equation is:
+**time lost on death = hours to re-reach prior level**. The spirit system
+covers what you *keep* (cards); the leveling design covers how fast you *recover*.
+Both must work together to make death feel tense rather than catastrophic.
+
+### Level Cap: 50
+
+Three arcs, each with a distinct feel:
+
+**Levels 1–10: The Foundation (tutorial arc)**
+- Estimated time first playthrough: ~3–5 hours.
+- Introduces combat, the spirit system, card equipping, and the first zone.
+- **Skippable on all subsequent lives** once completed on the account.
+  Skipping starts the character at level 10 with a curated starter kit
+  (basic gear set, a couple of common cards, a weak personal spirit bond) —
+  not comfortable, just past the tutorial floor.
+- Unlocks: 4 active / 2 passive hand slots, spirit bonding, first open zone.
+- Level 10 is a **soft account milestone**: the game remembers you did this.
+
+**Levels 10–30: The Awakening (open-world arc)**
+- Estimated time: ~15–20 hours from level 10.
+- New zones open roughly every 5 levels (mix of soft recommendation and hard
+  gates for a few key regions).
+- Card pool expands significantly; uncommon and rare cards become attainable.
+- Hand slots grow toward 8 active / 4 passive via spirit leveling.
+- This is the heart of the game — most deaths happen here; most re-runs start here.
+
+**Levels 30–50: The Deep Game (endgame arc)**
+- Estimated time: ~25–35 hours from level 30.
+- Dungeons become the primary driver (see Dungeons below).
+- Epic and legendary cards require level 35+ to equip.
+- Full hand (10 active / 5 passive) unlocked around level 40–45 via spirit.
+- At 50, open-world content is "solved" — dungeons are the endless endgame loop.
+
+### XP Curve Design Goals
+- Levels 1–10: fast and forgiving. Each level feels like a few quests.
+- Levels 10–30: medium pace. A level per solid play session.
+- Levels 30–50: slower, but dungeon rewards make it feel earned not ground.
+- **After death, re-reaching your prior level should take ~40–50% of the
+  original time** — you know what you're doing, the tutorial is skipped,
+  and your attuned cards give you a head start.
+
+### Dungeons
+Instanced group (or solo) content separate from the open world.
+
+**Difficulty tiers** (names provisional):
+1. **Delve** (recommended level 20+) — introductory dungeon, normal drops.
+2. **Vault** (recommended level 30+) — rare/epic drops, punishing mechanics.
+3. **Abyss** (recommended level 40+) — epic/legendary drops, brutal.
+4. **Hollow** (level 50 only) — endgame loop; legendary gear, best spirits.
+   Multiple Hollow tiers (Hollow I → Hollow V, etc.) give infinite scaling
+   goals post-cap. Higher tiers require a "Hollow Key" (rare drop) to enter.
+
+**Permadeath in dungeons:** death is still permanent. However, two softeners
+apply *inside dungeons only* (see Revival Systems below).
+
+**Why dungeons solve the endgame:** gear is always lost on death. A level-50
+player running Hollow V for legendary gear drops has the same gear-churn
+incentive as a level-20 player. The economy never stagnates.
+
+### Revival Systems
+Two safety valves — both deliberately scarce and dungeon-friendly:
+
+**Soul Ember** *(rare consumable, non-tradeable)*
+- A one-time-use item that prevents the *next* death this life.
+- On what would be a killing blow: HP locks at 1, the Ember is consumed.
+- Rare world/dungeon drop; cannot be bought, sold, or traded.
+  Non-tradeable prevents a pay-to-not-die market.
+- Carrying one is a meaningful inventory decision (it takes a slot).
+- Effect is visible to group members ("Ember-lit" status) — no surprises.
+
+**Revive** *(legendary passive card — healer archetype only)*
+- A passive TRIGGERED card that activates on a group member's death.
+- Pulls them back with partial HP once per dungeon run (long internal cooldown).
+- **Self-revive is explicitly impossible** — forces co-op identity.
+- Only fires inside instanced dungeons; has no effect in the open world.
+- Equipping it costs a precious passive slot — a real hand trade-off.
+- This is the primary mechanical identity for a support/healer build.
+
+### Account-Level Milestones
+Permanent progress that survives every death — *access and cosmetics, never power*:
+- **Tutorial skip** — unlocked at level 10 (first life only).
+- **Race unlocks** — additional races become available as you hit account XP
+  thresholds (total XP across all lives). Starting race is always available.
+- **Cosmetics** — titles, spirit appearances, character skins earned by
+  account milestones. Pure vanity; never affect power.
+- These exist so a long-term player feels that *nothing is ever fully wasted*.
+
+> **Note — no legacy vault:** the personal spirit is the sole cross-death retention
+> mechanism. The spirit's `bond_xp` accumulates across every life and never resets,
+> so a veteran player's spirit is meaningfully stronger than a fresh account's —
+> this *is* the meta-progression. A separate vault would duplicate that function.
+
 ## Open Questions
 
-- World structure: zone layout, level-gating (hard or soft?), spirit territories as gates.
+- World structure: zone layout, exact level gates, spirit territories as zone gates.
 - Gear trading rules (cards are tradeable; gear TBD).
-- Group revive in permadeath (none / at-spirit / steep cost?) and shared XP-loot rules.
 - Alliances: transient coalition vs persistent guild; persistent identity at account level.
-- Account-level meta beyond the personal spirit + level-gated cards — anything more?
-- Concrete balance numbers (stat conversion rates, avoidance caps, scaling curves,
-  gear stat budgets, drop rates) — all pending playtest; owned by the balancer skills.
+- Shared XP/loot rules for groups in dungeons.
+- Exact Soul Ember drop rate and spawn sources (owned by item-balancer).
+- Concrete balance numbers (stat conversion rates, avoidance caps, XP curve, scaling
+  curves, gear stat budgets, drop rates) — all pending playtest.
 
 **Resolved:** control scheme (cursor-aimed, PoE-style) · weapon = geometry (range
 + width) + stat carrier · cards weapon-agnostic with scaling tags (emergent classes)
+· cards freely tradeable · no card drops on death · full equipment slot list · tech
+stack · hand starts 2/1, capped 10/5, slots granted by **spirit** not character
+level · some cards have min-character-level to equip · death retention via
+**rarity-tiered attunement slots** · PvP: none at launch (arena → open-world later)
+· evasion = glancing/partial with low caps · armor weight classes (cloth/chain/plate,
+bias only, no wear restriction) · **level cap 50** · **tutorial skip at level 10
+(account unlock)** · **Soul Ember** (rare non-tradeable revival consumable) ·
+**Revive card** (legendary passive, group-only, dungeon-only, healer archetype) ·
+**dungeons with 4 difficulty tiers + Hollow endgame scaling** · **account milestones**
+(tutorial skip, race unlocks, legacy vault, cosmetics — access/vanity, never power).
 · cards freely tradeable · no card drops on death · full equipment slot list · tech
 stack · hand starts 2/1, capped 10/5, slots granted by **spirit** not character
 level · some cards have min-character-level to equip · death retention via
