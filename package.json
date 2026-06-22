@@ -7,9 +7,14 @@
     "dev": "esbuild src/main.ts --bundle --platform=node --outfile=dist/main.js --format=esm && node dist/main.js",
     "start": "node dist/main.js",
     "build": "esbuild src/main.ts --bundle --platform=node --outfile=dist/main.js --format=esm",
-    "spacetime:generate": "spacetime generate --lang typescript --out-dir src/module_bindings --module-path spacetimedb",
-    "spacetime:publish:local": "spacetime publish --module-path spacetimedb --server local",
-    "spacetime:publish": "spacetime publish --module-path spacetimedb --server maincloud"
+    "spacetime:bundle": "esbuild spacetimedb/src/index.ts --bundle --platform=neutral --format=esm --external:spacetime:sys@2.0 --external:spacetime:sys@2.1 --outfile=spacetimedb/dist/bundle.js",
+    "spacetime:generate": "pnpm spacetime:bundle && docker run --rm -v \"%cd%:/project\" clockworklabs/spacetime:latest generate --lang typescript -j /project/spacetimedb/dist/bundle.js -o /project/client/src/generated -y --include-private",
+    "spacetime:publish:local": "pnpm spacetime:bundle && docker run --rm -v \"%cd%:/project\" clockworklabs/spacetime:latest publish --no-config -j /project/spacetimedb/dist/bundle.js --server http://host.docker.internal:3000 spiritbound --yes",
+    "spacetime:publish": "pnpm spacetime:bundle && docker run --rm -v \"%cd%:/project\" -v spiritbound-cli-config:/home/spacetime/.config/spacetime clockworklabs/spacetime:latest publish --no-config -j /project/spacetimedb/dist/bundle.js --server maincloud spiritbound",
+    "spacetime:login": "docker run --rm -it -v spiritbound-cli-config:/home/spacetime/.config/spacetime clockworklabs/spacetime:latest login",
+    "db:start": "docker run -d --name spiritbound-local -p 3000:3000 clockworklabs/spacetime:latest start --in-memory",
+    "db:stop": "docker rm -f spiritbound-local",
+    "db:restart": "pnpm run db:stop && pnpm run db:start"
   },
   "dependencies": {
     "spacetimedb": "2.6.*"

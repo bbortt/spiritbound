@@ -16,7 +16,10 @@ export type TokenStore = {
   set(token: string): void;
 };
 
-export function connect(tokenStore?: TokenStore): DbConnection {
+export function connect(
+  tokenStore?: TokenStore,
+  onSubscribed?: (conn: DbConnection) => void,
+): DbConnection {
   return DbConnection.builder()
     .withUri(DB_URI)
     .withDatabaseName(DB_NAME)
@@ -24,7 +27,7 @@ export function connect(tokenStore?: TokenStore): DbConnection {
     .onConnect((conn, identity, token) => {
       console.log('[spacetime] connected:', identity.toHexString());
       tokenStore?.set(token);
-      _subscribeSlice(conn);
+      _subscribeSlice(conn, onSubscribed);
     })
     .onConnectError((_ctx, err) => {
       console.error('[spacetime] connect error:', err);
@@ -36,10 +39,16 @@ export function connect(tokenStore?: TokenStore): DbConnection {
     .build();
 }
 
-function _subscribeSlice(conn: DbConnection): SubscriptionHandle {
+function _subscribeSlice(
+  conn: DbConnection,
+  onSubscribed?: (conn: DbConnection) => void,
+): SubscriptionHandle {
   return conn
     .subscriptionBuilder()
-    .onApplied(() => console.log('[spacetime] subscription active'))
+    .onApplied(() => {
+      console.log('[spacetime] subscription active');
+      onSubscribed?.(conn);
+    })
     .onError((ctx) => console.error('[spacetime] subscription error:', ctx))
     .subscribe([
       'SELECT * FROM character',
