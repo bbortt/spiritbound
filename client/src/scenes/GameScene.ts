@@ -60,7 +60,7 @@ export class GameScene extends Phaser.Scene {
     this.conn = connect(this._tokenStore(), (conn) => {
       if (!this.localCharacter) {
         callReducer('startLife', () =>
-          conn.reducers.startLife({ spiritName: 'Aelith', startZoneId: 1 }),
+          conn.reducers.startLife({ spiritName: 'your spirit', startZoneId: 1 }),
         );
       }
     });

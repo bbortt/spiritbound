@@ -3,8 +3,7 @@
   <component name="ChangeListManager">
     <list default="true" id="5b82f24a-a837-4858-bdad-b79b887f77ac" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pnpm-lock.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/pnpm-lock.yaml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pnpm-workspace.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/pnpm-workspace.yaml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -43,7 +42,10 @@
     "node.js.detected.package.eslint": "true",
     "node.js.selected.package.eslint": "(autodetect)",
     "nodejs_package_manager_path": "pnpm",
+    "npm.db:start.executor": "Run",
     "npm.dev.executor": "Run",
+    "npm.spacetime:publish:local.executor": "Run",
+    "npm.ui:start.executor": "Run",
     "ts.external.directory.path": "D:\\dev\\workspaces\\fun\\eldoria\\node_modules\\typescript\\lib",
     "vue.rearranger.settings.migration": "true"
   },
@@ -59,7 +61,17 @@
       <recent name="D:\dev\workspaces\fun\eldoria\src\core" />
     </key>
   </component>
-  <component name="RunManager">
+  <component name="RunManager" selected="npm.ui:start">
+    <configuration name="db:start" type="js.build_tools.npm" temporary="true" nameIsGenerated="true">
+      <package-json value="$PROJECT_DIR$/package.json" />
+      <command value="run" />
+      <scripts>
+        <script value="db:start" />
+      </scripts>
+      <node-interpreter value="project" />
+      <envs />
+      <method v="2" />
+    </configuration>
     <configuration name="dev" type="js.build_tools.npm" temporary="true" nameIsGenerated="true">
       <package-json value="$PROJECT_DIR$/package.json" />
       <command value="run" />
@@ -70,8 +82,31 @@
       <envs />
       <method v="2" />
     </configuration>
+    <configuration name="spacetime:publish:local" type="js.build_tools.npm" temporary="true" nameIsGenerated="true">
+      <package-json value="$PROJECT_DIR$/package.json" />
+      <command value="run" />
+      <scripts>
+        <script value="spacetime:publish:local" />
+      </scripts>
+      <node-interpreter value="project" />
+      <envs />
+      <method v="2" />
+    </configuration>
+    <configuration name="ui:start" type="js.build_tools.npm" temporary="true" nameIsGenerated="true">
+      <package-json value="$PROJECT_DIR$/package.json" />
+      <command value="run" />
+      <scripts>
+        <script value="ui:start" />
+      </scripts>
+      <node-interpreter value="project" />
+      <envs />
+      <method v="2" />
+    </configuration>
     <recent_temporary>
       <list>
+        <item itemvalue="npm.ui:start" />
+        <item itemvalue="npm.spacetime:publish:local" />
+        <item itemvalue="npm.db:start" />
         <item itemvalue="npm.dev" />
       </list>
     </recent_temporary>
@@ -100,7 +135,7 @@
       <workItem from="1775996796902" duration="614000" />
       <workItem from="1781527443328" duration="3377000" />
       <workItem from="1781810196522" duration="5817000" />
-      <workItem from="1782051302351" duration="6706000" />
+      <workItem from="1782051302351" duration="11471000" />
     </task>
     <servers />
   </component>

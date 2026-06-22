@@ -120,7 +120,7 @@ const cardDefinition = table(
  * total_xp_all_lives never resets; it drives account-level unlocks.
  */
 const accountProgress = table(
-  { name: 'account_progress', public: false },
+  { name: 'account_progress', public: true },
   {
     accountIdentity:       t.identity().primaryKey(),
     totalXpAllLives:       t.u64(),
@@ -139,7 +139,7 @@ const accountProgress = table(
  * Lore: the spirit always finds its way back, perhaps weakened, but unbroken.
  */
 const personalSpirit = table(
-  { name: 'personal_spirit', public: false },
+  { name: 'personal_spirit', public: true },
   {
     accountIdentity:  t.identity().primaryKey(),  // 1:1 — accountIdentity is the PK
     name:             t.string(),

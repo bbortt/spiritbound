@@ -53,8 +53,7 @@ function _subscribeSlice(
     .subscribe([
       'SELECT * FROM character',
       'SELECT * FROM personal_spirit',
-      'SELECT * FROM card_instance',
-      'SELECT * FROM equipped_card',
+      'SELECT * FROM account_progress',
       'SELECT * FROM zone',
     ]);
 }
