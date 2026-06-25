@@ -14,6 +14,7 @@ const DB_NAME = 'spiritbound';
 export type TokenStore = {
   get(): string | undefined;
   set(token: string): void;
+  clear(): void;
 };
 
 export function connect(
@@ -31,6 +32,11 @@ export function connect(
     })
     .onConnectError((_ctx, err) => {
       console.error('[spacetime] connect error:', err);
+      if (String(err).includes('Unauthorized') && tokenStore?.get()) {
+        console.warn('[spacetime] stale token — clearing and reloading');
+        tokenStore.clear();
+        window.location.reload();
+      }
     })
     .onDisconnect((_ctx, err) => {
       if (err) console.error('[spacetime] disconnected with error:', err);
