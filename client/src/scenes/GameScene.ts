@@ -6,8 +6,30 @@ import type { Character, PersonalSpirit } from '../db';
 const WORLD_W = 3000;
 const WORLD_H = 3000;
 const PLAYER_R = 20;
-const OTHER_R = 18;
-const ENEMY_R = 24;
+const OTHER_R  = 18;
+const ENEMY_R  = 24;
+
+const LERP_SPEED  = 0.09;   // ~40% slower than original 0.15 — less overshoot
+const STOP_RADIUS = 60;     // Diablo-style: stop this far from enemy on left-click
+
+// Card slot dimensions (shared between art draw and overlay)
+const CARD_SW  = 52;
+const CARD_SH  = 72;
+const CARD_GAP = 6;
+
+// Basic attack (right-click)
+const ATTACK_RANGE    = 280;
+const ATTACK_HALF_ANG = 15 * Math.PI / 180;
+const ATTACK_COOLDOWN = 500;
+const ATTACK_DAMAGE   = 10;
+
+// Card 1 — Ember Strike
+const EMBER_RANGE    = 320;
+const EMBER_HALF_ANG = 30 * Math.PI / 180;  // wider cone than basic attack
+const EMBER_COOLDOWN = 1200;
+const EMBER_MP_COST  = 10;
+const EMBER_DAMAGE   = 25;
+const EMBER_MP_REGEN = 2;  // MP per second, client-side until server regen exists
 
 // Mirrors server rules: startingHp / startingMp in spacetimedb/src/index.ts
 const maxHp = (level: number) => 100 + level * 15;
@@ -40,12 +62,17 @@ export class GameScene extends Phaser.Scene {
   // Enemies (client-side only, no server table yet)
   private enemies: EnemyData[] = [];
 
-  // Attack state
   private lastAttackTime = 0;
-  private readonly ATTACK_COOLDOWN = 500;
-  private readonly ATTACK_RANGE    = 280;
-  private readonly ATTACK_HALF_ANG = 15 * Math.PI / 180;
-  private readonly ATTACK_DAMAGE   = 10;
+
+  // MP managed client-side (server has no regen reducer yet)
+  private clientMp = 0;
+
+  // Ember Strike HUD state
+  private emberCooldownEnd = 0;
+  private slotFlashEnd     = 0;
+  private cardOverlayGfx!: Phaser.GameObjects.Graphics;
+  private slot1X = 0;
+  private slot1Y = 0;
 
   // HUD — all fixed to screen via setScrollFactor(0)
   private hudBars!: Phaser.GameObjects.Graphics;
@@ -73,7 +100,7 @@ export class GameScene extends Phaser.Scene {
     this.playerCircle.setDepth(1);
     this.cameras.main.startFollow(this.playerCircle);
 
-    // ── Move line & facing indicator (drawn each frame in update) ─────────────
+    // ── Move line & facing indicator (drawn per-frame in update) ───────────────
     this.moveLine   = this.add.graphics().setDepth(0);
     this.facingLine = this.add.graphics().setDepth(2);
 
@@ -102,12 +129,12 @@ export class GameScene extends Phaser.Scene {
     this.conn.db.personalSpirit.onUpdate?.((_ctx, _old, row) => this._onSpiritRow(row));
   }
 
-  update() {
+  update(_time: number, delta: number) {
     if (!this.localCharacter) return;
 
-    // Move interpolation
-    this.playerCircle.x += (this.targetX - this.playerCircle.x) * 0.15;
-    this.playerCircle.y += (this.targetY - this.playerCircle.y) * 0.15;
+    // ── Move interpolation ────────────────────────────────────────────────────
+    this.playerCircle.x += (this.targetX - this.playerCircle.x) * LERP_SPEED;
+    this.playerCircle.y += (this.targetY - this.playerCircle.y) * LERP_SPEED;
 
     // Dotted move line — drawn while en route, cleared on arrival
     const mdx = this.targetX - this.playerCircle.x;
@@ -121,7 +148,7 @@ export class GameScene extends Phaser.Scene {
       );
     }
 
-    // Facing dot — small white dot on player edge pointing at cursor
+    // Facing dot — orbits player edge pointing at cursor
     const ptr   = this.input.activePointer;
     const angle = Phaser.Math.Angle.Between(
       this.playerCircle.x, this.playerCircle.y,
@@ -134,6 +161,31 @@ export class GameScene extends Phaser.Scene {
       this.playerCircle.y + Math.sin(angle) * PLAYER_R,
       4,
     );
+
+    // ── MP regen ──────────────────────────────────────────────────────────────
+    this.clientMp = Math.min(
+      this.clientMp + EMBER_MP_REGEN * (delta / 1000),
+      maxMp(this.localCharacter.level),
+    );
+    this._updateHud();
+
+    // ── Card slot overlays ────────────────────────────────────────────────────
+    const now = this.time.now;
+    this.cardOverlayGfx.clear();
+
+    if (now < this.emberCooldownEnd) {
+      // Grey sweep draining from top — fraction of slot height remaining
+      const fraction = (this.emberCooldownEnd - now) / EMBER_COOLDOWN;
+      this.cardOverlayGfx.fillStyle(0x000000, 0.55);
+      this.cardOverlayGfx.fillRect(this.slot1X, this.slot1Y, CARD_SW, CARD_SH * fraction);
+    }
+
+    if (now < this.slotFlashEnd) {
+      // Red flash fades out — no-MP feedback
+      const t = (this.slotFlashEnd - now) / 300;
+      this.cardOverlayGfx.fillStyle(0xff0000, 0.55 * t);
+      this.cardOverlayGfx.fillRect(this.slot1X, this.slot1Y, CARD_SW, CARD_SH);
+    }
   }
 
   // ── Identity ─────────────────────────────────────────────────────────────────
@@ -148,8 +200,9 @@ export class GameScene extends Phaser.Scene {
     if (!row.alive) return;
     if (this._isLocal(row.accountIdentity)) {
       this.localCharacter = row;
-      this.targetX = row.posX;
-      this.targetY = row.posY;
+      this.clientMp = row.currentMp;
+      this.targetX  = row.posX;
+      this.targetY  = row.posY;
       this.playerCircle.setPosition(row.posX, row.posY);
       this._updateHud();
     } else if (row.zoneId === (this.localCharacter?.zoneId ?? 1)) {
@@ -209,16 +262,17 @@ export class GameScene extends Phaser.Scene {
   private _setupInput() {
     this.input.mouse?.disableContextMenu();
 
-    // Left-click: move
+    // Left-click: move — respects stop-near-enemy
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
       if (pointer.rightButtonDown()) return;
       if (!this.localCharacter?.alive) return;
 
-      this.targetX = pointer.worldX;
-      this.targetY = pointer.worldY;
+      const dest = this._resolveClickTarget(pointer.worldX, pointer.worldY);
+      this.targetX = dest.x;
+      this.targetY = dest.y;
 
       callReducer('move', () =>
-        this.conn.reducers.move({ x: pointer.worldX, y: pointer.worldY }),
+        this.conn.reducers.move({ x: dest.x, y: dest.y }),
       );
     });
 
@@ -229,10 +283,35 @@ export class GameScene extends Phaser.Scene {
       this._fireBasicAttack(pointer.worldX, pointer.worldY);
     });
 
-    // Reserve keys 1–0 for active ability slots (no handlers yet)
-    this.input.keyboard?.addKeys(
-      'ONE,TWO,THREE,FOUR,FIVE,SIX,SEVEN,EIGHT,NINE,ZERO',
-    );
+    // Key 1: Ember Strike — fires toward current cursor position
+    this.input.keyboard?.on('keydown-ONE', () => {
+      if (!this.localCharacter?.alive) return;
+      this._castEmberStrike();
+    });
+
+    // Keys 2–0 reserved for future cards
+  }
+
+  // ── Movement helpers ──────────────────────────────────────────────────────────
+
+  // If click lands inside STOP_RADIUS of any alive enemy, reroute to the approach edge.
+  private _resolveClickTarget(clickX: number, clickY: number): { x: number; y: number } {
+    for (const enemy of this.enemies) {
+      if (!enemy.alive) continue;
+      const dx = clickX - enemy.x;
+      const dy = clickY - enemy.y;
+      if (dx * dx + dy * dy < STOP_RADIUS * STOP_RADIUS) {
+        const pdx = enemy.x - this.playerCircle.x;
+        const pdy = enemy.y - this.playerCircle.y;
+        const pDist = Math.sqrt(pdx * pdx + pdy * pdy);
+        if (pDist <= STOP_RADIUS) return { x: this.playerCircle.x, y: this.playerCircle.y };
+        return {
+          x: enemy.x - (pdx / pDist) * STOP_RADIUS,
+          y: enemy.y - (pdy / pDist) * STOP_RADIUS,
+        };
+      }
+    }
+    return { x: clickX, y: clickY };
   }
 
   // ── Enemies ───────────────────────────────────────────────────────────────────
@@ -279,7 +358,7 @@ export class GameScene extends Phaser.Scene {
   // ── Combat ────────────────────────────────────────────────────────────────────
 
   private _fireBasicAttack(worldX: number, worldY: number) {
-    if (this.time.now - this.lastAttackTime < this.ATTACK_COOLDOWN) return;
+    if (this.time.now - this.lastAttackTime < ATTACK_COOLDOWN) return;
     this.lastAttackTime = this.time.now;
 
     const ox = this.playerCircle.x;
@@ -291,11 +370,10 @@ export class GameScene extends Phaser.Scene {
 
     const nx = dx / dist;
     const ny = dy / dist;
-    const travelDist = Math.min(dist, this.ATTACK_RANGE);
-    const endX = ox + nx * travelDist;
-    const endY = oy + ny * travelDist;
+    const travelDist = Math.min(dist, ATTACK_RANGE);
 
     this._muzzleFlash(ox, oy);
+    this._showConePreview(ox, oy, nx, ny, ATTACK_RANGE, ATTACK_HALF_ANG, 0xffffff);
 
     const proj = this.add.graphics();
     proj.fillStyle(0xffffaa, 1);
@@ -303,45 +381,99 @@ export class GameScene extends Phaser.Scene {
     proj.setPosition(ox, oy);
     proj.setDepth(3);
 
-    const duration = (travelDist / 600) * 1000;
-
     this.tweens.add({
       targets: proj,
-      x: endX,
-      y: endY,
-      duration,
+      x: ox + nx * travelDist,
+      y: oy + ny * travelDist,
+      duration: (travelDist / 600) * 1000,
       ease: 'Linear',
       onComplete: () => {
         proj.destroy();
         let hitAny = false;
         for (const enemy of this.enemies) {
           if (!enemy.alive) continue;
-          if (this._inCone(enemy.x, enemy.y, ox, oy, nx, ny)) {
-            this._damageEnemy(enemy, this.ATTACK_DAMAGE);
+          if (this._inCone(enemy.x, enemy.y, ox, oy, nx, ny, ATTACK_RANGE, ATTACK_HALF_ANG)) {
+            this._damageEnemy(enemy, ATTACK_DAMAGE, '#ffffff');
             hitAny = true;
           }
         }
-        if (hitAny) {
-          this.cameras.main.shake(100, 0.002);
-        }
+        if (hitAny) this.cameras.main.shake(100, 0.002);
       },
     });
   }
 
-  private _inCone(ex: number, ey: number, ox: number, oy: number, nx: number, ny: number): boolean {
+  private _castEmberStrike() {
+    if (this.time.now < this.emberCooldownEnd) return;
+
+    if (this.clientMp < EMBER_MP_COST) {
+      this.slotFlashEnd = this.time.now + 300;
+      return;
+    }
+
+    this.clientMp -= EMBER_MP_COST;
+    this.emberCooldownEnd = this.time.now + EMBER_COOLDOWN;
+    this._updateHud();
+
+    const ox  = this.playerCircle.x;
+    const oy  = this.playerCircle.y;
+    const ptr = this.input.activePointer;
+    const dx  = ptr.worldX - ox;
+    const dy  = ptr.worldY - oy;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist === 0) return;
+
+    const nx = dx / dist;
+    const ny = dy / dist;
+
+    this._muzzleFlash(ox, oy);
+    this._showConePreview(ox, oy, nx, ny, EMBER_RANGE, EMBER_HALF_ANG, 0xff7700);
+
+    const proj = this.add.graphics();
+    proj.fillStyle(0xff7700, 1);
+    proj.fillCircle(0, 0, 7);
+    proj.setPosition(ox, oy);
+    proj.setDepth(3);
+
+    this.tweens.add({
+      targets: proj,
+      x: ox + nx * EMBER_RANGE,
+      y: oy + ny * EMBER_RANGE,
+      duration: (EMBER_RANGE / 400) * 1000,  // slower projectile than basic attack
+      ease: 'Linear',
+      onComplete: () => {
+        proj.destroy();
+        let hitAny = false;
+        for (const enemy of this.enemies) {
+          if (!enemy.alive) continue;
+          if (this._inCone(enemy.x, enemy.y, ox, oy, nx, ny, EMBER_RANGE, EMBER_HALF_ANG)) {
+            this._damageEnemy(enemy, EMBER_DAMAGE, '#ff8800');
+            this._emberBurnFlash(enemy);
+            hitAny = true;
+          }
+        }
+        if (hitAny) this.cameras.main.shake(120, 0.003);
+      },
+    });
+  }
+
+  private _inCone(
+    ex: number, ey: number,
+    ox: number, oy: number,
+    nx: number, ny: number,
+    range: number, halfAngle: number,
+  ): boolean {
     const dx = ex - ox;
     const dy = ey - oy;
     const dist = Math.sqrt(dx * dx + dy * dy);
-    if (dist > this.ATTACK_RANGE) return false;
+    if (dist > range) return false;
     if (dist === 0) return true;
-    const dot = (dx / dist) * nx + (dy / dist) * ny;
-    return dot >= Math.cos(this.ATTACK_HALF_ANG);
+    return (dx / dist) * nx + (dy / dist) * ny >= Math.cos(halfAngle);
   }
 
-  private _damageEnemy(enemy: EnemyData, amount: number) {
+  private _damageEnemy(enemy: EnemyData, amount: number, floatColor: string) {
     enemy.hp = Math.max(0, enemy.hp - amount);
     this._drawEnemyHpBar(enemy);
-    this._showFloatingDamage(enemy.x, enemy.y - ENEMY_R - 20, amount);
+    this._showFloatingDamage(enemy.x, enemy.y - ENEMY_R - 20, amount, floatColor);
 
     if (enemy.hp <= 0) {
       enemy.alive = false;
@@ -363,11 +495,27 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  private _showFloatingDamage(x: number, y: number, amount: number) {
+  private _emberBurnFlash(enemy: EnemyData) {
+    const flash = this.add.graphics();
+    flash.fillStyle(0xff6600, 0.7);
+    flash.fillCircle(0, 0, ENEMY_R + 6);
+    flash.setPosition(enemy.x, enemy.y);
+    flash.setDepth(1.5);
+
+    this.tweens.add({
+      targets: flash,
+      alpha: 0,
+      duration: 350,
+      ease: 'Quad.easeOut',
+      onComplete: () => flash.destroy(),
+    });
+  }
+
+  private _showFloatingDamage(x: number, y: number, amount: number, color: string) {
     const txt = this.add
       .text(x, y, `+${amount}`, {
         fontSize: '16px',
-        color: '#ffffff',
+        color,
         fontFamily: 'monospace',
         stroke: '#000000',
         strokeThickness: 2,
@@ -404,6 +552,38 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  // Brief cone outline at attack origin, fades out in 200ms.
+  // Shows players the attack geometry before the projectile lands.
+  private _showConePreview(
+    ox: number, oy: number,
+    nx: number, ny: number,
+    range: number, halfAngle: number,
+    color: number,
+  ) {
+    const g = this.add.graphics();
+    g.lineStyle(1.5, color, 0.75);
+    g.setDepth(4);
+
+    const base = Math.atan2(ny, nx);
+    const a1   = base - halfAngle;
+    const a2   = base + halfAngle;
+
+    g.beginPath();
+    g.moveTo(ox, oy);
+    g.lineTo(ox + Math.cos(a1) * range, oy + Math.sin(a1) * range);
+    g.arc(ox, oy, range, a1, a2, false);
+    g.closePath();
+    g.strokePath();
+
+    this.tweens.add({
+      targets: g,
+      alpha: 0,
+      duration: 200,
+      ease: 'Linear',
+      onComplete: () => g.destroy(),
+    });
+  }
+
   // ── Drawing helpers ───────────────────────────────────────────────────────────
 
   private _drawDottedLine(
@@ -412,15 +592,14 @@ export class GameScene extends Phaser.Scene {
     x2: number, y2: number,
   ) {
     const DOT_SPACING = 12;
-    const DOT_R = 2;
-    const dx = x2 - x1;
-    const dy = y2 - y1;
+    const dx  = x2 - x1;
+    const dy  = y2 - y1;
     const len = Math.sqrt(dx * dx + dy * dy);
-    const nx = dx / len;
-    const ny = dy / len;
+    const nx  = dx / len;
+    const ny  = dy / len;
     g.fillStyle(0xffffff, 0.35);
     for (let d = DOT_SPACING; d < len; d += DOT_SPACING) {
-      g.fillCircle(x1 + nx * d, y1 + ny * d, DOT_R);
+      g.fillCircle(x1 + nx * d, y1 + ny * d, 2);
     }
   }
 
@@ -460,28 +639,52 @@ export class GameScene extends Phaser.Scene {
       .setDepth(11);
 
     this._drawCardSlots(W, H);
+
+    // Per-frame overlay for cooldown sweep and no-MP flash
+    this.cardOverlayGfx = this.add.graphics().setScrollFactor(0).setDepth(12);
+
     this._updateHud();
   }
 
   private _drawCardSlots(camW: number, camH: number) {
-    const SW = 52, SH = 72, GAP = 6;
-    const activeCount = 10, passiveCount = 5;
-    const activeW = activeCount * SW + (activeCount - 1) * GAP;
-    const passiveW = passiveCount * SW + (passiveCount - 1) * GAP;
-    const activeY = camH - SH - 12;
-    const passiveY = activeY - SH - 8;
+    const activeCount  = 10;
+    const passiveCount = 5;
+    const activeW  = activeCount  * CARD_SW + (activeCount  - 1) * CARD_GAP;
+    const passiveW = passiveCount * CARD_SW + (passiveCount - 1) * CARD_GAP;
+    const activeY  = camH - CARD_SH - 12;
+    const passiveY = activeY - CARD_SH - 8;
+    const ax = (camW - activeW)  / 2;
+    const px = (camW - passiveW) / 2;
 
+    // Store slot 1 screen position for overlay rendering in update()
+    this.slot1X = ax;
+    this.slot1Y = activeY;
+
+    // Slot outlines
     const g = this.add.graphics().setScrollFactor(0).setDepth(10);
     g.lineStyle(2, 0xffffff, 0.35);
-
-    const ax = (camW - activeW) / 2;
     for (let i = 0; i < activeCount; i++) {
-      g.strokeRect(ax + i * (SW + GAP), activeY, SW, SH);
+      g.strokeRect(ax + i * (CARD_SW + CARD_GAP), activeY, CARD_SW, CARD_SH);
     }
-    const px = (camW - passiveW) / 2;
     for (let i = 0; i < passiveCount; i++) {
-      g.strokeRect(px + i * (SW + GAP), passiveY, SW, SH);
+      g.strokeRect(px + i * (CARD_SW + CARD_GAP), passiveY, CARD_SW, CARD_SH);
     }
+
+    // Slot 1 — Ember Strike art placeholder (deep ember orange fill)
+    const art = this.add.graphics().setScrollFactor(0).setDepth(10);
+    art.fillStyle(0xc43a08, 1);
+    art.fillRect(ax + 2, activeY + 2, CARD_SW - 4, CARD_SH - 4);
+
+    this.add
+      .text(ax + CARD_SW / 2, activeY + CARD_SH / 2, 'Ember\nStrike', {
+        fontSize: '9px',
+        color: '#ffffff',
+        fontFamily: 'monospace',
+        align: 'center',
+      })
+      .setOrigin(0.5)
+      .setScrollFactor(0)
+      .setDepth(11);
   }
 
   // ── HUD update ────────────────────────────────────────────────────────────────
@@ -491,14 +694,12 @@ export class GameScene extends Phaser.Scene {
     const BAR_W = 200, BAR_H = 18, X = 12;
 
     this.hudBars.clear();
-
-    // Background tracks (always shown)
     this.hudBars.fillStyle(0x2a0000, 0.85).fillRect(X, 12, BAR_W, BAR_H);
     this.hudBars.fillStyle(0x001a3a, 0.85).fillRect(X, 38, BAR_W, BAR_H);
 
     if (c) {
-      const hp = Math.max(0, c.currentHp);
-      const mp = Math.max(0, c.currentMp);
+      const hp  = Math.max(0, c.currentHp);
+      const mp  = Math.max(0, Math.floor(this.clientMp));
       const mhp = maxHp(c.level);
       const mmp = maxMp(c.level);
 
