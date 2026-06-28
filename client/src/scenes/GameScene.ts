@@ -3,14 +3,23 @@ import type { Identity } from 'spacetimedb';
 import { connect, callReducer, type DbConnection } from '../db';
 import type { Character, PersonalSpirit } from '../db';
 
-const WORLD_W = 3000;
-const WORLD_H = 3000;
+// ── Tilemap constants ─────────────────────────────────────────────────────────
+const TILE_SIZE  = 48;
+const MAP_W      = 60;
+const MAP_H      = 60;
+const TILE_GRASS = 0;
+const TILE_DIRT  = 1;
+const TILE_STONE = 2;
+
+const WORLD_W = MAP_W * TILE_SIZE;  // 2880
+const WORLD_H = MAP_H * TILE_SIZE;  // 2880
+
 const PLAYER_R = 20;
 const OTHER_R  = 18;
 const ENEMY_R  = 24;
 
-const LERP_SPEED  = 0.09;   // ~40% slower than original 0.15 — less overshoot
-const STOP_RADIUS = 60;     // Diablo-style: stop this far from enemy on left-click
+const LERP_SPEED  = 0.09;
+const STOP_RADIUS = 60;
 
 // Card slot dimensions (shared between art draw and overlay)
 const CARD_SW  = 52;
@@ -25,15 +34,65 @@ const ATTACK_DAMAGE   = 10;
 
 // Card 1 — Ember Strike
 const EMBER_RANGE    = 320;
-const EMBER_HALF_ANG = 30 * Math.PI / 180;  // wider cone than basic attack
+const EMBER_HALF_ANG = 30 * Math.PI / 180;
 const EMBER_COOLDOWN = 1200;
 const EMBER_MP_COST  = 10;
 const EMBER_DAMAGE   = 25;
-const EMBER_MP_REGEN = 2;  // MP per second, client-side until server regen exists
+const EMBER_MP_REGEN = 2;
 
-// Mirrors server rules: startingHp / startingMp in spacetimedb/src/index.ts
 const maxHp = (level: number) => 100 + level * 15;
 const maxMp = (level: number) => 50 + level * 8;
+
+// ── Map layout ────────────────────────────────────────────────────────────────
+// 0 = grass, 1 = dirt path, 2 = stone (solid border)
+// Generated once at module load; accessed by _tileSolid() for collision checks.
+
+function buildMap(): number[][] {
+  const rows = Array.from({ length: MAP_H }, () => Array<number>(MAP_W).fill(TILE_GRASS));
+
+  // Stone border
+  for (let x = 0; x < MAP_W; x++) {
+    rows[0][x]        = TILE_STONE;
+    rows[MAP_H - 1][x] = TILE_STONE;
+  }
+  for (let y = 0; y < MAP_H; y++) {
+    rows[y][0]        = TILE_STONE;
+    rows[y][MAP_W - 1] = TILE_STONE;
+  }
+
+  // Meandering dirt path: array of [col, row] waypoints
+  const PATH = [
+    [1, 30], [12, 25], [20, 38], [30, 30],
+    [38, 18], [46, 34], [54, 28], [58, 30],
+  ];
+  for (let i = 0; i < PATH.length - 1; i++) {
+    const [x0, y0] = PATH[i];
+    const [x1, y1] = PATH[i + 1];
+    const steps = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)) * 2 + 1;
+    for (let s = 0; s <= steps; s++) {
+      const t = s / steps;
+      const cx = Math.round(x0 + (x1 - x0) * t);
+      const cy = Math.round(y0 + (y1 - y0) * t);
+      // 3-tile wide path
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          const nx = cx + dx;
+          const ny = cy + dy;
+          if (nx > 0 && nx < MAP_W - 1 && ny > 0 && ny < MAP_H - 1) {
+            rows[ny][nx] = TILE_DIRT;
+          }
+        }
+      }
+    }
+  }
+
+  return rows;
+}
+
+const MAP_DATA = buildMap();
+
+// ── Tile texture key ──────────────────────────────────────────────────────────
+const TILE_TEX = 'tiles';
 
 type EnemyData = {
   x: number;
@@ -52,13 +111,13 @@ type EnemyData = {
 // _createCasts() with its own key, geometry, and onFire callback.
 
 type CastCfg = {
-  key: string;            // Phaser keyboard constant (e.g. 'ONE')
+  key: string;
   range: number;
-  halfAngle: number;      // half-angle of the cone in radians
+  halfAngle: number;
   indicatorColor: number;
-  cooldown: number;       // ms
+  cooldown: number;
   mpCost: number;
-  slotX: number;          // HUD slot screen-space X for cooldown/flash overlay
+  slotX: number;
   slotY: number;
   getPlayerPos: () => { x: number; y: number };
   isAlive: () => boolean;
@@ -79,26 +138,21 @@ class CastController {
   constructor(scene: Phaser.Scene, cfg: CastCfg) {
     this.scene = scene;
     this.cfg   = cfg;
-    // World-space indicator; no scroll lock so it moves with the camera
     this.indicatorGfx = scene.add.graphics().setDepth(4);
-    // Screen-space overlay for cooldown sweep + no-MP flash
     this.overlayGfx   = scene.add.graphics().setScrollFactor(0).setDepth(12);
     this._bindKeys();
   }
 
-  /** Called by the scene on left-click so movement cancels an active aim. */
   cancelIfHolding() {
     if (!this.holding) return;
     this.holding = false;
     this.indicatorGfx.clear();
   }
 
-  /** Must be called every frame from scene.update(). */
   update() {
     const now = this.scene.time.now;
     const { slotX: sx, slotY: sy, cooldown } = this.cfg;
 
-    // Live cone tracks cursor while key is held
     if (this.holding) {
       const { x, y } = this.cfg.getPlayerPos();
       const ptr  = this.scene.input.activePointer;
@@ -121,7 +175,6 @@ class CastController {
       this.indicatorGfx.strokePath();
     }
 
-    // Cooldown sweep + no-MP flash (both screen-space on the HUD slot)
     this.overlayGfx.clear();
 
     if (now < this.cooldownEnd) {
@@ -152,26 +205,21 @@ class CastController {
       this._tryFire();
     });
 
-    // Escape cancels without firing
     kb.on('keydown-ESC', () => this.cancelIfHolding());
   }
 
   private _tryFire() {
     const now = this.scene.time.now;
-
-    // Blocked: flash red, no fire
     if (now < this.cooldownEnd || !this.cfg.hasMp()) {
       this.flashEnd = now + 300;
       return;
     }
-
     const ptr  = this.scene.input.activePointer;
     const { x, y } = this.cfg.getPlayerPos();
     const dx   = ptr.worldX - x;
     const dy   = ptr.worldY - y;
     const dist = Math.sqrt(dx * dx + dy * dy);
     if (dist === 0) return;
-
     this.cfg.spendMp();
     this.cooldownEnd = now + this.cfg.cooldown;
     this.cfg.onFire(dx / dist, dy / dist);
@@ -186,7 +234,6 @@ export class GameScene extends Phaser.Scene {
   private localSpirit: PersonalSpirit | null = null;
   private otherCircles = new Map<bigint, Phaser.GameObjects.Graphics>();
 
-  // Client-side prediction: move immediately on click, server corrects only on significant drift
   private targetX = 0;
   private targetY = 0;
 
@@ -194,22 +241,17 @@ export class GameScene extends Phaser.Scene {
   private moveLine!: Phaser.GameObjects.Graphics;
   private facingLine!: Phaser.GameObjects.Graphics;
 
-  // Enemies (client-side only, no server table yet)
   private enemies: EnemyData[] = [];
 
   private lastAttackTime = 0;
 
-  // MP managed client-side (server has no regen reducer yet)
   private clientMp = 0;
 
-  // Card cast controllers — one per active slot
   private emberCast!: CastController;
 
-  // Slot position stored so _createCasts() can read it after _createHud()
   private slot1X = 0;
   private slot1Y = 0;
 
-  // HUD — all fixed to screen via setScrollFactor(0)
   private hudBars!: Phaser.GameObjects.Graphics;
   private hpText!: Phaser.GameObjects.Text;
   private mpText!: Phaser.GameObjects.Text;
@@ -220,13 +262,31 @@ export class GameScene extends Phaser.Scene {
     super({ key: 'GameScene' });
   }
 
-  create() {
-    // ── World ──────────────────────────────────────────────────────────────────
-    this.cameras.main.setBounds(0, 0, WORLD_W, WORLD_H);
+  preload() {
+    // Build the tile texture as a horizontal strip: [grass | dirt | stone]
+    const canvas = this.textures.createCanvas(TILE_TEX, TILE_SIZE * 3, TILE_SIZE)!;
+    const ctx    = canvas.getContext();
 
-    const bg = this.add.graphics();
-    bg.fillStyle(0x12121e, 1);
-    bg.fillRect(0, 0, WORLD_W, WORLD_H);
+    ctx.fillStyle = '#2d4a1e';  // grass
+    ctx.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
+
+    ctx.fillStyle = '#6b4c2a';  // dirt path
+    ctx.fillRect(TILE_SIZE, 0, TILE_SIZE, TILE_SIZE);
+
+    ctx.fillStyle = '#4a4a4a';  // stone wall
+    ctx.fillRect(TILE_SIZE * 2, 0, TILE_SIZE, TILE_SIZE);
+
+    canvas.refresh();
+  }
+
+  create() {
+    // ── Tilemap ────────────────────────────────────────────────────────────────
+    const map     = this.make.tilemap({ data: MAP_DATA, tileWidth: TILE_SIZE, tileHeight: TILE_SIZE });
+    const tileset = map.addTilesetImage(TILE_TEX, TILE_TEX, TILE_SIZE, TILE_SIZE)!;
+    map.createLayer(0, tileset, 0, 0)!.setDepth(-1);
+
+    // World camera bounds = tilemap pixel size
+    this.cameras.main.setBounds(0, 0, WORLD_W, WORLD_H);
 
     // ── Local player circle ───────────────────────────────────────────────────
     this.playerCircle = this.add.graphics();
@@ -235,7 +295,7 @@ export class GameScene extends Phaser.Scene {
     this.playerCircle.setDepth(1);
     this.cameras.main.startFollow(this.playerCircle);
 
-    // ── Move line & facing indicator (drawn per-frame in update) ───────────────
+    // ── Move line & facing indicator ──────────────────────────────────────────
     this.moveLine   = this.add.graphics().setDepth(0);
     this.facingLine = this.add.graphics().setDepth(2);
 
@@ -274,7 +334,6 @@ export class GameScene extends Phaser.Scene {
     this.playerCircle.x += (this.targetX - this.playerCircle.x) * LERP_SPEED;
     this.playerCircle.y += (this.targetY - this.playerCircle.y) * LERP_SPEED;
 
-    // Dotted move line — drawn while en route, cleared on arrival
     const mdx = this.targetX - this.playerCircle.x;
     const mdy = this.targetY - this.playerCircle.y;
     this.moveLine.clear();
@@ -286,7 +345,6 @@ export class GameScene extends Phaser.Scene {
       );
     }
 
-    // Facing dot — orbits player edge pointing at cursor
     const ptr   = this.input.activePointer;
     const angle = Phaser.Math.Angle.Between(
       this.playerCircle.x, this.playerCircle.y,
@@ -307,7 +365,6 @@ export class GameScene extends Phaser.Scene {
     );
     this._updateHud();
 
-    // ── Cast controller tick (indicator + slot overlays) ──────────────────────
     this.emberCast.update();
   }
 
@@ -336,7 +393,6 @@ export class GameScene extends Phaser.Scene {
   private _onCharUpdate(row: Character) {
     if (this._isLocal(row.accountIdentity)) {
       this.localCharacter = row;
-      // Only correct prediction if server position diverges by more than 5 px
       const dx = row.posX - this.playerCircle.x;
       const dy = row.posY - this.playerCircle.y;
       if (dx * dx + dy * dy > 25) {
@@ -355,10 +411,7 @@ export class GameScene extends Phaser.Scene {
       this._updateHud();
     } else {
       const g = this.otherCircles.get(row.characterId);
-      if (g) {
-        g.destroy();
-        this.otherCircles.delete(row.characterId);
-      }
+      if (g) { g.destroy(); this.otherCircles.delete(row.characterId); }
     }
   }
 
@@ -405,14 +458,15 @@ export class GameScene extends Phaser.Scene {
   private _setupInput() {
     this.input.mouse?.disableContextMenu();
 
-    // Left-click: cancel any held cast first, then move
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
       if (pointer.rightButtonDown()) return;
       if (!this.localCharacter?.alive) return;
 
+      // Cancel any held cast before moving
       this.emberCast.cancelIfHolding();
 
-      const dest = this._resolveClickTarget(pointer.worldX, pointer.worldY);
+      let dest = this._resolveClickTarget(pointer.worldX, pointer.worldY);
+      dest = this._clampWalkable(dest.x, dest.y);
       this.targetX = dest.x;
       this.targetY = dest.y;
 
@@ -421,20 +475,53 @@ export class GameScene extends Phaser.Scene {
       );
     });
 
-    // Right-click: basic attack (instant-fire, no held indicator)
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
       if (!pointer.rightButtonDown()) return;
       if (!this.localCharacter?.alive) return;
       this._fireBasicAttack(pointer.worldX, pointer.worldY);
     });
+  }
 
-    // Keys 1–0: card cast controllers bind themselves in _createCasts()
-    // Keys 2–0 reserved for future cards
+  // ── Tile collision helpers ────────────────────────────────────────────────────
+
+  // Returns true if a world-space point touches a solid tile, accounting for
+  // player body radius so the player's edge doesn't clip into walls.
+  private _isSolid(worldX: number, worldY: number): boolean {
+    const R = PLAYER_R + 2;
+    return this._tileSolid(worldX - R, worldY)
+        || this._tileSolid(worldX + R, worldY)
+        || this._tileSolid(worldX, worldY - R)
+        || this._tileSolid(worldX, worldY + R);
+  }
+
+  private _tileSolid(worldX: number, worldY: number): boolean {
+    const tx = Math.floor(worldX / TILE_SIZE);
+    const ty = Math.floor(worldY / TILE_SIZE);
+    if (tx < 0 || ty < 0 || tx >= MAP_W || ty >= MAP_H) return true;
+    return MAP_DATA[ty][tx] === TILE_STONE;
+  }
+
+  // Binary-search the movement vector to find the last walkable position.
+  private _clampWalkable(tx: number, ty: number): { x: number; y: number } {
+    if (!this._isSolid(tx, ty)) return { x: tx, y: ty };
+
+    const px = this.playerCircle.x;
+    const py = this.playerCircle.y;
+    const dx = tx - px;
+    const dy = ty - py;
+
+    let lo = 0;
+    let hi = 1;
+    for (let i = 0; i < 10; i++) {
+      const mid = (lo + hi) / 2;
+      if (this._isSolid(px + dx * mid, py + dy * mid)) hi = mid;
+      else lo = mid;
+    }
+    return { x: px + dx * lo, y: py + dy * lo };
   }
 
   // ── Movement helpers ──────────────────────────────────────────────────────────
 
-  // If click lands inside STOP_RADIUS of any alive enemy, reroute to the approach edge.
   private _resolveClickTarget(clickX: number, clickY: number): { x: number; y: number } {
     for (const enemy of this.enemies) {
       if (!enemy.alive) continue;
@@ -455,12 +542,14 @@ export class GameScene extends Phaser.Scene {
   }
 
   // ── Enemies ───────────────────────────────────────────────────────────────────
+  // All spawn positions are on grass tiles in the upper open area of the map,
+  // well above the meandering dirt path (path row minimum ≈ 18; these are row 8).
 
   private _spawnEnemies() {
     const SPAWN = [
-      { x: 1600, y: 1400 },
-      { x: 1720, y: 1510 },
-      { x: 1560, y: 1620 },
+      { x: 10 * TILE_SIZE + TILE_SIZE / 2, y: 8 * TILE_SIZE + TILE_SIZE / 2 },  // tile (10,8)
+      { x: 30 * TILE_SIZE + TILE_SIZE / 2, y: 8 * TILE_SIZE + TILE_SIZE / 2 },  // tile (30,8)
+      { x: 50 * TILE_SIZE + TILE_SIZE / 2, y: 8 * TILE_SIZE + TILE_SIZE / 2 },  // tile (50,8)
     ];
 
     for (const pos of SPAWN) {
@@ -542,8 +631,6 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  // Spawns the Ember Strike projectile toward (nx, ny). MP/cooldown are
-  // handled by CastController before this is called.
   private _executeEmberStrike(nx: number, ny: number) {
     const ox = this.playerCircle.x;
     const oy = this.playerCircle.y;
@@ -561,7 +648,7 @@ export class GameScene extends Phaser.Scene {
       targets: proj,
       x: ox + nx * EMBER_RANGE,
       y: oy + ny * EMBER_RANGE,
-      duration: (EMBER_RANGE / 400) * 1000,  // slower projectile than basic attack
+      duration: (EMBER_RANGE / 400) * 1000,
       ease: 'Linear',
       onComplete: () => {
         proj.destroy();
@@ -610,10 +697,7 @@ export class GameScene extends Phaser.Scene {
         alpha: 0,
         duration: 400,
         ease: 'Quad.easeIn',
-        onComplete: () => {
-          enemy.bodyGfx.destroy();
-          enemy.hpBarGfx.destroy();
-        },
+        onComplete: () => { enemy.bodyGfx.destroy(); enemy.hpBarGfx.destroy(); },
       });
     }
   }
@@ -675,8 +759,6 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  // Brief cone outline at attack origin, fades out in 200ms.
-  // Shows players the attack geometry before the projectile lands.
   private _showConePreview(
     ox: number, oy: number,
     nx: number, ny: number,
@@ -775,11 +857,9 @@ export class GameScene extends Phaser.Scene {
     const ax = (camW - activeW)  / 2;
     const px = (camW - passiveW) / 2;
 
-    // Store slot 1 screen position for CastController overlay
     this.slot1X = ax;
     this.slot1Y = activeY;
 
-    // Slot outlines
     const g = this.add.graphics().setScrollFactor(0).setDepth(10);
     g.lineStyle(2, 0xffffff, 0.35);
     for (let i = 0; i < activeCount; i++) {
@@ -789,7 +869,6 @@ export class GameScene extends Phaser.Scene {
       g.strokeRect(px + i * (CARD_SW + CARD_GAP), passiveY, CARD_SW, CARD_SH);
     }
 
-    // Slot 1 — Ember Strike art placeholder (deep ember orange fill)
     const art = this.add.graphics().setScrollFactor(0).setDepth(10);
     art.fillStyle(0xc43a08, 1);
     art.fillRect(ax + 2, activeY + 2, CARD_SW - 4, CARD_SH - 4);
@@ -822,10 +901,8 @@ export class GameScene extends Phaser.Scene {
       const mhp = maxHp(c.level);
       const mmp = maxMp(c.level);
 
-      if (hp > 0)
-        this.hudBars.fillStyle(0xef5350, 1).fillRect(X, 12, BAR_W * (hp / mhp), BAR_H);
-      if (mp > 0)
-        this.hudBars.fillStyle(0x42a5f5, 1).fillRect(X, 38, BAR_W * (mp / mmp), BAR_H);
+      if (hp > 0) this.hudBars.fillStyle(0xef5350, 1).fillRect(X, 12, BAR_W * (hp / mhp), BAR_H);
+      if (mp > 0) this.hudBars.fillStyle(0x42a5f5, 1).fillRect(X, 38, BAR_W * (mp / mmp), BAR_H);
 
       this.hpText.setText(`HP  ${hp} / ${mhp}`);
       this.mpText.setText(`MP  ${mp} / ${mmp}`);
