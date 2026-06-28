@@ -45,6 +45,141 @@ type EnemyData = {
   alive: boolean;
 };
 
+// ── CastController ─────────────────────────────────────────────────────────────
+// "Quick Cast with Indicator": press-and-hold enters targeting mode with a live
+// cone indicator; release fires toward current cursor position.
+// Each card slot gets one CastController — register a new one per card in
+// _createCasts() with its own key, geometry, and onFire callback.
+
+type CastCfg = {
+  key: string;            // Phaser keyboard constant (e.g. 'ONE')
+  range: number;
+  halfAngle: number;      // half-angle of the cone in radians
+  indicatorColor: number;
+  cooldown: number;       // ms
+  mpCost: number;
+  slotX: number;          // HUD slot screen-space X for cooldown/flash overlay
+  slotY: number;
+  getPlayerPos: () => { x: number; y: number };
+  isAlive: () => boolean;
+  hasMp: () => boolean;
+  spendMp: () => void;
+  onFire: (nx: number, ny: number) => void;
+};
+
+class CastController {
+  private holding     = false;
+  private cooldownEnd = 0;
+  private flashEnd    = 0;
+  private readonly scene: Phaser.Scene;
+  private readonly cfg: CastCfg;
+  private readonly indicatorGfx: Phaser.GameObjects.Graphics;
+  private readonly overlayGfx: Phaser.GameObjects.Graphics;
+
+  constructor(scene: Phaser.Scene, cfg: CastCfg) {
+    this.scene = scene;
+    this.cfg   = cfg;
+    // World-space indicator; no scroll lock so it moves with the camera
+    this.indicatorGfx = scene.add.graphics().setDepth(4);
+    // Screen-space overlay for cooldown sweep + no-MP flash
+    this.overlayGfx   = scene.add.graphics().setScrollFactor(0).setDepth(12);
+    this._bindKeys();
+  }
+
+  /** Called by the scene on left-click so movement cancels an active aim. */
+  cancelIfHolding() {
+    if (!this.holding) return;
+    this.holding = false;
+    this.indicatorGfx.clear();
+  }
+
+  /** Must be called every frame from scene.update(). */
+  update() {
+    const now = this.scene.time.now;
+    const { slotX: sx, slotY: sy, cooldown } = this.cfg;
+
+    // Live cone tracks cursor while key is held
+    if (this.holding) {
+      const { x, y } = this.cfg.getPlayerPos();
+      const ptr  = this.scene.input.activePointer;
+      const dx   = ptr.worldX - x;
+      const dy   = ptr.worldY - y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const nx   = dist > 0 ? dx / dist : 1;
+      const ny   = dist > 0 ? dy / dist : 0;
+      const base = Math.atan2(ny, nx);
+      const a1   = base - this.cfg.halfAngle;
+      const a2   = base + this.cfg.halfAngle;
+
+      this.indicatorGfx.clear();
+      this.indicatorGfx.lineStyle(1.5, this.cfg.indicatorColor, 0.85);
+      this.indicatorGfx.beginPath();
+      this.indicatorGfx.moveTo(x, y);
+      this.indicatorGfx.lineTo(x + Math.cos(a1) * this.cfg.range, y + Math.sin(a1) * this.cfg.range);
+      this.indicatorGfx.arc(x, y, this.cfg.range, a1, a2, false);
+      this.indicatorGfx.closePath();
+      this.indicatorGfx.strokePath();
+    }
+
+    // Cooldown sweep + no-MP flash (both screen-space on the HUD slot)
+    this.overlayGfx.clear();
+
+    if (now < this.cooldownEnd) {
+      const fraction = (this.cooldownEnd - now) / cooldown;
+      this.overlayGfx.fillStyle(0x000000, 0.55);
+      this.overlayGfx.fillRect(sx, sy, CARD_SW, CARD_SH * fraction);
+    }
+
+    if (now < this.flashEnd) {
+      const t = (this.flashEnd - now) / 300;
+      this.overlayGfx.fillStyle(0xff0000, 0.55 * t);
+      this.overlayGfx.fillRect(sx, sy, CARD_SW, CARD_SH);
+    }
+  }
+
+  private _bindKeys() {
+    const kb = this.scene.input.keyboard!;
+
+    kb.on(`keydown-${this.cfg.key}`, () => {
+      if (this.holding || !this.cfg.isAlive()) return;
+      this.holding = true;
+    });
+
+    kb.on(`keyup-${this.cfg.key}`, () => {
+      if (!this.holding) return;
+      this.holding = false;
+      this.indicatorGfx.clear();
+      this._tryFire();
+    });
+
+    // Escape cancels without firing
+    kb.on('keydown-ESC', () => this.cancelIfHolding());
+  }
+
+  private _tryFire() {
+    const now = this.scene.time.now;
+
+    // Blocked: flash red, no fire
+    if (now < this.cooldownEnd || !this.cfg.hasMp()) {
+      this.flashEnd = now + 300;
+      return;
+    }
+
+    const ptr  = this.scene.input.activePointer;
+    const { x, y } = this.cfg.getPlayerPos();
+    const dx   = ptr.worldX - x;
+    const dy   = ptr.worldY - y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist === 0) return;
+
+    this.cfg.spendMp();
+    this.cooldownEnd = now + this.cfg.cooldown;
+    this.cfg.onFire(dx / dist, dy / dist);
+  }
+}
+
+// ── GameScene ─────────────────────────────────────────────────────────────────
+
 export class GameScene extends Phaser.Scene {
   private conn!: DbConnection;
   private localCharacter: Character | null = null;
@@ -67,10 +202,10 @@ export class GameScene extends Phaser.Scene {
   // MP managed client-side (server has no regen reducer yet)
   private clientMp = 0;
 
-  // Ember Strike HUD state
-  private emberCooldownEnd = 0;
-  private slotFlashEnd     = 0;
-  private cardOverlayGfx!: Phaser.GameObjects.Graphics;
+  // Card cast controllers — one per active slot
+  private emberCast!: CastController;
+
+  // Slot position stored so _createCasts() can read it after _createHud()
   private slot1X = 0;
   private slot1Y = 0;
 
@@ -107,8 +242,11 @@ export class GameScene extends Phaser.Scene {
     // ── Enemies ───────────────────────────────────────────────────────────────
     this._spawnEnemies();
 
-    // ── HUD ───────────────────────────────────────────────────────────────────
+    // ── HUD (must run before _createCasts so slot1X/Y are set) ───────────────
     this._createHud();
+
+    // ── Cast controllers ──────────────────────────────────────────────────────
+    this._createCasts();
 
     // ── Input ─────────────────────────────────────────────────────────────────
     this._setupInput();
@@ -169,23 +307,8 @@ export class GameScene extends Phaser.Scene {
     );
     this._updateHud();
 
-    // ── Card slot overlays ────────────────────────────────────────────────────
-    const now = this.time.now;
-    this.cardOverlayGfx.clear();
-
-    if (now < this.emberCooldownEnd) {
-      // Grey sweep draining from top — fraction of slot height remaining
-      const fraction = (this.emberCooldownEnd - now) / EMBER_COOLDOWN;
-      this.cardOverlayGfx.fillStyle(0x000000, 0.55);
-      this.cardOverlayGfx.fillRect(this.slot1X, this.slot1Y, CARD_SW, CARD_SH * fraction);
-    }
-
-    if (now < this.slotFlashEnd) {
-      // Red flash fades out — no-MP feedback
-      const t = (this.slotFlashEnd - now) / 300;
-      this.cardOverlayGfx.fillStyle(0xff0000, 0.55 * t);
-      this.cardOverlayGfx.fillRect(this.slot1X, this.slot1Y, CARD_SW, CARD_SH);
-    }
+    // ── Cast controller tick (indicator + slot overlays) ──────────────────────
+    this.emberCast.update();
   }
 
   // ── Identity ─────────────────────────────────────────────────────────────────
@@ -257,15 +380,37 @@ export class GameScene extends Phaser.Scene {
     this.spiritLevelText.setText(`Spirit Lv ${row.level}`);
   }
 
+  // ── Cast controllers ──────────────────────────────────────────────────────────
+
+  private _createCasts() {
+    this.emberCast = new CastController(this, {
+      key:            'ONE',
+      range:          EMBER_RANGE,
+      halfAngle:      EMBER_HALF_ANG,
+      indicatorColor: 0xff7700,
+      cooldown:       EMBER_COOLDOWN,
+      mpCost:         EMBER_MP_COST,
+      slotX:          this.slot1X,
+      slotY:          this.slot1Y,
+      getPlayerPos:   () => ({ x: this.playerCircle.x, y: this.playerCircle.y }),
+      isAlive:        () => !!this.localCharacter?.alive,
+      hasMp:          () => this.clientMp >= EMBER_MP_COST,
+      spendMp:        () => { this.clientMp -= EMBER_MP_COST; },
+      onFire:         (nx, ny) => this._executeEmberStrike(nx, ny),
+    });
+  }
+
   // ── Input ─────────────────────────────────────────────────────────────────────
 
   private _setupInput() {
     this.input.mouse?.disableContextMenu();
 
-    // Left-click: move — respects stop-near-enemy
+    // Left-click: cancel any held cast first, then move
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
       if (pointer.rightButtonDown()) return;
       if (!this.localCharacter?.alive) return;
+
+      this.emberCast.cancelIfHolding();
 
       const dest = this._resolveClickTarget(pointer.worldX, pointer.worldY);
       this.targetX = dest.x;
@@ -276,19 +421,14 @@ export class GameScene extends Phaser.Scene {
       );
     });
 
-    // Right-click: basic attack
+    // Right-click: basic attack (instant-fire, no held indicator)
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
       if (!pointer.rightButtonDown()) return;
       if (!this.localCharacter?.alive) return;
       this._fireBasicAttack(pointer.worldX, pointer.worldY);
     });
 
-    // Key 1: Ember Strike — fires toward current cursor position
-    this.input.keyboard?.on('keydown-ONE', () => {
-      if (!this.localCharacter?.alive) return;
-      this._castEmberStrike();
-    });
-
+    // Keys 1–0: card cast controllers bind themselves in _createCasts()
     // Keys 2–0 reserved for future cards
   }
 
@@ -402,28 +542,11 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  private _castEmberStrike() {
-    if (this.time.now < this.emberCooldownEnd) return;
-
-    if (this.clientMp < EMBER_MP_COST) {
-      this.slotFlashEnd = this.time.now + 300;
-      return;
-    }
-
-    this.clientMp -= EMBER_MP_COST;
-    this.emberCooldownEnd = this.time.now + EMBER_COOLDOWN;
-    this._updateHud();
-
-    const ox  = this.playerCircle.x;
-    const oy  = this.playerCircle.y;
-    const ptr = this.input.activePointer;
-    const dx  = ptr.worldX - ox;
-    const dy  = ptr.worldY - oy;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    if (dist === 0) return;
-
-    const nx = dx / dist;
-    const ny = dy / dist;
+  // Spawns the Ember Strike projectile toward (nx, ny). MP/cooldown are
+  // handled by CastController before this is called.
+  private _executeEmberStrike(nx: number, ny: number) {
+    const ox = this.playerCircle.x;
+    const oy = this.playerCircle.y;
 
     this._muzzleFlash(ox, oy);
     this._showConePreview(ox, oy, nx, ny, EMBER_RANGE, EMBER_HALF_ANG, 0xff7700);
@@ -639,10 +762,6 @@ export class GameScene extends Phaser.Scene {
       .setDepth(11);
 
     this._drawCardSlots(W, H);
-
-    // Per-frame overlay for cooldown sweep and no-MP flash
-    this.cardOverlayGfx = this.add.graphics().setScrollFactor(0).setDepth(12);
-
     this._updateHud();
   }
 
@@ -656,7 +775,7 @@ export class GameScene extends Phaser.Scene {
     const ax = (camW - activeW)  / 2;
     const px = (camW - passiveW) / 2;
 
-    // Store slot 1 screen position for overlay rendering in update()
+    // Store slot 1 screen position for CastController overlay
     this.slot1X = ax;
     this.slot1Y = activeY;
 
