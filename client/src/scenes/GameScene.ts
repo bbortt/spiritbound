@@ -18,7 +18,7 @@ const PLAYER_R = 20;
 const OTHER_R  = 18;
 const ENEMY_R  = 24;
 
-const LERP_SPEED  = 0.09;
+const MOVE_SPEED  = 180; // px/second, constant regardless of click distance
 const STOP_RADIUS = 60;
 
 // Card slot dimensions (shared between art draw and overlay)
@@ -330,9 +330,22 @@ export class GameScene extends Phaser.Scene {
   update(_time: number, delta: number) {
     if (!this.localCharacter) return;
 
-    // ── Move interpolation ────────────────────────────────────────────────────
-    this.playerCircle.x += (this.targetX - this.playerCircle.x) * LERP_SPEED;
-    this.playerCircle.y += (this.targetY - this.playerCircle.y) * LERP_SPEED;
+    // ── Move ──────────────────────────────────────────────────────────────────
+    {
+      const dx   = this.targetX - this.playerCircle.x;
+      const dy   = this.targetY - this.playerCircle.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist > 4) {
+        const step = MOVE_SPEED * (delta / 1000);
+        if (step >= dist) {
+          this.playerCircle.x = this.targetX;
+          this.playerCircle.y = this.targetY;
+        } else {
+          this.playerCircle.x += (dx / dist) * step;
+          this.playerCircle.y += (dy / dist) * step;
+        }
+      }
+    }
 
     const mdx = this.targetX - this.playerCircle.x;
     const mdy = this.targetY - this.playerCircle.y;
