@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import type { Identity } from 'spacetimedb';
 import { connect, callReducer, type DbConnection } from '../db';
-import type { Character, PersonalSpirit } from '../db';
+import type { Character, PersonalSpirit, Enemy } from '../db';
 
 // ── Tilemap constants ─────────────────────────────────────────────────────────
 const TILE_SIZE  = 48;
@@ -18,10 +18,10 @@ const PLAYER_R = 20;
 const OTHER_R  = 18;
 const ENEMY_R  = 24;
 
-const MOVE_SPEED  = 180; // px/second, constant regardless of click distance
+const MOVE_SPEED  = 180; // px/second
 const STOP_RADIUS = 60;
 
-// Card slot dimensions (shared between art draw and overlay)
+// Card slot dimensions
 const CARD_SW  = 52;
 const CARD_SH  = 72;
 const CARD_GAP = 6;
@@ -44,13 +44,10 @@ const maxHp = (level: number) => 100 + level * 15;
 const maxMp = (level: number) => 50 + level * 8;
 
 // ── Map layout ────────────────────────────────────────────────────────────────
-// 0 = grass, 1 = dirt path, 2 = stone (solid border)
-// Generated once at module load; accessed by _tileSolid() for collision checks.
 
 function buildMap(): number[][] {
   const rows = Array.from({ length: MAP_H }, () => Array<number>(MAP_W).fill(TILE_GRASS));
 
-  // Stone border
   for (let x = 0; x < MAP_W; x++) {
     rows[0][x]        = TILE_STONE;
     rows[MAP_H - 1][x] = TILE_STONE;
@@ -60,7 +57,6 @@ function buildMap(): number[][] {
     rows[y][MAP_W - 1] = TILE_STONE;
   }
 
-  // Meandering dirt path: array of [col, row] waypoints
   const PATH = [
     [1, 30], [12, 25], [20, 38], [30, 30],
     [38, 18], [46, 34], [54, 28], [58, 30],
@@ -73,7 +69,6 @@ function buildMap(): number[][] {
       const t = s / steps;
       const cx = Math.round(x0 + (x1 - x0) * t);
       const cy = Math.round(y0 + (y1 - y0) * t);
-      // 3-tile wide path
       for (let dy = -1; dy <= 1; dy++) {
         for (let dx = -1; dx <= 1; dx++) {
           const nx = cx + dx;
@@ -90,25 +85,22 @@ function buildMap(): number[][] {
 }
 
 const MAP_DATA = buildMap();
-
-// ── Tile texture key ──────────────────────────────────────────────────────────
 const TILE_TEX = 'tiles';
 
-type EnemyData = {
+// ── Enemy graphics data (client side, mirrors DB row) ─────────────────────────
+
+type EnemyGfx = {
+  enemyId: bigint;
   x: number;
   y: number;
   hp: number;
   maxHp: number;
+  alive: boolean;
   bodyGfx: Phaser.GameObjects.Graphics;
   hpBarGfx: Phaser.GameObjects.Graphics;
-  alive: boolean;
 };
 
 // ── CastController ─────────────────────────────────────────────────────────────
-// "Quick Cast with Indicator": press-and-hold enters targeting mode with a live
-// cone indicator; release fires toward current cursor position.
-// Each card slot gets one CastController — register a new one per card in
-// _createCasts() with its own key, geometry, and onFire callback.
 
 type CastCfg = {
   key: string;
@@ -241,14 +233,13 @@ export class GameScene extends Phaser.Scene {
   private moveLine!: Phaser.GameObjects.Graphics;
   private facingLine!: Phaser.GameObjects.Graphics;
 
-  private enemies: EnemyData[] = [];
+  // DB-synced enemy graphics
+  private dbEnemies = new Map<bigint, EnemyGfx>();
 
   private lastAttackTime = 0;
-
   private clientMp = 0;
 
   private emberCast!: CastController;
-
   private slot1X = 0;
   private slot1Y = 0;
 
@@ -258,22 +249,27 @@ export class GameScene extends Phaser.Scene {
   private levelText!: Phaser.GameObjects.Text;
   private spiritLevelText!: Phaser.GameObjects.Text;
 
+  // Death overlay
+  private isDead = false;
+  private deathOverlay!: Phaser.GameObjects.Graphics;
+  private deathText!: Phaser.GameObjects.Text;
+  private returnBtn!: Phaser.GameObjects.Text;
+
   constructor() {
     super({ key: 'GameScene' });
   }
 
   preload() {
-    // Build the tile texture as a horizontal strip: [grass | dirt | stone]
     const canvas = this.textures.createCanvas(TILE_TEX, TILE_SIZE * 3, TILE_SIZE)!;
     const ctx    = canvas.getContext();
 
-    ctx.fillStyle = '#2d4a1e';  // grass
+    ctx.fillStyle = '#2d4a1e';
     ctx.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
 
-    ctx.fillStyle = '#6b4c2a';  // dirt path
+    ctx.fillStyle = '#6b4c2a';
     ctx.fillRect(TILE_SIZE, 0, TILE_SIZE, TILE_SIZE);
 
-    ctx.fillStyle = '#4a4a4a';  // stone wall
+    ctx.fillStyle = '#4a4a4a';
     ctx.fillRect(TILE_SIZE * 2, 0, TILE_SIZE, TILE_SIZE);
 
     canvas.refresh();
@@ -284,8 +280,6 @@ export class GameScene extends Phaser.Scene {
     const map     = this.make.tilemap({ data: MAP_DATA, tileWidth: TILE_SIZE, tileHeight: TILE_SIZE });
     const tileset = map.addTilesetImage(TILE_TEX, TILE_TEX, TILE_SIZE, TILE_SIZE)!;
     map.createLayer(0, tileset, 0, 0)!.setDepth(-1);
-
-    // World camera bounds = tilemap pixel size
     this.cameras.main.setBounds(0, 0, WORLD_W, WORLD_H);
 
     // ── Local player circle ───────────────────────────────────────────────────
@@ -299,11 +293,11 @@ export class GameScene extends Phaser.Scene {
     this.moveLine   = this.add.graphics().setDepth(0);
     this.facingLine = this.add.graphics().setDepth(2);
 
-    // ── Enemies ───────────────────────────────────────────────────────────────
-    this._spawnEnemies();
-
     // ── HUD (must run before _createCasts so slot1X/Y are set) ───────────────
     this._createHud();
+
+    // ── Death overlay (hidden by default) ────────────────────────────────────
+    this._createDeathOverlay();
 
     // ── Cast controllers ──────────────────────────────────────────────────────
     this._createCasts();
@@ -325,59 +319,64 @@ export class GameScene extends Phaser.Scene {
     this.conn.db.character.onDelete((_ctx, row) => this._onCharDelete(row));
     this.conn.db.personalSpirit.onInsert((_ctx, row) => this._onSpiritRow(row));
     this.conn.db.personalSpirit.onUpdate?.((_ctx, _old, row) => this._onSpiritRow(row));
+    this.conn.db.enemy.onInsert((_ctx, row) => this._onEnemyInsert(row));
+    this.conn.db.enemy.onUpdate?.((_ctx, old, row) => this._onEnemyUpdate(old, row));
+    this.conn.db.enemy.onDelete((_ctx, row) => this._onEnemyDelete(row));
   }
 
   update(_time: number, delta: number) {
     if (!this.localCharacter) return;
 
-    // ── Move ──────────────────────────────────────────────────────────────────
-    {
-      const dx   = this.targetX - this.playerCircle.x;
-      const dy   = this.targetY - this.playerCircle.y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist > 4) {
-        const step = MOVE_SPEED * (delta / 1000);
-        if (step >= dist) {
-          this.playerCircle.x = this.targetX;
-          this.playerCircle.y = this.targetY;
-        } else {
-          this.playerCircle.x += (dx / dist) * step;
-          this.playerCircle.y += (dy / dist) * step;
+    if (this.localCharacter.alive) {
+      // ── Move ────────────────────────────────────────────────────────────────
+      {
+        const dx   = this.targetX - this.playerCircle.x;
+        const dy   = this.targetY - this.playerCircle.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist > 4) {
+          const step = MOVE_SPEED * (delta / 1000);
+          if (step >= dist) {
+            this.playerCircle.x = this.targetX;
+            this.playerCircle.y = this.targetY;
+          } else {
+            this.playerCircle.x += (dx / dist) * step;
+            this.playerCircle.y += (dy / dist) * step;
+          }
         }
       }
-    }
 
-    const mdx = this.targetX - this.playerCircle.x;
-    const mdy = this.targetY - this.playerCircle.y;
-    this.moveLine.clear();
-    if (mdx * mdx + mdy * mdy > 25) {
-      this._drawDottedLine(
-        this.moveLine,
+      const mdx = this.targetX - this.playerCircle.x;
+      const mdy = this.targetY - this.playerCircle.y;
+      this.moveLine.clear();
+      if (mdx * mdx + mdy * mdy > 25) {
+        this._drawDottedLine(
+          this.moveLine,
+          this.playerCircle.x, this.playerCircle.y,
+          this.targetX, this.targetY,
+        );
+      }
+
+      const ptr   = this.input.activePointer;
+      const angle = Phaser.Math.Angle.Between(
         this.playerCircle.x, this.playerCircle.y,
-        this.targetX, this.targetY,
+        ptr.worldX, ptr.worldY,
+      );
+      this.facingLine.clear();
+      this.facingLine.fillStyle(0xffffff, 0.9);
+      this.facingLine.fillCircle(
+        this.playerCircle.x + Math.cos(angle) * PLAYER_R,
+        this.playerCircle.y + Math.sin(angle) * PLAYER_R,
+        4,
+      );
+
+      // ── MP regen ────────────────────────────────────────────────────────────
+      this.clientMp = Math.min(
+        this.clientMp + EMBER_MP_REGEN * (delta / 1000),
+        maxMp(this.localCharacter.level),
       );
     }
 
-    const ptr   = this.input.activePointer;
-    const angle = Phaser.Math.Angle.Between(
-      this.playerCircle.x, this.playerCircle.y,
-      ptr.worldX, ptr.worldY,
-    );
-    this.facingLine.clear();
-    this.facingLine.fillStyle(0xffffff, 0.9);
-    this.facingLine.fillCircle(
-      this.playerCircle.x + Math.cos(angle) * PLAYER_R,
-      this.playerCircle.y + Math.sin(angle) * PLAYER_R,
-      4,
-    );
-
-    // ── MP regen ──────────────────────────────────────────────────────────────
-    this.clientMp = Math.min(
-      this.clientMp + EMBER_MP_REGEN * (delta / 1000),
-      maxMp(this.localCharacter.level),
-    );
     this._updateHud();
-
     this.emberCast.update();
   }
 
@@ -397,6 +396,7 @@ export class GameScene extends Phaser.Scene {
       this.targetX  = row.posX;
       this.targetY  = row.posY;
       this.playerCircle.setPosition(row.posX, row.posY);
+      if (this.isDead) this._hideDeathOverlay();
       this._updateHud();
     } else if (row.zoneId === (this.localCharacter?.zoneId ?? 1)) {
       this._addOtherPlayer(row);
@@ -405,12 +405,20 @@ export class GameScene extends Phaser.Scene {
 
   private _onCharUpdate(row: Character) {
     if (this._isLocal(row.accountIdentity)) {
+      const wasAlive = this.localCharacter?.alive;
       this.localCharacter = row;
-      const dx = row.posX - this.playerCircle.x;
-      const dy = row.posY - this.playerCircle.y;
-      if (dx * dx + dy * dy > 25) {
-        this.targetX = row.posX;
-        this.targetY = row.posY;
+
+      if (!row.alive && wasAlive) {
+        this._showDeathOverlay();
+      }
+
+      if (row.alive) {
+        const dx = row.posX - this.playerCircle.x;
+        const dy = row.posY - this.playerCircle.y;
+        if (dx * dx + dy * dy > 25) {
+          this.targetX = row.posX;
+          this.targetY = row.posY;
+        }
       }
       this._updateHud();
     } else {
@@ -446,6 +454,82 @@ export class GameScene extends Phaser.Scene {
     this.spiritLevelText.setText(`Spirit Lv ${row.level}`);
   }
 
+  // ── Enemy table callbacks ──────────────────────────────────────────────────────
+
+  private _onEnemyInsert(row: Enemy) {
+    const bodyGfx = this.add.graphics();
+    bodyGfx.fillStyle(0x8b0000, 1);
+    bodyGfx.fillCircle(0, 0, ENEMY_R);
+    bodyGfx.setPosition(row.posX, row.posY);
+    bodyGfx.setDepth(1);
+
+    const hpBarGfx = this.add.graphics().setDepth(2);
+
+    const data: EnemyGfx = {
+      enemyId: row.enemyId,
+      x: row.posX,
+      y: row.posY,
+      hp: row.currentHp,
+      maxHp: row.maxHp,
+      alive: row.alive,
+      bodyGfx,
+      hpBarGfx,
+    };
+    this._drawEnemyHpBar(data);
+    this.dbEnemies.set(row.enemyId, data);
+  }
+
+  private _onEnemyUpdate(old: Enemy, row: Enemy) {
+    const data = this.dbEnemies.get(row.enemyId);
+    if (!data) return;
+
+    data.x    = row.posX;
+    data.y    = row.posY;
+    data.hp   = row.currentHp;
+    data.alive = row.alive;
+
+    const dmg = old.currentHp - row.currentHp;
+    if (dmg > 0) {
+      this._drawEnemyHpBar(data);
+      this._showFloatingDamage(data.x, data.y - ENEMY_R - 20, dmg, '#ffffff');
+    }
+
+    if (!row.alive && old.alive) {
+      // Death flash → fade
+      data.hpBarGfx.setVisible(false);
+      data.bodyGfx.clear();
+      data.bodyGfx.fillStyle(0xffffff, 1);
+      data.bodyGfx.fillCircle(0, 0, ENEMY_R);
+      this.tweens.add({
+        targets: data.bodyGfx,
+        alpha: 0,
+        duration: 400,
+        ease: 'Quad.easeIn',
+        onComplete: () => data.bodyGfx.setVisible(false),
+      });
+    }
+
+    if (row.alive && !old.alive) {
+      // Respawn: restore visuals at new position
+      data.bodyGfx.setAlpha(1).setVisible(true);
+      data.bodyGfx.clear();
+      data.bodyGfx.fillStyle(0x8b0000, 1);
+      data.bodyGfx.fillCircle(0, 0, ENEMY_R);
+      data.bodyGfx.setPosition(row.posX, row.posY);
+      data.hpBarGfx.setVisible(true);
+      this._drawEnemyHpBar(data);
+    }
+  }
+
+  private _onEnemyDelete(row: Enemy) {
+    const data = this.dbEnemies.get(row.enemyId);
+    if (data) {
+      data.bodyGfx.destroy();
+      data.hpBarGfx.destroy();
+      this.dbEnemies.delete(row.enemyId);
+    }
+  }
+
   // ── Cast controllers ──────────────────────────────────────────────────────────
 
   private _createCasts() {
@@ -475,7 +559,6 @@ export class GameScene extends Phaser.Scene {
       if (pointer.rightButtonDown()) return;
       if (!this.localCharacter?.alive) return;
 
-      // Cancel any held cast before moving
       this.emberCast.cancelIfHolding();
 
       let dest = this._resolveClickTarget(pointer.worldX, pointer.worldY);
@@ -497,8 +580,6 @@ export class GameScene extends Phaser.Scene {
 
   // ── Tile collision helpers ────────────────────────────────────────────────────
 
-  // Returns true if a world-space point touches a solid tile, accounting for
-  // player body radius so the player's edge doesn't clip into walls.
   private _isSolid(worldX: number, worldY: number): boolean {
     const R = PLAYER_R + 2;
     return this._tileSolid(worldX - R, worldY)
@@ -514,7 +595,6 @@ export class GameScene extends Phaser.Scene {
     return MAP_DATA[ty][tx] === TILE_STONE;
   }
 
-  // Binary-search the movement vector to find the last walkable position.
   private _clampWalkable(tx: number, ty: number): { x: number; y: number } {
     if (!this._isSolid(tx, ty)) return { x: tx, y: ty };
 
@@ -536,64 +616,36 @@ export class GameScene extends Phaser.Scene {
   // ── Movement helpers ──────────────────────────────────────────────────────────
 
   private _resolveClickTarget(clickX: number, clickY: number): { x: number; y: number } {
-    for (const enemy of this.enemies) {
-      if (!enemy.alive) continue;
-      const dx = clickX - enemy.x;
-      const dy = clickY - enemy.y;
+    for (const data of this.dbEnemies.values()) {
+      if (!data.alive) continue;
+      const dx = clickX - data.x;
+      const dy = clickY - data.y;
       if (dx * dx + dy * dy < STOP_RADIUS * STOP_RADIUS) {
-        const pdx = enemy.x - this.playerCircle.x;
-        const pdy = enemy.y - this.playerCircle.y;
+        const pdx = data.x - this.playerCircle.x;
+        const pdy = data.y - this.playerCircle.y;
         const pDist = Math.sqrt(pdx * pdx + pdy * pdy);
         if (pDist <= STOP_RADIUS) return { x: this.playerCircle.x, y: this.playerCircle.y };
         return {
-          x: enemy.x - (pdx / pDist) * STOP_RADIUS,
-          y: enemy.y - (pdy / pDist) * STOP_RADIUS,
+          x: data.x - (pdx / pDist) * STOP_RADIUS,
+          y: data.y - (pdy / pDist) * STOP_RADIUS,
         };
       }
     }
     return { x: clickX, y: clickY };
   }
 
-  // ── Enemies ───────────────────────────────────────────────────────────────────
-  // All spawn positions are on grass tiles in the upper open area of the map,
-  // well above the meandering dirt path (path row minimum ≈ 18; these are row 8).
+  // ── Enemy HP bar ──────────────────────────────────────────────────────────────
 
-  private _spawnEnemies() {
-    const SPAWN = [
-      { x: 10 * TILE_SIZE + TILE_SIZE / 2, y: 8 * TILE_SIZE + TILE_SIZE / 2 },  // tile (10,8)
-      { x: 30 * TILE_SIZE + TILE_SIZE / 2, y: 8 * TILE_SIZE + TILE_SIZE / 2 },  // tile (30,8)
-      { x: 50 * TILE_SIZE + TILE_SIZE / 2, y: 8 * TILE_SIZE + TILE_SIZE / 2 },  // tile (50,8)
-    ];
-
-    for (const pos of SPAWN) {
-      const bodyGfx = this.add.graphics();
-      bodyGfx.fillStyle(0x8b0000, 1);
-      bodyGfx.fillCircle(0, 0, ENEMY_R);
-      bodyGfx.setPosition(pos.x, pos.y);
-      bodyGfx.setDepth(1);
-
-      const hpBarGfx = this.add.graphics().setDepth(2);
-      const enemy: EnemyData = {
-        x: pos.x, y: pos.y,
-        hp: 100, maxHp: 100,
-        bodyGfx, hpBarGfx,
-        alive: true,
-      };
-      this._drawEnemyHpBar(enemy);
-      this.enemies.push(enemy);
-    }
-  }
-
-  private _drawEnemyHpBar(enemy: EnemyData) {
+  private _drawEnemyHpBar(data: EnemyGfx) {
     const W = 48, H = 6;
-    const bx = enemy.x - W / 2;
-    const by = enemy.y - ENEMY_R - 14;
-    enemy.hpBarGfx.clear();
-    enemy.hpBarGfx.fillStyle(0x333333, 1);
-    enemy.hpBarGfx.fillRect(bx, by, W, H);
-    if (enemy.hp > 0) {
-      enemy.hpBarGfx.fillStyle(0xff3333, 1);
-      enemy.hpBarGfx.fillRect(bx, by, W * (enemy.hp / enemy.maxHp), H);
+    const bx = data.x - W / 2;
+    const by = data.y - ENEMY_R - 14;
+    data.hpBarGfx.clear();
+    data.hpBarGfx.fillStyle(0x333333, 1);
+    data.hpBarGfx.fillRect(bx, by, W, H);
+    if (data.hp > 0) {
+      data.hpBarGfx.fillStyle(0xff3333, 1);
+      data.hpBarGfx.fillRect(bx, by, W * (data.hp / data.maxHp), H);
     }
   }
 
@@ -632,10 +684,16 @@ export class GameScene extends Phaser.Scene {
       onComplete: () => {
         proj.destroy();
         let hitAny = false;
-        for (const enemy of this.enemies) {
-          if (!enemy.alive) continue;
-          if (this._inCone(enemy.x, enemy.y, ox, oy, nx, ny, ATTACK_RANGE, ATTACK_HALF_ANG)) {
-            this._damageEnemy(enemy, ATTACK_DAMAGE, '#ffffff');
+        for (const [, data] of this.dbEnemies) {
+          if (!data.alive) continue;
+          if (this._inCone(data.x, data.y, ox, oy, nx, ny, ATTACK_RANGE, ATTACK_HALF_ANG)) {
+            callReducer('damageEnemy', () =>
+              this.conn.reducers.damageEnemy({
+                enemyId: data.enemyId,
+                damage:  ATTACK_DAMAGE,
+                school:  { tag: 'Physical' },
+              }),
+            );
             hitAny = true;
           }
         }
@@ -666,11 +724,17 @@ export class GameScene extends Phaser.Scene {
       onComplete: () => {
         proj.destroy();
         let hitAny = false;
-        for (const enemy of this.enemies) {
-          if (!enemy.alive) continue;
-          if (this._inCone(enemy.x, enemy.y, ox, oy, nx, ny, EMBER_RANGE, EMBER_HALF_ANG)) {
-            this._damageEnemy(enemy, EMBER_DAMAGE, '#ff8800');
-            this._emberBurnFlash(enemy);
+        for (const [, data] of this.dbEnemies) {
+          if (!data.alive) continue;
+          if (this._inCone(data.x, data.y, ox, oy, nx, ny, EMBER_RANGE, EMBER_HALF_ANG)) {
+            callReducer('damageEnemy', () =>
+              this.conn.reducers.damageEnemy({
+                enemyId: data.enemyId,
+                damage:  EMBER_DAMAGE,
+                school:  { tag: 'Magical' },
+              }),
+            );
+            this._emberBurnFlash(data);
             hitAny = true;
           }
         }
@@ -693,33 +757,11 @@ export class GameScene extends Phaser.Scene {
     return (dx / dist) * nx + (dy / dist) * ny >= Math.cos(halfAngle);
   }
 
-  private _damageEnemy(enemy: EnemyData, amount: number, floatColor: string) {
-    enemy.hp = Math.max(0, enemy.hp - amount);
-    this._drawEnemyHpBar(enemy);
-    this._showFloatingDamage(enemy.x, enemy.y - ENEMY_R - 20, amount, floatColor);
-
-    if (enemy.hp <= 0) {
-      enemy.alive = false;
-      enemy.bodyGfx.clear();
-      enemy.bodyGfx.fillStyle(0xffffff, 1);
-      enemy.bodyGfx.fillCircle(0, 0, ENEMY_R);
-      enemy.hpBarGfx.setVisible(false);
-
-      this.tweens.add({
-        targets: enemy.bodyGfx,
-        alpha: 0,
-        duration: 400,
-        ease: 'Quad.easeIn',
-        onComplete: () => { enemy.bodyGfx.destroy(); enemy.hpBarGfx.destroy(); },
-      });
-    }
-  }
-
-  private _emberBurnFlash(enemy: EnemyData) {
+  private _emberBurnFlash(data: EnemyGfx) {
     const flash = this.add.graphics();
     flash.fillStyle(0xff6600, 0.7);
     flash.fillCircle(0, 0, ENEMY_R + 6);
-    flash.setPosition(enemy.x, enemy.y);
+    flash.setPosition(data.x, data.y);
     flash.setDepth(1.5);
 
     this.tweens.add({
@@ -819,6 +861,75 @@ export class GameScene extends Phaser.Scene {
     for (let d = DOT_SPACING; d < len; d += DOT_SPACING) {
       g.fillCircle(x1 + nx * d, y1 + ny * d, 2);
     }
+  }
+
+  // ── Death overlay ─────────────────────────────────────────────────────────────
+
+  private _createDeathOverlay() {
+    const W = this.cameras.main.width;
+    const H = this.cameras.main.height;
+
+    this.deathOverlay = this.add.graphics()
+      .setScrollFactor(0)
+      .setDepth(20);
+    this.deathOverlay.fillStyle(0x000000, 0.72);
+    this.deathOverlay.fillRect(0, 0, W, H);
+    this.deathOverlay.setVisible(false);
+
+    this.deathText = this.add
+      .text(W / 2, H / 2 - 50, 'YOU DIED', {
+        fontSize: '72px',
+        color: '#cc2222',
+        fontFamily: 'monospace',
+        stroke: '#000000',
+        strokeThickness: 5,
+      })
+      .setOrigin(0.5)
+      .setScrollFactor(0)
+      .setDepth(21)
+      .setVisible(false);
+
+    this.returnBtn = this.add
+      .text(W / 2, H / 2 + 60, '[ RETURN ]', {
+        fontSize: '24px',
+        color: '#ffffff',
+        fontFamily: 'monospace',
+        backgroundColor: '#1a1a2e',
+        padding: { x: 24, y: 10 },
+      })
+      .setOrigin(0.5)
+      .setScrollFactor(0)
+      .setDepth(21)
+      .setVisible(false)
+      .setInteractive({ useHandCursor: true });
+
+    this.returnBtn.on('pointerover',  () => this.returnBtn.setColor('#ffcc44'));
+    this.returnBtn.on('pointerout',   () => this.returnBtn.setColor('#ffffff'));
+    this.returnBtn.on('pointerdown',  () => {
+      this.returnBtn.setVisible(false);
+      callReducer('startLife', () =>
+        this.conn.reducers.startLife({ spiritName: 'your spirit', startZoneId: 1 }),
+      );
+    });
+  }
+
+  private _showDeathOverlay() {
+    this.isDead = true;
+    this.emberCast.cancelIfHolding();
+    this.moveLine.clear();
+    this.deathOverlay.setVisible(true);
+    this.deathText.setVisible(true);
+    // Delay the Return button by 2 s so the player reads the screen first
+    this.time.delayedCall(2000, () => {
+      if (this.isDead) this.returnBtn.setVisible(true);
+    });
+  }
+
+  private _hideDeathOverlay() {
+    this.isDead = false;
+    this.deathOverlay.setVisible(false);
+    this.deathText.setVisible(false);
+    this.returnBtn.setVisible(false);
   }
 
   // ── HUD creation ──────────────────────────────────────────────────────────────

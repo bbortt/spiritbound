@@ -60,6 +60,23 @@ export const CardType = __t.enum("CardType", {
 });
 export type CardType = __Infer<typeof CardType>;
 
+export const Enemy = __t.object("Enemy", {
+  enemyId: __t.u64(),
+  zoneId: __t.u32(),
+  posX: __t.f32(),
+  posY: __t.f32(),
+  spawnX: __t.f32(),
+  spawnY: __t.f32(),
+  currentHp: __t.i32(),
+  maxHp: __t.i32(),
+  alive: __t.bool(),
+  damagePerHit: __t.i32(),
+  attackRangePx: __t.f32(),
+  attackCooldownSeconds: __t.f32(),
+  lastAttackAt: __t.option(__t.timestamp()),
+});
+export type Enemy = __Infer<typeof Enemy>;
+
 export const Character = __t.object("Character", {
   characterId: __t.u64(),
   accountIdentity: __t.identity(),

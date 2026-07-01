@@ -9,12 +9,13 @@
  *     are computed in rules/ and never stored.
  *
  * Vertical slice covers: account bootstrap, character lifecycle, personal spirit,
- * card collection, equipped hand, move, damage, permadeath, and card retention.
+ * card collection, equipped hand, move, damage, permadeath, card retention, enemies.
  * Gear, location spirits, groups, dungeons, and sets are deferred to v2.
  */
 
 import { schema, table, t } from 'spacetimedb/server';
 import { SenderError } from 'spacetimedb/server';
+import { ScheduleAt } from 'spacetimedb';
 
 import {
   computeSpiritLevel,
@@ -73,26 +74,18 @@ const TShape       = t.enum('ShapeType',   { cone: t.unit(), line: t.unit(), arc
 // CONTENT TABLES  (static game data — written by tooling, read by everyone)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/**
- * Zone — a region of the world.
- * Zones gate access by level (min_level = hard gate; recommended_level = soft hint).
- */
 const zone = table(
   { name: 'zone', public: true },
   {
     zoneId:           t.u32().primaryKey(),
     name:             t.string(),
-    minLevel:         t.u32(),   // hard gate
-    recommendedLevel: t.u32(),   // soft hint shown to player
+    minLevel:         t.u32(),
+    recommendedLevel: t.u32(),
     maxLevel:         t.u32(),
     description:      t.string(),
   },
 );
 
-/**
- * CardDefinition — the static blueprint for a card.
- * Never mutated after content is loaded. One row per card type.
- */
 const cardDefinition = table(
   { name: 'card_definition', public: true },
   {
@@ -100,14 +93,14 @@ const cardDefinition = table(
     name:               t.string(),
     rarity:             TRarity,
     cardType:           TCardType,
-    passiveKind:        TPassiveKind,   // 'none' when cardType = active
-    scalingSchool:      TSchool,        // which attack stat powers this card
-    baseShape:          TShape,         // weapon geometry_modifier will bend this
+    passiveKind:        TPassiveKind,
+    scalingSchool:      TSchool,
+    baseShape:          TShape,
     basePower:          t.f32(),
     baseCooldown:       t.f32(),
     mpCost:             t.i32(),
-    minCharacterLevel:  t.u32(),        // must re-earn after death before equipping again
-    flavor:             t.string(),     // lore-keeper domain
+    minCharacterLevel:  t.u32(),
+    flavor:             t.string(),
   },
 );
 
@@ -115,44 +108,26 @@ const cardDefinition = table(
 // ACCOUNT-LEVEL TABLES  (survive permadeath)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/**
- * AccountProgress — cross-death milestone tracking.
- * total_xp_all_lives never resets; it drives account-level unlocks.
- */
 const accountProgress = table(
   { name: 'account_progress', public: true },
   {
     accountIdentity:       t.identity().primaryKey(),
     totalXpAllLives:       t.u64(),
-    tutorialCompleted:     t.bool(),      // true → next character starts at level 10
+    tutorialCompleted:     t.bool(),
     unlockedMilestoneIds:  t.array(t.u32()),
   },
 );
 
-/**
- * PersonalSpirit — the one thread that never dies.
- *
- * Design: 1:1 with Account. Persists across all character deaths.
- * bond_xp accumulates from card sacrifices across ALL lives.
- * Slot counts (hand + attunement) are DERIVED from level — see rules/death.ts.
- *
- * Lore: the spirit always finds its way back, perhaps weakened, but unbroken.
- */
 const personalSpirit = table(
   { name: 'personal_spirit', public: true },
   {
-    accountIdentity:  t.identity().primaryKey(),  // 1:1 — accountIdentity is the PK
+    accountIdentity:  t.identity().primaryKey(),
     name:             t.string(),
     level:            t.u32(),
-    bondXp:           t.u64(),    // NEVER resets — accumulates across all lives
+    bondXp:           t.u64(),
   },
 );
 
-/**
- * CardInstance — a specific copy of a card, owned at the account level.
- * Account-owned = survives permadeath (subject to spirit retention).
- * attuned = true → guaranteed to survive if spirit has a slot of that rarity.
- */
 const cardInstance = table(
   {
     name: 'card_instance',
@@ -163,8 +138,8 @@ const cardInstance = table(
     cardInstanceId:  t.u64().primaryKey().autoInc(),
     ownerIdentity:   t.identity(),
     cardDefId:       t.u32(),
-    mergeLevel:      t.u32(),    // adds EFFECTS (not raw power) — see ability-balancer
-    attuned:         t.bool(),   // player's "save this one" decision before venturing out
+    mergeLevel:      t.u32(),
+    attuned:         t.bool(),
   },
 );
 
@@ -172,12 +147,6 @@ const cardInstance = table(
 // CHARACTER-LEVEL TABLES  (lost on permadeath)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/**
- * Character — one life. On death: alive → false, gear deleted, unretained cards deleted.
- * A new character is created for the next life; the spirit carries over.
- *
- * effectiveStats is DERIVED (race base + gear + ward passives) — never stored here.
- */
 const character = table(
   {
     name: 'character',
@@ -203,24 +172,81 @@ const character = table(
   },
 );
 
-/**
- * EquippedCard — the Hand: which cards are currently in the deck.
- * Scoped to a character (lost on death — cards themselves survive via cardInstance).
- * Changed only at a spirit (location spirit for high-rarity; personal spirit for minor).
- */
 const equippedCard = table(
   {
     name: 'equipped_card',
     public: false,
-    indexes: [{ accessor: 'by_character', algorithm: 'btree', columns: ['characterId'] }],
+    indexes: [
+      { accessor: 'by_character', algorithm: 'btree', columns: ['characterId'] },
+    ],
   },
   {
     equippedCardId:   t.u64().primaryKey().autoInc(),
     characterId:      t.u64(),
     cardInstanceId:   t.u64(),
-    slotType:         TCardType,   // 'active' (max 10) or 'passive' (max 5)
-    slotIndex:        t.u32(),     // 0-indexed within slot type
+    slotType:         TCardType,
+    slotIndex:        t.u32(),
   },
+);
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ENEMY TABLES
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Enemy — server-authoritative mob state.
+ * Stationary "turret" enemies for the vertical slice: range-check + damage tick.
+ * spawnX/spawnY stores the original position so the respawn reducer can reset.
+ */
+const enemy = table(
+  {
+    name: 'enemy',
+    public: true,
+    indexes: [
+      { accessor: 'by_zone', algorithm: 'btree', columns: ['zoneId'] },
+    ],
+  },
+  {
+    enemyId:               t.u64().primaryKey().autoInc(),
+    zoneId:                t.u32(),
+    posX:                  t.f32(),
+    posY:                  t.f32(),
+    spawnX:                t.f32(),
+    spawnY:                t.f32(),
+    currentHp:             t.i32(),
+    maxHp:                 t.i32(),
+    alive:                 t.bool(),
+    damagePerHit:          t.i32(),
+    attackRangePx:         t.f32(),
+    attackCooldownSeconds: t.f32(),
+    lastAttackAt:          t.option(t.timestamp()),
+  },
+);
+
+// Row schemas extracted to break the forward/backward type-reference cycle:
+// table references reducer (via thunk), reducer references row schema (explicit).
+// Using the same RowBuilder object for both ensures the SDK deduplicates the type
+// and produces (0: &N) in the module definition — which is what SpacetimeDB expects.
+const enemyTickRow = t.row({
+  scheduledId: t.u64().primaryKey().autoInc(),
+  scheduledAt: t.scheduleAt(),
+});
+const enemyRespawnRow = t.row({
+  scheduledId: t.u64().primaryKey().autoInc(),
+  scheduledAt: t.scheduleAt(),
+  enemyId:     t.u64(),
+});
+
+// Repeating schedule: fires enemyTick every 500 ms (Interval keeps the row alive).
+const enemyTickSchedule = table(
+  { name: 'enemy_tick_schedule', scheduled: () => enemyTick },
+  enemyTickRow,
+);
+
+// One-shot schedule: fires respawnEnemy once 15 s after enemy death (Time deletes row after fire).
+const enemyRespawnSchedule = table(
+  { name: 'enemy_respawn_schedule', scheduled: () => respawnEnemy },
+  enemyRespawnRow,
 );
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -235,6 +261,9 @@ const db = schema({
   cardInstance,
   character,
   equippedCard,
+  enemy,
+  enemyTickSchedule,
+  enemyRespawnSchedule,
 });
 
 export default db;
@@ -244,7 +273,6 @@ export default db;
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export const onConnect = db.clientConnected((ctx) => {
-  // Ensure accountProgress row exists for new players on first connect.
   const existing = ctx.db.accountProgress.accountIdentity.find(ctx.sender);
   if (!existing) {
     ctx.db.accountProgress.insert({
@@ -256,29 +284,58 @@ export const onConnect = db.clientConnected((ctx) => {
   }
 });
 
+/** Runs once when the module is first published. Seeds enemies and starts the damage ticker. */
+export const init = db.init((ctx) => {
+  _seedZone1Enemies(ctx);
+  ctx.db.enemyTickSchedule.insert({
+    scheduledId: 0n,
+    scheduledAt: ScheduleAt.interval(500_000n),  // fire every 500 ms
+  });
+});
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // PRIVATE REDUCER HELPERS
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/** Find the caller's living character, or null. */
 function activeCharacter(ctx: any) {
   const chars = [...ctx.db.character.by_account.filter(ctx.sender)];
   return chars.find((c: any) => c.alive) ?? null;
 }
 
-/** Default HP/MP for a fresh character at a given level (placeholder until gear system lands). */
 function startingHp(level: number): number { return 100 + level * 15; }
 function startingMp(level: number): number { return  50 + level * 8; }
+
+function _seedZone1Enemies(ctx: any): void {
+  const TILE = 48;
+  const half = TILE / 2;
+  const spawns = [
+    { x: 10 * TILE + half, y: 8 * TILE + half },
+    { x: 30 * TILE + half, y: 8 * TILE + half },
+    { x: 50 * TILE + half, y: 8 * TILE + half },
+  ];
+  for (const pos of spawns) {
+    ctx.db.enemy.insert({
+      enemyId:               0n,
+      zoneId:                1,
+      posX:                  pos.x,
+      posY:                  pos.y,
+      spawnX:                pos.x,
+      spawnY:                pos.y,
+      currentHp:             100,
+      maxHp:                 100,
+      alive:                 true,
+      damagePerHit:          8,
+      attackRangePx:         220,
+      attackCooldownSeconds: 1.5,
+      lastAttackAt:          undefined,
+    });
+  }
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // REDUCERS — character lifecycle
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/**
- * startLife — create a new character and (if needed) bond a personal spirit.
- * Called once for the very first life; also called after permadeath to start the next.
- * If the account has tutorialCompleted, the character starts at level 10.
- */
 export const startLife = db.reducer(
   { spiritName: t.string(), startZoneId: t.u32() },
   (ctx, { spiritName, startZoneId }) => {
@@ -287,7 +344,6 @@ export const startLife = db.reducer(
     const progress = ctx.db.accountProgress.accountIdentity.find(ctx.sender);
     if (!progress) throw new SenderError('Account not initialised — reconnect to trigger onConnect');
 
-    // Bond a spirit on first life; it persists forever after.
     const existingSpirit = ctx.db.personalSpirit.accountIdentity.find(ctx.sender);
     if (!existingSpirit) {
       ctx.db.personalSpirit.insert({
@@ -300,13 +356,13 @@ export const startLife = db.reducer(
 
     const startLevel = progress.tutorialCompleted ? 10 : 1;
     ctx.db.character.insert({
-      characterId:      0n,       // autoInc
+      characterId:      0n,
       accountIdentity:  ctx.sender,
       level:            startLevel,
       xp:               0n,
       zoneId:           startZoneId,
-      posX:             0,
-      posY:             0,
+      posX:             480,   // tile (10,8) — first enemy spawn area, grass
+      posY:             432,
       currentHp:        startingHp(startLevel),
       currentMp:        startingMp(startLevel),
       alive:            true,
@@ -316,11 +372,6 @@ export const startLife = db.reducer(
   },
 );
 
-/**
- * move — update the active character's position.
- * Server trusts client position for the vertical slice;
- * add server-side validation (speed cap, wall collision) in a later pass.
- */
 export const move = db.reducer(
   { x: t.f32(), y: t.f32() },
   (ctx, { x, y }) => {
@@ -330,10 +381,6 @@ export const move = db.reducer(
   },
 );
 
-/**
- * grantXp — reward XP to the active character and accumulate to account total.
- * Typically called by server-side enemy-kill reducers (not directly by clients in prod).
- */
 export const grantXp = db.reducer(
   { amount: t.u64() },
   (ctx, { amount }) => {
@@ -344,7 +391,6 @@ export const grantXp = db.reducer(
     const newLevel = computeCharacterLevel(newXp);
     ctx.db.character.characterId.update({ ...char, xp: newXp, level: newLevel });
 
-    // Always accumulate to account (never resets)
     const progress = ctx.db.accountProgress.accountIdentity.find(ctx.sender);
     if (progress) {
       ctx.db.accountProgress.accountIdentity.update({
@@ -355,13 +401,6 @@ export const grantXp = db.reducer(
   },
 );
 
-/**
- * applyDamage — inflict damage on a target character.
- *
- * In the vertical slice this is called by the client (self-reporting or simple AI).
- * TODO v2: move damage application to server-side enemy AI reducers and validate
- *          that ctx.sender is an authorised source for this target.
- */
 export const applyDamage = db.reducer(
   { targetCharacterId: t.u64(), rawDamage: t.i32() },
   (ctx, { targetCharacterId, rawDamage }) => {
@@ -380,7 +419,6 @@ export const applyDamage = db.reducer(
 // ─── Internal: permadeath handler ─────────────────────────────────────────────
 
 function _handleDeath(ctx: any, char: any): void {
-  // 1. Mark character dead
   ctx.db.character.characterId.update({
     ...char,
     alive:    false,
@@ -388,18 +426,13 @@ function _handleDeath(ctx: any, char: any): void {
     diedAt:   ctx.timestamp,
   });
 
-  // 2. Clear the hand (equippedCard rows are character-scoped; cards themselves survive)
   const hand = [...ctx.db.equippedCard.by_character.filter(char.characterId)];
   for (const slot of hand) {
     ctx.db.equippedCard.equippedCardId.delete(slot.equippedCardId);
   }
 
-  // Gear (ItemInstance) deletion goes here once the gear system is built.
-
-  // 3. Card retention via spirit
   const spirit = ctx.db.personalSpirit.accountIdentity.find(char.accountIdentity);
   if (!spirit) {
-    // No spirit bonded yet — lose all cards (extreme edge case)
     const allCards = [...ctx.db.cardInstance.by_owner.filter(char.accountIdentity)];
     for (const ci of allCards) {
       ctx.db.cardInstance.cardInstanceId.delete(ci.cardInstanceId);
@@ -408,8 +441,6 @@ function _handleDeath(ctx: any, char: any): void {
   }
 
   const slots = computeAttunementSlots(spirit.level);
-
-  // JOIN: fetch rarity from cardDefinition for each cardInstance
   const cards: CardForRetention[] = [...ctx.db.cardInstance.by_owner.filter(char.accountIdentity)]
     .map((ci: any) => {
       const def = ctx.db.cardDefinition.cardDefId.find(ci.cardDefId);
@@ -425,7 +456,6 @@ function _handleDeath(ctx: any, char: any): void {
     ctx.db.cardInstance.cardInstanceId.delete(id);
   }
 
-  // 4. Mark tutorial complete if applicable
   const progress = ctx.db.accountProgress.accountIdentity.find(char.accountIdentity);
   if (progress && char.level >= 10 && !progress.tutorialCompleted) {
     ctx.db.accountProgress.accountIdentity.update({
@@ -439,10 +469,6 @@ function _handleDeath(ctx: any, char: any): void {
 // REDUCERS — spirit
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/**
- * sacrificeCard — destroy a card to gain bond XP for the personal spirit.
- * A weighty, permanent decision: more XP for rarer cards.
- */
 export const sacrificeCard = db.reducer(
   { cardInstanceId: t.u64() },
   (ctx, { cardInstanceId }) => {
@@ -456,10 +482,8 @@ export const sacrificeCard = db.reducer(
     const spirit = ctx.db.personalSpirit.accountIdentity.find(ctx.sender);
     if (!spirit) throw new SenderError('No spirit bonded');
 
-    // Destroy the card first
     ctx.db.cardInstance.cardInstanceId.delete(cardInstanceId);
 
-    // Level the spirit
     const xpGain   = SACRIFICE_XP[def.rarity.tag as keyof typeof SACRIFICE_XP] ?? 10n;
     const newBondXp = spirit.bondXp + xpGain;
     const newLevel  = computeSpiritLevel(newBondXp);
@@ -467,11 +491,6 @@ export const sacrificeCard = db.reducer(
   },
 );
 
-/**
- * toggleAttune — mark/unmark a card as "guaranteed to survive death".
- * Consumes one rarity-specific attunement slot on the spirit.
- * The player decides this BEFORE venturing out — no RNG, just preparation.
- */
 export const toggleAttune = db.reducer(
   { cardInstanceId: t.u64() },
   (ctx, { cardInstanceId }) => {
@@ -486,7 +505,6 @@ export const toggleAttune = db.reducer(
     if (!spirit) throw new SenderError('No spirit bonded');
 
     if (!card.attuned) {
-      // Check slot budget before allowing attunement
       const slots      = computeAttunementSlots(spirit.level);
       const rarityTag  = def.rarity.tag as keyof typeof slots;
       const slotMax    = slots[rarityTag];
@@ -509,13 +527,6 @@ export const toggleAttune = db.reducer(
 // REDUCERS — hand management
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/**
- * equipCard — place a card from the account's collection into the active Hand.
- *
- * Can only be done at a spirit (proximity check is a TODO for v2 — add
- * a zone/spirit check once SpiritDefinition and location spirits are built).
- * Slot caps are derived from spirit level (computeHandSlots).
- */
 export const equipCard = db.reducer(
   { cardInstanceId: t.u64(), slotType: TCardType, slotIndex: t.u32() },
   (ctx, { cardInstanceId, slotType, slotIndex }) => {
@@ -529,13 +540,11 @@ export const equipCard = db.reducer(
     const def = ctx.db.cardDefinition.cardDefId.find(card.cardDefId);
     if (!def) throw new SenderError('Card definition missing');
 
-    // Enforce min character level
     if (def.minCharacterLevel > char.level)
       throw new SenderError(
         `Requires character level ${def.minCharacterLevel} (you are ${char.level})`
       );
 
-    // Enforce hand slot cap (derived from spirit level)
     const spirit = ctx.db.personalSpirit.accountIdentity.find(ctx.sender);
     if (!spirit) throw new SenderError('No spirit bonded');
 
@@ -545,20 +554,18 @@ export const equipCard = db.reducer(
     const count     = hand.filter((e: any) => e.slotType.tag === tag).length;
     const cap       = tag === 'active' ? handSlots.active : handSlots.passive;
 
-    // Check if we're replacing an existing slot (doesn't count toward cap)
     const existingInSlot = hand.find(
       (e: any) => e.slotType.tag === tag && e.slotIndex === slotIndex
     );
     if (!existingInSlot && count >= cap)
       throw new SenderError(`${tag} hand is full (${count}/${cap} — spirit level ${spirit.level})`);
 
-    // Remove whatever was in this slot
     if (existingInSlot) {
       ctx.db.equippedCard.equippedCardId.delete(existingInSlot.equippedCardId);
     }
 
     ctx.db.equippedCard.insert({
-      equippedCardId: 0n,   // autoInc
+      equippedCardId: 0n,
       characterId:    char.characterId,
       cardInstanceId,
       slotType,
@@ -567,10 +574,6 @@ export const equipCard = db.reducer(
   },
 );
 
-/**
- * unequipCard — remove a card from the Hand back to the collection.
- * Also only allowed at a spirit (TODO: add proximity check in v2).
- */
 export const unequipCard = db.reducer(
   { equippedCardId: t.u64() },
   (ctx, { equippedCardId }) => {
@@ -582,5 +585,131 @@ export const unequipCard = db.reducer(
       throw new SenderError('Equipped card not found on this character');
 
     ctx.db.equippedCard.equippedCardId.delete(equippedCardId);
+  },
+);
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// REDUCERS — enemy combat
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * spawnEnemy — insert one enemy at a given world position.
+ * Useful for testing; seeding is handled by init().
+ */
+export const spawnEnemy = db.reducer(
+  { zoneId: t.u32(), x: t.f32(), y: t.f32() },
+  (ctx, { zoneId, x, y }) => {
+    ctx.db.enemy.insert({
+      enemyId:               0n,
+      zoneId,
+      posX:                  x,
+      posY:                  y,
+      spawnX:                x,
+      spawnY:                y,
+      currentHp:             100,
+      maxHp:                 100,
+      alive:                 true,
+      damagePerHit:          8,
+      attackRangePx:         220,
+      attackCooldownSeconds: 1.5,
+      lastAttackAt:          undefined,
+    });
+  },
+);
+
+/**
+ * damageEnemy — apply player-initiated damage to an enemy.
+ * Client sends enemyId + damage amount after confirming a geometric hit locally.
+ * Server validates that the caller is alive and in the same zone.
+ */
+export const damageEnemy = db.reducer(
+  { enemyId: t.u64(), damage: t.i32(), school: TSchool },
+  (ctx, { enemyId, damage }) => {
+    const char = activeCharacter(ctx);
+    if (!char) throw new SenderError('No active character');
+
+    const e = ctx.db.enemy.enemyId.find(enemyId);
+    if (!e || !e.alive) return;
+    if (e.zoneId !== char.zoneId) throw new SenderError('Enemy not in same zone');
+
+    const newHp = e.currentHp - damage;
+    if (newHp <= 0) {
+      ctx.db.enemy.enemyId.update({ ...e, currentHp: 0, alive: false });
+      // Schedule respawn 15 s from now
+      ctx.db.enemyRespawnSchedule.insert({
+        scheduledId: 0n,
+        scheduledAt: ScheduleAt.time(ctx.timestamp.microsSinceUnixEpoch + 15_000_000n),
+        enemyId:     e.enemyId,
+      });
+    } else {
+      ctx.db.enemy.enemyId.update({ ...e, currentHp: newHp });
+    }
+  },
+);
+
+/**
+ * enemyTick — runs every 500 ms (Interval schedule, row never deleted).
+ * For each alive enemy, finds alive characters in range and damages the closest.
+ */
+export const enemyTick = db.reducer(
+  { scheduleRow: enemyTickRow },
+  (ctx, _args: any) => {
+    for (const e of ctx.db.enemy) {
+      if (!e.alive) continue;
+
+      // Cooldown check
+      const cooldownUs = BigInt(Math.round(e.attackCooldownSeconds * 1_000_000));
+      const readyToAttack = e.lastAttackAt === undefined ||
+        ctx.timestamp.microsSinceUnixEpoch - e.lastAttackAt.microsSinceUnixEpoch >= cooldownUs;
+      if (!readyToAttack) continue;
+
+      // Find alive characters in same zone within attack range
+      const nearby = [...ctx.db.character.by_zone.filter(e.zoneId)].filter((c: any) => {
+        if (!c.alive) return false;
+        const dx = c.posX - e.posX;
+        const dy = c.posY - e.posY;
+        return dx * dx + dy * dy <= e.attackRangePx * e.attackRangePx;
+      });
+      if (nearby.length === 0) continue;
+
+      // Closest character
+      const target = nearby.reduce((best: any, c: any) => {
+        const dx = c.posX - e.posX, dy = c.posY - e.posY;
+        const bdx = best.posX - e.posX, bdy = best.posY - e.posY;
+        return (dx * dx + dy * dy) < (bdx * bdx + bdy * bdy) ? c : best;
+      });
+
+      // Apply damage
+      const newHp = target.currentHp - e.damagePerHit;
+      if (newHp <= 0) {
+        _handleDeath(ctx, target);
+      } else {
+        ctx.db.character.characterId.update({ ...target, currentHp: newHp });
+      }
+
+      // Record attack time
+      ctx.db.enemy.enemyId.update({ ...e, lastAttackAt: ctx.timestamp });
+    }
+  },
+);
+
+/**
+ * respawnEnemy — fired once 15 s after an enemy dies.
+ * Restores the enemy to full HP at its spawn position.
+ */
+export const respawnEnemy = db.reducer(
+  { scheduleRow: enemyRespawnRow },
+  (ctx, args: any) => {
+    const { enemyId } = args.scheduleRow;
+    const e = ctx.db.enemy.enemyId.find(enemyId);
+    if (!e || e.alive) return;
+    ctx.db.enemy.enemyId.update({
+      ...e,
+      currentHp:    e.maxHp,
+      alive:        true,
+      posX:         e.spawnX,
+      posY:         e.spawnY,
+      lastAttackAt: undefined,
+    });
   },
 );

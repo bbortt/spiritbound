@@ -61,6 +61,7 @@ function _subscribeSlice(
       'SELECT * FROM personal_spirit',
       'SELECT * FROM account_progress',
       'SELECT * FROM zone',
+      'SELECT * FROM enemy',
     ]);
 }
 

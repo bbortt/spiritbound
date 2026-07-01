@@ -35,6 +35,7 @@ import {
 
 // Import all reducer arg schemas
 import ApplyDamageReducer from "./apply_damage_reducer";
+import DamageEnemyReducer from "./damage_enemy_reducer";
 import EquipCardReducer from "./equip_card_reducer";
 import GrantXpReducer from "./grant_xp_reducer";
 import MoveReducer from "./move_reducer";
@@ -50,6 +51,7 @@ import AccountProgressRow from "./account_progress_table";
 import CardDefinitionRow from "./card_definition_table";
 import CardInstanceRow from "./card_instance_table";
 import CharacterRow from "./character_table";
+import EnemyRow from "./enemy_table";
 import EquippedCardRow from "./equipped_card_table";
 import PersonalSpiritRow from "./personal_spirit_table";
 import ZoneRow from "./zone_table";
@@ -111,6 +113,20 @@ const tablesSchema = __schema({
       { name: 'character_character_id_key', constraint: 'unique', columns: ['characterId'] },
     ],
   }, CharacterRow),
+  enemy: __table({
+    name: 'enemy',
+    indexes: [
+      { accessor: 'enemyId', name: 'enemy_enemy_id_idx_btree', algorithm: 'btree', columns: [
+        'enemyId',
+      ] },
+      { accessor: 'by_zone', name: 'enemy_zone_id_idx_btree', algorithm: 'btree', columns: [
+        'zoneId',
+      ] },
+    ],
+    constraints: [
+      { name: 'enemy_enemy_id_key', constraint: 'unique', columns: ['enemyId'] },
+    ],
+  }, EnemyRow),
   equippedCard: __table({
     name: 'equipped_card',
     indexes: [
@@ -152,6 +168,7 @@ const tablesSchema = __schema({
 /** The schema information for all reducers in this module. This is defined the same way as the reducers would have been defined in the server, except the body of the reducer is omitted in code generation. */
 const reducersSchema = __reducers(
   __reducerSchema("apply_damage", ApplyDamageReducer),
+  __reducerSchema("damage_enemy", DamageEnemyReducer),
   __reducerSchema("equip_card", EquipCardReducer),
   __reducerSchema("grant_xp", GrantXpReducer),
   __reducerSchema("move", MoveReducer),
