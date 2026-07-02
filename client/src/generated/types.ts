@@ -20,6 +20,7 @@ export type AccountProgress = __Infer<typeof AccountProgress>;
 
 export const CardDefinition = __t.object("CardDefinition", {
   cardDefId: __t.u32(),
+  slug: __t.string(),
   name: __t.string(),
   get rarity() {
     return Rarity;

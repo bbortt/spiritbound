@@ -20,6 +20,7 @@ import {
 
 export default __t.row({
   cardDefId: __t.u32().primaryKey().name("card_def_id"),
+  slug: __t.string(),
   name: __t.string(),
   get rarity() {
     return Rarity;

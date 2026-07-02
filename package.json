@@ -3,11 +3,13 @@
   "private": true,
   "version": "0.0.1",
   "type": "module",
+  "sideEffects": false,
   "scripts": {
     "dev": "esbuild src/main.ts --bundle --platform=node --outfile=dist/main.js --format=esm && node dist/main.js",
     "start": "node dist/main.js",
     "build": "esbuild src/main.ts --bundle --platform=node --outfile=dist/main.js --format=esm",
-    "spacetime:bundle": "esbuild spacetimedb/src/index.ts --bundle --platform=neutral --format=esm --external:spacetime:sys@2.0 --external:spacetime:sys@2.1 --outfile=spacetimedb/dist/bundle.js",
+    "vitest": "vitest run",
+    "spacetime:bundle": "esbuild spacetimedb/src/index.ts --bundle --platform=neutral --format=esm --external:spacetime:sys@2.0 --external:spacetime:sys@2.1 --external:node:fs --external:node:path --external:node:url --outfile=spacetimedb/dist/bundle.js",
     "spacetime:generate": "pnpm spacetime:bundle && docker run --rm -v \"%cd%:/project\" clockworklabs/spacetime:latest generate --lang typescript -j /project/spacetimedb/dist/bundle.js -o /project/client/src/generated -y --include-private",
     "spacetime:publish:local": "pnpm run db:restart && pnpm spacetime:bundle && docker run --rm -v \"%cd%:/project\" clockworklabs/spacetime:latest publish --anonymous --no-config -j /project/spacetimedb/dist/bundle.js --server http://host.docker.internal:3000 spiritbound --yes",
     "spacetime:publish": "pnpm spacetime:bundle && docker run --rm -v \"%cd%:/project\" -v spiritbound-cli-config:/home/spacetime/.config/spacetime clockworklabs/spacetime:latest publish --no-config -j /project/spacetimedb/dist/bundle.js --server maincloud spiritbound",
@@ -18,11 +20,13 @@
     "ui:start": "pnpm -C client dev"
   },
   "dependencies": {
-    "spacetimedb": "2.6.*"
+    "spacetimedb": "2.6.*",
+    "zod": "^3.22.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
     "esbuild": "^0.24.0",
-    "typescript": "~5.6.2"
+    "typescript": "~5.6.2",
+    "vitest": "^2.0.0"
   }
 }

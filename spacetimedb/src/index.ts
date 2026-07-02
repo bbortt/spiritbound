@@ -17,6 +17,10 @@ import { schema, table, t } from 'spacetimedb/server';
 import { SenderError } from 'spacetimedb/server';
 import { ScheduleAt } from 'spacetimedb';
 
+// @ts-ignore — JSON import resolved by esbuild; loader.ts (node:fs) is tree-shaken from this bundle
+import cardsJson from '../../content/cards.json';
+import { parseCards } from '../../content/validate';
+
 import {
   computeSpiritLevel,
   computeAttunementSlots,
@@ -87,9 +91,15 @@ const zone = table(
 );
 
 const cardDefinition = table(
-  { name: 'card_definition', public: true },
+  {
+    name: 'card_definition',
+    public: true,
+    indexes: [{ accessor: 'slug', algorithm: 'btree', columns: ['slug'] }],
+    constraints: [{ name: 'card_definition_slug_key', constraint: 'unique', columns: ['slug'] }],
+  },
   {
     cardDefId:          t.u32().primaryKey(),
+    slug:               t.string(),
     name:               t.string(),
     rarity:             TRarity,
     cardType:           TCardType,
@@ -268,6 +278,10 @@ const db = schema({
 
 export default db;
 
+// Validate card data at module load — module refuses to start if cards.json is invalid.
+// In Node.js contexts use loadCards() from content/validate; here we bundle the JSON statically.
+const CARD_DEFS = parseCards(cardsJson as unknown[]);
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // LIFECYCLE HOOKS
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -284,14 +298,64 @@ export const onConnect = db.clientConnected((ctx) => {
   }
 });
 
-/** Runs once when the module is first published. Seeds enemies and starts the damage ticker. */
+/** Runs once when the module is first published. Seeds cards + enemies and starts the damage ticker. */
 export const init = db.init((ctx) => {
+  _doSeedCards(ctx);
   _seedZone1Enemies(ctx);
   ctx.db.enemyTickSchedule.insert({
     scheduledId: 0n,
     scheduledAt: ScheduleAt.interval(500_000n),  // fire every 500 ms
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// REDUCERS — card seeding
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function _doSeedCards(ctx: any): void {
+  let inserted = 0;
+  let updated  = 0;
+
+  for (let i = 0; i < CARD_DEFS.length; i++) {
+    const card      = CARD_DEFS[i];
+    const cardDefId = i + 1;  // stable 1-based ID; slug is the idempotency key
+
+    const rowData = {
+      slug:              card.slug,
+      name:              card.name,
+      rarity:            { tag: card.rarity },
+      cardType:          { tag: card.type },
+      passiveKind:       { tag: card.passiveKind ?? 'none' },
+      scalingSchool:     { tag: card.school },
+      baseShape:         { tag: card.shape },
+      basePower:         card.basePower,
+      baseCooldown:      card.cooldownSeconds,
+      mpCost:            card.mpCost,
+      minCharacterLevel: card.minLevel,
+      flavor:            card.flavor,
+    };
+
+    const existing = ctx.db.cardDefinition.slug.find(card.slug);
+    if (existing) {
+      ctx.db.cardDefinition.cardDefId.update({ cardDefId: existing.cardDefId, ...rowData });
+      updated++;
+    } else {
+      ctx.db.cardDefinition.insert({ cardDefId, ...rowData });
+      inserted++;
+    }
+  }
+
+  console.log(`[seedCards] ${inserted} inserted, ${updated} updated`);
+}
+
+/**
+ * seedCards — upserts all cards from content/cards.json into cardDefinition.
+ * TODO: restrict to module owner identity before shipping to production.
+ */
+export const seedCards = db.reducer(
+  {},
+  (ctx) => { _doSeedCards(ctx); },
+);
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // PRIVATE REDUCER HELPERS

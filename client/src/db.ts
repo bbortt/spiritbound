@@ -62,6 +62,7 @@ function _subscribeSlice(
       'SELECT * FROM account_progress',
       'SELECT * FROM zone',
       'SELECT * FROM enemy',
+      'SELECT * FROM card_definition',
     ]);
 }
 

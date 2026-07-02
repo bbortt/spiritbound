@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import type { Identity } from 'spacetimedb';
 import { connect, callReducer, type DbConnection } from '../db';
-import type { Character, PersonalSpirit, Enemy } from '../db';
+import type { Character, PersonalSpirit, Enemy, CardDefinition } from '../db';
 
 // ── Tilemap constants ─────────────────────────────────────────────────────────
 const TILE_SIZE  = 48;
@@ -32,12 +32,9 @@ const ATTACK_HALF_ANG = 15 * Math.PI / 180;
 const ATTACK_COOLDOWN = 500;
 const ATTACK_DAMAGE   = 10;
 
-// Card 1 — Ember Strike
+// Card 1 — Ember Strike geometry (fixed; actual power values come from DB)
 const EMBER_RANGE    = 320;
 const EMBER_HALF_ANG = 30 * Math.PI / 180;
-const EMBER_COOLDOWN = 1200;
-const EMBER_MP_COST  = 10;
-const EMBER_DAMAGE   = 25;
 const EMBER_MP_REGEN = 2;
 
 const maxHp = (level: number) => 100 + level * 15;
@@ -141,6 +138,10 @@ class CastController {
     this.indicatorGfx.clear();
   }
 
+  setCooldown(ms: number): void {
+    this.cfg.cooldown = ms;
+  }
+
   update() {
     const now = this.scene.time.now;
     const { slotX: sx, slotY: sy, cooldown } = this.cfg;
@@ -240,8 +241,12 @@ export class GameScene extends Phaser.Scene {
   private clientMp = 0;
 
   private emberCast!: CastController;
+  private emberDef: CardDefinition | null = null;
+  private emberDamage = 25;   // default; overwritten when card_definition row arrives
+  private emberMpCost = 10;   // default; overwritten when card_definition row arrives
   private slot1X = 0;
   private slot1Y = 0;
+  private slot1Label!: Phaser.GameObjects.Text;
 
   private hudBars!: Phaser.GameObjects.Graphics;
   private hpText!: Phaser.GameObjects.Text;
@@ -322,6 +327,8 @@ export class GameScene extends Phaser.Scene {
     this.conn.db.enemy.onInsert((_ctx, row) => this._onEnemyInsert(row));
     this.conn.db.enemy.onUpdate?.((_ctx, old, row) => this._onEnemyUpdate(old, row));
     this.conn.db.enemy.onDelete((_ctx, row) => this._onEnemyDelete(row));
+    this.conn.db.cardDefinition.onInsert((_ctx, row) => this._onCardDefRow(row));
+    this.conn.db.cardDefinition.onUpdate?.((_ctx, _old, row) => this._onCardDefRow(row));
   }
 
   update(_time: number, delta: number) {
@@ -530,6 +537,18 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  // ── Card definition callbacks ─────────────────────────────────────────────────
+
+  private _onCardDefRow(row: CardDefinition) {
+    if (row.slug === 'ember-strike') {
+      this.emberDef    = row;
+      this.emberDamage = row.basePower;
+      this.emberMpCost = row.mpCost;
+      this.emberCast.setCooldown(row.baseCooldown * 1000);
+      this.slot1Label?.setText(row.name);
+    }
+  }
+
   // ── Cast controllers ──────────────────────────────────────────────────────────
 
   private _createCasts() {
@@ -538,14 +557,14 @@ export class GameScene extends Phaser.Scene {
       range:          EMBER_RANGE,
       halfAngle:      EMBER_HALF_ANG,
       indicatorColor: 0xff7700,
-      cooldown:       EMBER_COOLDOWN,
-      mpCost:         EMBER_MP_COST,
+      cooldown:       1200,   // default until card_definition row arrives
+      mpCost:         this.emberMpCost,
       slotX:          this.slot1X,
       slotY:          this.slot1Y,
       getPlayerPos:   () => ({ x: this.playerCircle.x, y: this.playerCircle.y }),
       isAlive:        () => !!this.localCharacter?.alive,
-      hasMp:          () => this.clientMp >= EMBER_MP_COST,
-      spendMp:        () => { this.clientMp -= EMBER_MP_COST; },
+      hasMp:          () => this.clientMp >= this.emberMpCost,
+      spendMp:        () => { this.clientMp -= this.emberMpCost; },
       onFire:         (nx, ny) => this._executeEmberStrike(nx, ny),
     });
   }
@@ -730,8 +749,8 @@ export class GameScene extends Phaser.Scene {
             callReducer('damageEnemy', () =>
               this.conn.reducers.damageEnemy({
                 enemyId: data.enemyId,
-                damage:  EMBER_DAMAGE,
-                school:  { tag: 'Magical' },
+                damage:  Math.round(this.emberDamage),
+                school:  this.emberDef?.scalingSchool ?? { tag: 'Physical' as const },
               }),
             );
             this._emberBurnFlash(data);
@@ -997,7 +1016,7 @@ export class GameScene extends Phaser.Scene {
     art.fillStyle(0xc43a08, 1);
     art.fillRect(ax + 2, activeY + 2, CARD_SW - 4, CARD_SH - 4);
 
-    this.add
+    this.slot1Label = this.add
       .text(ax + CARD_SW / 2, activeY + CARD_SH / 2, 'Ember\nStrike', {
         fontSize: '9px',
         color: '#ffffff',

@@ -77,9 +77,13 @@ const tablesSchema = __schema({
       { accessor: 'cardDefId', name: 'card_definition_card_def_id_idx_btree', algorithm: 'btree', columns: [
         'cardDefId',
       ] },
+      { accessor: 'slug', name: 'card_definition_slug_idx_btree', algorithm: 'btree', columns: [
+        'slug',
+      ] },
     ],
     constraints: [
       { name: 'card_definition_card_def_id_key', constraint: 'unique', columns: ['cardDefId'] },
+      { name: 'card_definition_slug_key', constraint: 'unique', columns: ['slug'] },
     ],
   }, CardDefinitionRow),
   cardInstance: __table({
