@@ -73,6 +73,7 @@ const TCardType    = t.enum('CardType',    { active: t.unit(), passive: t.unit()
 const TPassiveKind = t.enum('PassiveKind', { ward: t.unit(), triggered: t.unit(), none: t.unit() });
 const TSchool      = t.enum('DamageSchool',{ physical: t.unit(), magical: t.unit() });
 const TShape       = t.enum('ShapeType',   { cone: t.unit(), line: t.unit(), arc: t.unit(), circle: t.unit() });
+const TCastState   = t.enum('CastState',   { idle: t.unit(), casting: t.unit(), cooldown: t.unit() });
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CONTENT TABLES  (static game data — written by tooling, read by everyone)
@@ -230,6 +231,11 @@ const enemy = table(
     attackRangePx:         t.f32(),
     attackCooldownSeconds: t.f32(),
     lastAttackAt:          t.option(t.timestamp()),
+    castState:             TCastState,
+    castStartedAt:         t.option(t.timestamp()),
+    castDurationSeconds:   t.f32(),
+    castShape:             TShape,
+    castDamage:            t.i32(),
   },
 );
 
@@ -390,8 +396,13 @@ function _seedZone1Enemies(ctx: any): void {
       alive:                 true,
       damagePerHit:          8,
       attackRangePx:         220,
-      attackCooldownSeconds: 1.5,
+      attackCooldownSeconds: 3.0,
       lastAttackAt:          undefined,
+      castState:             { tag: 'idle' },
+      castStartedAt:         undefined,
+      castDurationSeconds:   1.8,
+      castShape:             { tag: 'circle' },
+      castDamage:            15,
     });
   }
 }
@@ -675,8 +686,13 @@ export const spawnEnemy = db.reducer(
       alive:                 true,
       damagePerHit:          8,
       attackRangePx:         220,
-      attackCooldownSeconds: 1.5,
+      attackCooldownSeconds: 3.0,
       lastAttackAt:          undefined,
+      castState:             { tag: 'idle' },
+      castStartedAt:         undefined,
+      castDurationSeconds:   1.8,
+      castShape:             { tag: 'circle' },
+      castDamage:            15,
     });
   },
 );
@@ -713,7 +729,8 @@ export const damageEnemy = db.reducer(
 
 /**
  * enemyTick — runs every 500 ms (Interval schedule, row never deleted).
- * For each alive enemy, finds alive characters in range and damages the closest.
+ * Drives a three-state machine per enemy: idle → casting → cooldown → idle.
+ * Damage fires only after castDurationSeconds, hitting every character in the AoE.
  */
 export const enemyTick = db.reducer(
   { scheduleRow: enemyTickRow },
@@ -721,38 +738,64 @@ export const enemyTick = db.reducer(
     for (const e of ctx.db.enemy) {
       if (!e.alive) continue;
 
-      // Cooldown check
-      const cooldownUs = BigInt(Math.round(e.attackCooldownSeconds * 1_000_000));
-      const readyToAttack = e.lastAttackAt === undefined ||
-        ctx.timestamp.microsSinceUnixEpoch - e.lastAttackAt.microsSinceUnixEpoch >= cooldownUs;
-      if (!readyToAttack) continue;
+      const castTag = e.castState.tag as 'idle' | 'casting' | 'cooldown';
 
-      // Find alive characters in same zone within attack range
-      const nearby = [...ctx.db.character.by_zone.filter(e.zoneId)].filter((c: any) => {
-        if (!c.alive) return false;
-        const dx = c.posX - e.posX;
-        const dy = c.posY - e.posY;
-        return dx * dx + dy * dy <= e.attackRangePx * e.attackRangePx;
-      });
-      if (nearby.length === 0) continue;
+      if (castTag === 'idle') {
+        // Begin a cast when any character enters range
+        const nearby = [...ctx.db.character.by_zone.filter(e.zoneId)].some((c: any) => {
+          if (!c.alive) return false;
+          const dx = c.posX - e.posX;
+          const dy = c.posY - e.posY;
+          return dx * dx + dy * dy <= e.attackRangePx * e.attackRangePx;
+        });
+        if (nearby) {
+          ctx.db.enemy.enemyId.update({
+            ...e,
+            castState:     { tag: 'casting' },
+            castStartedAt: ctx.timestamp,
+          });
+        }
 
-      // Closest character
-      const target = nearby.reduce((best: any, c: any) => {
-        const dx = c.posX - e.posX, dy = c.posY - e.posY;
-        const bdx = best.posX - e.posX, bdy = best.posY - e.posY;
-        return (dx * dx + dy * dy) < (bdx * bdx + bdy * bdy) ? c : best;
-      });
+      } else if (castTag === 'casting') {
+        // Check whether the cast duration has elapsed
+        if (e.castStartedAt === undefined) continue;
+        const elapsedUs  = ctx.timestamp.microsSinceUnixEpoch - e.castStartedAt.microsSinceUnixEpoch;
+        const durationUs = BigInt(Math.round(e.castDurationSeconds * 1_000_000));
+        if (elapsedUs >= durationUs) {
+          // Fire: damage every alive character still in the AoE
+          for (const c of [...ctx.db.character.by_zone.filter(e.zoneId)]) {
+            if (!(c as any).alive) continue;
+            const dx = (c as any).posX - e.posX;
+            const dy = (c as any).posY - e.posY;
+            if (dx * dx + dy * dy > e.attackRangePx * e.attackRangePx) continue;
+            const newHp = (c as any).currentHp - e.castDamage;
+            if (newHp <= 0) {
+              _handleDeath(ctx, c);
+            } else {
+              ctx.db.character.characterId.update({ ...(c as any), currentHp: newHp });
+            }
+          }
+          ctx.db.enemy.enemyId.update({
+            ...e,
+            castState:     { tag: 'cooldown' },
+            castStartedAt: undefined,
+            lastAttackAt:  ctx.timestamp,
+          });
+        }
 
-      // Apply damage
-      const newHp = target.currentHp - e.damagePerHit;
-      if (newHp <= 0) {
-        _handleDeath(ctx, target);
-      } else {
-        ctx.db.character.characterId.update({ ...target, currentHp: newHp });
+      } else if (castTag === 'cooldown') {
+        // Return to idle once the cooldown window has passed
+        if (e.lastAttackAt === undefined) continue;
+        const elapsedUs  = ctx.timestamp.microsSinceUnixEpoch - e.lastAttackAt.microsSinceUnixEpoch;
+        const cooldownUs = BigInt(Math.round(e.attackCooldownSeconds * 1_000_000));
+        if (elapsedUs >= cooldownUs) {
+          ctx.db.enemy.enemyId.update({
+            ...e,
+            castState:     { tag: 'idle' },
+            castStartedAt: undefined,
+          });
+        }
       }
-
-      // Record attack time
-      ctx.db.enemy.enemyId.update({ ...e, lastAttackAt: ctx.timestamp });
     }
   },
 );
@@ -769,11 +812,13 @@ export const respawnEnemy = db.reducer(
     if (!e || e.alive) return;
     ctx.db.enemy.enemyId.update({
       ...e,
-      currentHp:    e.maxHp,
-      alive:        true,
-      posX:         e.spawnX,
-      posY:         e.spawnY,
-      lastAttackAt: undefined,
+      currentHp:     e.maxHp,
+      alive:         true,
+      posX:          e.spawnX,
+      posY:          e.spawnY,
+      lastAttackAt:  undefined,
+      castState:     { tag: 'idle' },
+      castStartedAt: undefined,
     });
   },
 );

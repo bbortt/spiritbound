@@ -61,6 +61,14 @@ export const CardType = __t.enum("CardType", {
 });
 export type CardType = __Infer<typeof CardType>;
 
+// The tagged union or sum type for the algebraic type `CastState`.
+export const CastState = __t.enum("CastState", {
+  Idle: __t.unit(),
+  Casting: __t.unit(),
+  Cooldown: __t.unit(),
+});
+export type CastState = __Infer<typeof CastState>;
+
 export const Enemy = __t.object("Enemy", {
   enemyId: __t.u64(),
   zoneId: __t.u32(),
@@ -75,6 +83,15 @@ export const Enemy = __t.object("Enemy", {
   attackRangePx: __t.f32(),
   attackCooldownSeconds: __t.f32(),
   lastAttackAt: __t.option(__t.timestamp()),
+  get castState() {
+    return CastState;
+  },
+  castStartedAt: __t.option(__t.timestamp()),
+  castDurationSeconds: __t.f32(),
+  get castShape() {
+    return ShapeType;
+  },
+  castDamage: __t.i32(),
 });
 export type Enemy = __Infer<typeof Enemy>;
 

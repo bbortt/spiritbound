@@ -3,11 +3,6 @@
   <component name="ChangeListManager">
     <list default="true" id="5b82f24a-a837-4858-bdad-b79b887f77ac" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/client/src/db.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/db.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/client/src/generated/index.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/generated/index.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/client/src/generated/types.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/generated/types.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/client/src/scenes/GameScene.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/scenes/GameScene.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/spacetimedb/src/index.ts" beforeDir="false" afterPath="$PROJECT_DIR$/spacetimedb/src/index.ts" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -66,7 +61,7 @@
       <recent name="D:\dev\workspaces\fun\eldoria\src\core" />
     </key>
   </component>
-  <component name="RunManager" selected="npm.spacetime:publish:local">
+  <component name="RunManager" selected="npm.ui:start">
     <configuration name="db:start" type="js.build_tools.npm" temporary="true" nameIsGenerated="true">
       <package-json value="$PROJECT_DIR$/package.json" />
       <command value="run" />
@@ -104,9 +99,9 @@
     </list>
     <recent_temporary>
       <list>
+        <item itemvalue="npm.ui:start" />
         <item itemvalue="npm.spacetime:publish:local" />
         <item itemvalue="npm.db:start" />
-        <item itemvalue="npm.ui:start" />
       </list>
     </recent_temporary>
   </component>
@@ -137,7 +132,8 @@
       <workItem from="1782051302351" duration="11471000" />
       <workItem from="1782474960018" duration="322000" />
       <workItem from="1782831891964" duration="6792000" />
-      <workItem from="1782916439548" duration="598000" />
+      <workItem from="1782916439548" duration="7954000" />
+      <workItem from="1783022288567" duration="500000" />
     </task>
     <servers />
   </component>

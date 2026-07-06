@@ -95,6 +95,12 @@ type EnemyGfx = {
   alive: boolean;
   bodyGfx: Phaser.GameObjects.Graphics;
   hpBarGfx: Phaser.GameObjects.Graphics;
+  castCircleGfx: Phaser.GameObjects.Graphics;
+  castBarGfx: Phaser.GameObjects.Graphics;
+  castState: 'Idle' | 'Casting' | 'Cooldown';
+  castStartedAtMs: number | null;
+  castDurationMs: number;
+  castRadius: number;
 };
 
 // ── CastController ─────────────────────────────────────────────────────────────
@@ -320,7 +326,7 @@ export class GameScene extends Phaser.Scene {
     });
 
     this.conn.db.character.onInsert((_ctx, row) => this._onCharInsert(row));
-    this.conn.db.character.onUpdate?.((_ctx, _old, row) => this._onCharUpdate(row));
+    this.conn.db.character.onUpdate?.((_ctx, old, row) => this._onCharUpdate(old, row));
     this.conn.db.character.onDelete((_ctx, row) => this._onCharDelete(row));
     this.conn.db.personalSpirit.onInsert((_ctx, row) => this._onSpiritRow(row));
     this.conn.db.personalSpirit.onUpdate?.((_ctx, _old, row) => this._onSpiritRow(row));
@@ -385,6 +391,7 @@ export class GameScene extends Phaser.Scene {
 
     this._updateHud();
     this.emberCast.update();
+    this._updateCastTelegraphs();
   }
 
   // ── Identity ─────────────────────────────────────────────────────────────────
@@ -410,10 +417,15 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  private _onCharUpdate(row: Character) {
+  private _onCharUpdate(old: Character, row: Character) {
     if (this._isLocal(row.accountIdentity)) {
       const wasAlive = this.localCharacter?.alive;
       this.localCharacter = row;
+
+      if (row.alive && old.alive) {
+        const hpLost = old.currentHp - row.currentHp;
+        if (hpLost > 0) this._showPlayerHitFeedback(hpLost);
+      }
 
       if (!row.alive && wasAlive) {
         this._showDeathOverlay();
@@ -470,7 +482,9 @@ export class GameScene extends Phaser.Scene {
     bodyGfx.setPosition(row.posX, row.posY);
     bodyGfx.setDepth(1);
 
-    const hpBarGfx = this.add.graphics().setDepth(2);
+    const hpBarGfx      = this.add.graphics().setDepth(2);
+    const castCircleGfx = this.add.graphics().setDepth(0.5).setVisible(false);
+    const castBarGfx    = this.add.graphics().setDepth(3).setVisible(false);
 
     const data: EnemyGfx = {
       enemyId: row.enemyId,
@@ -481,6 +495,14 @@ export class GameScene extends Phaser.Scene {
       alive: row.alive,
       bodyGfx,
       hpBarGfx,
+      castCircleGfx,
+      castBarGfx,
+      castState:       row.castState.tag as 'Idle' | 'Casting' | 'Cooldown',
+      castStartedAtMs: row.castStartedAt
+        ? Number(row.castStartedAt.microsSinceUnixEpoch) / 1000
+        : null,
+      castDurationMs: row.castDurationSeconds * 1000,
+      castRadius:     row.attackRangePx,
     };
     this._drawEnemyHpBar(data);
     this.dbEnemies.set(row.enemyId, data);
@@ -490,9 +512,9 @@ export class GameScene extends Phaser.Scene {
     const data = this.dbEnemies.get(row.enemyId);
     if (!data) return;
 
-    data.x    = row.posX;
-    data.y    = row.posY;
-    data.hp   = row.currentHp;
+    data.x     = row.posX;
+    data.y     = row.posY;
+    data.hp    = row.currentHp;
     data.alive = row.alive;
 
     const dmg = old.currentHp - row.currentHp;
@@ -501,8 +523,48 @@ export class GameScene extends Phaser.Scene {
       this._showFloatingDamage(data.x, data.y - ENEMY_R - 20, dmg, '#ffffff');
     }
 
+    // ── Cast state transitions ─────────────────────────────────────────────────
+    const wasCasting  = old.castState.tag === 'Casting';
+    const nowCasting  = row.castState.tag === 'Casting';
+    const nowCooldown = row.castState.tag === 'Cooldown';
+    const nowIdle     = row.castState.tag === 'Idle';
+
+    if (!wasCasting && nowCasting) {
+      // IDLE → CASTING: show telegraph
+      data.castState       = 'Casting';
+      data.castStartedAtMs = row.castStartedAt
+        ? Number(row.castStartedAt.microsSinceUnixEpoch) / 1000
+        : Date.now();
+      data.castDurationMs = row.castDurationSeconds * 1000;
+      data.castCircleGfx.setVisible(true);
+      data.castBarGfx.setVisible(true);
+    } else if (wasCasting && nowCooldown) {
+      // CASTING → COOLDOWN: flash and remove telegraph
+      data.castState = 'Cooldown';
+      data.castCircleGfx.clear();
+      data.castCircleGfx.fillStyle(0xff0000, 0.6);
+      data.castCircleGfx.fillCircle(data.x, data.y, data.castRadius);
+      data.castBarGfx.clear();
+      this.time.delayedCall(150, () => {
+        data.castCircleGfx.clear();
+        data.castCircleGfx.setVisible(false);
+        data.castBarGfx.setVisible(false);
+      });
+    } else if (nowIdle && data.castState !== 'Idle') {
+      // COOLDOWN → IDLE
+      data.castState       = 'Idle';
+      data.castStartedAtMs = null;
+      data.castCircleGfx.setVisible(false).clear();
+      data.castBarGfx.setVisible(false).clear();
+    } else {
+      data.castState = row.castState.tag as 'Idle' | 'Casting' | 'Cooldown';
+    }
+
     if (!row.alive && old.alive) {
-      // Death flash → fade
+      // Death: cancel telegraph, flash white and fade
+      data.castCircleGfx.clear().setVisible(false);
+      data.castBarGfx.clear().setVisible(false);
+      data.castState = 'Idle';
       data.hpBarGfx.setVisible(false);
       data.bodyGfx.clear();
       data.bodyGfx.fillStyle(0xffffff, 1);
@@ -517,7 +579,11 @@ export class GameScene extends Phaser.Scene {
     }
 
     if (row.alive && !old.alive) {
-      // Respawn: restore visuals at new position
+      // Respawn: restore visuals at spawn position
+      data.castState       = 'Idle';
+      data.castStartedAtMs = null;
+      data.castCircleGfx.clear().setVisible(false);
+      data.castBarGfx.clear().setVisible(false);
       data.bodyGfx.setAlpha(1).setVisible(true);
       data.bodyGfx.clear();
       data.bodyGfx.fillStyle(0x8b0000, 1);
@@ -533,6 +599,8 @@ export class GameScene extends Phaser.Scene {
     if (data) {
       data.bodyGfx.destroy();
       data.hpBarGfx.destroy();
+      data.castCircleGfx.destroy();
+      data.castBarGfx.destroy();
       this.dbEnemies.delete(row.enemyId);
     }
   }
@@ -651,6 +719,87 @@ export class GameScene extends Phaser.Scene {
       }
     }
     return { x: clickX, y: clickY };
+  }
+
+  // ── Cast telegraph ────────────────────────────────────────────────────────────
+
+  private _updateCastTelegraphs() {
+    const now = this.time.now;
+    for (const [, data] of this.dbEnemies) {
+      if (data.castState !== 'Casting' || data.castStartedAtMs === null) continue;
+
+      const elapsed  = Date.now() - data.castStartedAtMs;
+      const fraction = Math.min(elapsed / data.castDurationMs, 1.0);
+      const pulse    = 1.0 + 0.04 * Math.sin((now / 300) * Math.PI);
+      const r        = data.castRadius * pulse;
+
+      data.castCircleGfx.clear();
+      data.castCircleGfx.fillStyle(0xff2222, 0.12);
+      data.castCircleGfx.fillCircle(data.x, data.y, r);
+      data.castCircleGfx.lineStyle(2, 0xff2222, 0.85);
+      data.castCircleGfx.strokeCircle(data.x, data.y, r);
+
+      this._drawCastBar(data, fraction);
+    }
+  }
+
+  private _drawCastBar(data: EnemyGfx, fraction: number) {
+    const remaining = 1.0 - fraction;
+    const W = 48, H = 4;
+    const bx = data.x - W / 2;
+    const by = data.y - ENEMY_R - 26;
+
+    // White (remaining=1) → red (remaining=0)
+    const gb       = Math.round(255 * remaining);
+    const barColor = (0xff << 16) | (gb << 8) | gb;
+
+    data.castBarGfx.clear();
+    data.castBarGfx.fillStyle(0x222222, 0.85);
+    data.castBarGfx.fillRect(bx, by, W, H);
+    if (remaining > 0.001) {
+      data.castBarGfx.fillStyle(barColor, 1);
+      data.castBarGfx.fillRect(bx, by, W * remaining, H);
+    }
+  }
+
+  // ── Player hit feedback ───────────────────────────────────────────────────────
+
+  private _showPlayerHitFeedback(damage: number) {
+    const W = this.cameras.main.width;
+    const H = this.cameras.main.height;
+
+    const vignette = this.add.graphics().setScrollFactor(0).setDepth(16);
+    vignette.fillStyle(0xff0000, 0.35);
+    vignette.fillRect(0, 0, W, H);
+    this.tweens.add({
+      targets: vignette,
+      alpha: 0,
+      duration: 300,
+      ease: 'Quad.easeOut',
+      onComplete: () => vignette.destroy(),
+    });
+
+    const px  = this.playerCircle.x;
+    const py  = this.playerCircle.y;
+    const txt = this.add
+      .text(px, py - PLAYER_R - 10, `-${damage}`, {
+        fontSize: '18px',
+        color: '#ff4444',
+        fontFamily: 'monospace',
+        stroke: '#000000',
+        strokeThickness: 3,
+      })
+      .setOrigin(0.5)
+      .setDepth(10);
+
+    this.tweens.add({
+      targets: txt,
+      y: py - PLAYER_R - 50,
+      alpha: 0,
+      duration: 800,
+      ease: 'Quad.easeOut',
+      onComplete: () => txt.destroy(),
+    });
   }
 
   // ── Enemy HP bar ──────────────────────────────────────────────────────────────
