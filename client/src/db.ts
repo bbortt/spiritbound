@@ -63,6 +63,9 @@ function _subscribeSlice(
       'SELECT * FROM zone',
       'SELECT * FROM enemy',
       'SELECT * FROM card_definition',
+      'SELECT * FROM card_drop',
+      'SELECT * FROM card_instance',
+      'SELECT * FROM equipped_card',
     ]);
 }
 

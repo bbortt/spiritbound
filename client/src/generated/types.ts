@@ -95,6 +95,16 @@ export const Enemy = __t.object("Enemy", {
 });
 export type Enemy = __Infer<typeof Enemy>;
 
+export const CardDrop = __t.object("CardDrop", {
+  dropId: __t.u64(),
+  cardDefId: __t.u32(),
+  zoneId: __t.u32(),
+  posX: __t.f32(),
+  posY: __t.f32(),
+  createdAt: __t.timestamp(),
+});
+export type CardDrop = __Infer<typeof CardDrop>;
+
 export const Character = __t.object("Character", {
   characterId: __t.u64(),
   accountIdentity: __t.identity(),

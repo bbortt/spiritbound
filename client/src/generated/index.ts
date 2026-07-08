@@ -35,6 +35,7 @@ import {
 
 // Import all reducer arg schemas
 import ApplyDamageReducer from "./apply_damage_reducer";
+import PickupCardReducer from "./pickup_card_reducer";
 import DamageEnemyReducer from "./damage_enemy_reducer";
 import EquipCardReducer from "./equip_card_reducer";
 import GrantXpReducer from "./grant_xp_reducer";
@@ -48,6 +49,7 @@ import UnequipCardReducer from "./unequip_card_reducer";
 
 // Import all table schema definitions
 import AccountProgressRow from "./account_progress_table";
+import CardDropRow from "./card_drop_table";
 import CardDefinitionRow from "./card_definition_table";
 import CardInstanceRow from "./card_instance_table";
 import CharacterRow from "./character_table";
@@ -71,6 +73,16 @@ const tablesSchema = __schema({
       { name: 'account_progress_account_identity_key', constraint: 'unique', columns: ['accountIdentity'] },
     ],
   }, AccountProgressRow),
+  cardDrop: __table({
+    name: 'card_drop',
+    indexes: [
+      { accessor: 'dropId', name: 'card_drop_drop_id_idx_btree', algorithm: 'btree', columns: ['dropId'] },
+      { accessor: 'by_zone', name: 'card_drop_zone_id_idx_btree', algorithm: 'btree', columns: ['zoneId'] },
+    ],
+    constraints: [
+      { name: 'card_drop_drop_id_key', constraint: 'unique', columns: ['dropId'] },
+    ],
+  }, CardDropRow),
   cardDefinition: __table({
     name: 'card_definition',
     indexes: [
@@ -180,6 +192,7 @@ const reducersSchema = __reducers(
   __reducerSchema("start_life", StartLifeReducer),
   __reducerSchema("toggle_attune", ToggleAttuneReducer),
   __reducerSchema("unequip_card", UnequipCardReducer),
+  __reducerSchema("pickup_card", PickupCardReducer),
 );
 
 /** The schema information for all procedures in this module. This is defined the same way as the procedures would have been defined in the server. */

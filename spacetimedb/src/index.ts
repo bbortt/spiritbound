@@ -186,7 +186,7 @@ const character = table(
 const equippedCard = table(
   {
     name: 'equipped_card',
-    public: false,
+    public: true,
     indexes: [
       { accessor: 'by_character', algorithm: 'btree', columns: ['characterId'] },
     ],
@@ -197,6 +197,27 @@ const equippedCard = table(
     cardInstanceId:   t.u64(),
     slotType:         TCardType,
     slotIndex:        t.u32(),
+  },
+);
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// LOOT TABLES
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** Ground drop — spawned on enemy death, despawned after 60 s or on pickup. */
+const cardDrop = table(
+  {
+    name: 'card_drop',
+    public: true,
+    indexes: [{ accessor: 'by_zone', algorithm: 'btree', columns: ['zoneId'] }],
+  },
+  {
+    dropId:    t.u64().primaryKey().autoInc(),
+    cardDefId: t.u32(),
+    zoneId:    t.u32(),
+    posX:      t.f32(),
+    posY:      t.f32(),
+    createdAt: t.timestamp(),
   },
 );
 
@@ -239,6 +260,18 @@ const enemy = table(
   },
 );
 
+// Row schema for card-drop cleanup schedule
+const cardDropCleanupRow = t.row({
+  scheduledId: t.u64().primaryKey().autoInc(),
+  scheduledAt: t.scheduleAt(),
+});
+
+// Fires every 10 s; deletes drops older than 60 s.
+const cardDropCleanupSchedule = table(
+  { name: 'card_drop_cleanup_schedule', scheduled: () => cardDropCleanup },
+  cardDropCleanupRow,
+);
+
 // Row schemas extracted to break the forward/backward type-reference cycle:
 // table references reducer (via thunk), reducer references row schema (explicit).
 // Using the same RowBuilder object for both ensures the SDK deduplicates the type
@@ -277,9 +310,11 @@ const db = schema({
   cardInstance,
   character,
   equippedCard,
+  cardDrop,
   enemy,
   enemyTickSchedule,
   enemyRespawnSchedule,
+  cardDropCleanupSchedule,
 });
 
 export default db;
@@ -310,7 +345,11 @@ export const init = db.init((ctx) => {
   _seedZone1Enemies(ctx);
   ctx.db.enemyTickSchedule.insert({
     scheduledId: 0n,
-    scheduledAt: ScheduleAt.interval(500_000n),  // fire every 500 ms
+    scheduledAt: ScheduleAt.interval(500_000n),     // fire every 500 ms
+  });
+  ctx.db.cardDropCleanupSchedule.insert({
+    scheduledId: 0n,
+    scheduledAt: ScheduleAt.interval(10_000_000n),  // fire every 10 s
   });
 });
 
@@ -444,6 +483,35 @@ export const startLife = db.reducer(
       createdAt:        ctx.timestamp,
       diedAt:           undefined,
     });
+
+    // First-ever life: grant the tutorial starting hand (1 active card, auto-equipped).
+    // On subsequent lives the player re-equips surviving attuned cards at a spirit.
+    const ownedCards = [...ctx.db.cardInstance.by_owner.filter(ctx.sender)];
+    if (ownedCards.length === 0) {
+      const emberDef = ctx.db.cardDefinition.slug.find('ember-strike');
+      if (emberDef) {
+        ctx.db.cardInstance.insert({
+          cardInstanceId: 0n,
+          ownerIdentity:  ctx.sender,
+          cardDefId:      emberDef.cardDefId,
+          mergeLevel:     0,
+          attuned:        false,
+        });
+        // Query back to get the autoInc ID for both the character and card instance.
+        const newChar = [...ctx.db.character.by_account.filter(ctx.sender)].find((c: any) => c.alive);
+        const newCard = [...ctx.db.cardInstance.by_owner.filter(ctx.sender)]
+          .find((ci: any) => ci.cardDefId === emberDef.cardDefId);
+        if (newChar && newCard) {
+          ctx.db.equippedCard.insert({
+            equippedCardId: 0n,
+            characterId:    (newChar as any).characterId,
+            cardInstanceId: (newCard as any).cardInstanceId,
+            slotType:       { tag: 'active' },
+            slotIndex:      0,
+          });
+        }
+      }
+    }
   },
 );
 
@@ -721,8 +789,69 @@ export const damageEnemy = db.reducer(
         scheduledAt: ScheduleAt.time(ctx.timestamp.microsSinceUnixEpoch + 15_000_000n),
         enemyId:     e.enemyId,
       });
+      // Roll a card drop (70% chance)
+      _dropCardFromEnemy(ctx, e, char);
     } else {
       ctx.db.enemy.enemyId.update({ ...e, currentHp: newHp });
+    }
+  },
+);
+
+/** Roll a ground card drop when an enemy dies. 70% chance, random eligible card. */
+function _dropCardFromEnemy(ctx: any, e: any, char: any): void {
+  if (Math.random() >= 0.7) return;
+  const allDefs  = [...ctx.db.cardDefinition];
+  const eligible = allDefs.filter((def: any) => def.minCharacterLevel <= char.level);
+  if (eligible.length === 0) return;
+  const def = eligible[Math.floor(Math.random() * eligible.length)];
+  ctx.db.cardDrop.insert({
+    dropId:    0n,
+    cardDefId: def.cardDefId,
+    zoneId:    e.zoneId,
+    posX:      e.posX,
+    posY:      e.posY,
+    createdAt: ctx.timestamp,
+  });
+}
+
+/** pickupCard — player picks up a ground drop within 80 px. */
+export const pickupCard = db.reducer(
+  { dropId: t.u64() },
+  (ctx, { dropId }) => {
+    const char = activeCharacter(ctx);
+    if (!char) throw new SenderError('No active character');
+
+    const drop = ctx.db.cardDrop.dropId.find(dropId);
+    if (!drop) throw new SenderError('Drop not found');
+    if (drop.zoneId !== char.zoneId) throw new SenderError('Drop not in same zone');
+
+    const dx = char.posX - drop.posX;
+    const dy = char.posY - drop.posY;
+    if (dx * dx + dy * dy > 80 * 80) throw new SenderError('Too far from drop');
+
+    ctx.db.cardInstance.insert({
+      cardInstanceId: 0n,
+      ownerIdentity:  ctx.sender,
+      cardDefId:      drop.cardDefId,
+      mergeLevel:     0,
+      attuned:        false,
+    });
+    ctx.db.cardDrop.dropId.delete(dropId);
+
+    const def = ctx.db.cardDefinition.cardDefId.find(drop.cardDefId);
+    console.log(`[pickup] ${def?.name ?? '?'} → ${ctx.sender.toHexString().slice(0, 8)}...`);
+  },
+);
+
+/** cardDropCleanup — runs every 10 s, deletes drops older than 60 s. */
+export const cardDropCleanup = db.reducer(
+  { scheduleRow: cardDropCleanupRow },
+  (ctx, _args: any) => {
+    const maxAgeUs = 60_000_000n;
+    for (const drop of ctx.db.cardDrop) {
+      if (ctx.timestamp.microsSinceUnixEpoch - drop.createdAt.microsSinceUnixEpoch >= maxAgeUs) {
+        ctx.db.cardDrop.dropId.delete(drop.dropId);
+      }
     }
   },
 );

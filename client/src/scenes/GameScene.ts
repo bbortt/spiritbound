@@ -1,7 +1,8 @@
 import Phaser from 'phaser';
 import type { Identity } from 'spacetimedb';
 import { connect, callReducer, type DbConnection } from '../db';
-import type { Character, PersonalSpirit, Enemy, CardDefinition } from '../db';
+import type { Character, PersonalSpirit, Enemy, CardDefinition, CardDrop, CardInstance, EquippedCard } from '../db';
+import { CollectionPanel } from '../ui/CollectionPanel';
 
 // ── Tilemap constants ─────────────────────────────────────────────────────────
 const TILE_SIZE  = 48;
@@ -25,6 +26,20 @@ const STOP_RADIUS = 60;
 const CARD_SW  = 52;
 const CARD_SH  = 72;
 const CARD_GAP = 6;
+
+// Spirit anchor
+const SPIRIT_X = 360;
+const SPIRIT_Y = 360;
+const SPIRIT_PROX_R = 100;
+const DROP_PICKUP_R  = 80;
+
+const DROP_COLORS: Record<string, number> = {
+  Common: 0xcccccc, Uncommon: 0x44cc44, Rare: 0x4488ff, Epic: 0xaa44ff, Legendary: 0xffcc00,
+};
+
+function _rarityTag(tag: unknown): string {
+  return String((tag as any)?.tag ?? tag).match(/^(\w+)/)?.[1] ?? 'Common';
+}
 
 // Basic attack (right-click)
 const ATTACK_RANGE    = 280;
@@ -263,6 +278,18 @@ export class GameScene extends Phaser.Scene {
   // Death overlay
   private isDead = false;
   private deathOverlay!: Phaser.GameObjects.Graphics;
+  private deathSummaryText: Phaser.GameObjects.Text | null = null;
+
+  // Card lifecycle
+  private collectionPanel!: CollectionPanel;
+  private _cardDefs        = new Map<number, CardDefinition>();
+  private localCardInst    = new Map<bigint, CardInstance>();
+  private localEquipped    = new Map<bigint, EquippedCard>(); // key = equippedCardId
+  private worldDrops       = new Map<bigint, { dropRow: CardDrop; gfx: Phaser.GameObjects.Graphics; label: Phaser.GameObjects.Text }>();
+  private spiritGfx!: Phaser.GameObjects.Graphics;
+  private spiritLabel!:  Phaser.GameObjects.Text;
+  private nearSpirit      = false;
+  private nearDropId: bigint | null = null;
   private deathText!: Phaser.GameObjects.Text;
   private returnBtn!: Phaser.GameObjects.Text;
 
@@ -335,6 +362,58 @@ export class GameScene extends Phaser.Scene {
     this.conn.db.enemy.onDelete((_ctx, row) => this._onEnemyDelete(row));
     this.conn.db.cardDefinition.onInsert((_ctx, row) => this._onCardDefRow(row));
     this.conn.db.cardDefinition.onUpdate?.((_ctx, _old, row) => this._onCardDefRow(row));
+
+    this.conn.db.cardDrop.onInsert((_ctx, row) => this._onDropInsert(row));
+    this.conn.db.cardDrop.onDelete((_ctx, row) => this._onDropDelete(row));
+
+    this.conn.db.cardInstance.onInsert((_ctx, row) => {
+      this.localCardInst.set(row.cardInstanceId, row);
+      this.collectionPanel.onCardInsert(row);
+    });
+    this.conn.db.cardInstance.onUpdate?.((_ctx, old, row) => {
+      this.localCardInst.set(row.cardInstanceId, row);
+      this.collectionPanel.onCardUpdate(old, row);
+    });
+    this.conn.db.cardInstance.onDelete((_ctx, row) => {
+      this.localCardInst.delete(row.cardInstanceId);
+      this.collectionPanel.onCardDelete(row);
+    });
+
+    this.conn.db.equippedCard.onInsert((_ctx, row) => {
+      this.localEquipped.set(row.equippedCardId, row);
+      this.collectionPanel.onEquippedInsert(row);
+    });
+    this.conn.db.equippedCard.onDelete((_ctx, row) => {
+      this.localEquipped.delete(row.equippedCardId);
+      this.collectionPanel.onEquippedDelete(row);
+    });
+
+    // ── CollectionPanel ────────────────────────────────────────────────────────
+    this.collectionPanel = new CollectionPanel();
+    this.collectionPanel.onAction = (action, payload) => this._onPanelAction(action, payload);
+
+    // ── Spirit ─────────────────────────────────────────────────────────────────
+    this.spiritGfx = this.add.graphics().setDepth(0.8);
+    this.spiritGfx.fillStyle(0xffd700, 0.25);
+    this.spiritGfx.fillCircle(SPIRIT_X, SPIRIT_Y, 22);
+    this.spiritGfx.lineStyle(2, 0xffd700, 0.9);
+    this.spiritGfx.strokeCircle(SPIRIT_X, SPIRIT_Y, 22);
+    this.tweens.add({
+      targets: this.spiritGfx,
+      alpha: { from: 0.6, to: 1.0 },
+      duration: 1200,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
+
+    this.spiritLabel = this.add
+      .text(SPIRIT_X, SPIRIT_Y - 34, 'Press E — Spirit', {
+        fontSize: '11px', color: '#ffd700', fontFamily: 'monospace',
+      })
+      .setOrigin(0.5)
+      .setDepth(3)
+      .setVisible(false);
   }
 
   update(_time: number, delta: number) {
@@ -392,6 +471,7 @@ export class GameScene extends Phaser.Scene {
     this._updateHud();
     this.emberCast.update();
     this._updateCastTelegraphs();
+    this._updateProximity();
   }
 
   // ── Identity ─────────────────────────────────────────────────────────────────
@@ -428,7 +508,13 @@ export class GameScene extends Phaser.Scene {
       }
 
       if (!row.alive && wasAlive) {
-        this._showDeathOverlay();
+        const survived = [...this.localCardInst.values()]
+          .filter(ci => ci.attuned)
+          .map(ci => this._cardDefs.get(ci.cardDefId)?.name ?? '?');
+        const lost = [...this.localCardInst.values()]
+          .filter(ci => !ci.attuned)
+          .map(ci => this._cardDefs.get(ci.cardDefId)?.name ?? '?');
+        this._showDeathOverlay(survived, lost);
       }
 
       if (row.alive) {
@@ -608,6 +694,8 @@ export class GameScene extends Phaser.Scene {
   // ── Card definition callbacks ─────────────────────────────────────────────────
 
   private _onCardDefRow(row: CardDefinition) {
+    this._cardDefs.set(row.cardDefId, row);
+    this.collectionPanel?.onCardDefInsert(row);
     if (row.slug === 'ember-strike') {
       this.emberDef    = row;
       this.emberDamage = row.basePower;
@@ -663,6 +751,19 @@ export class GameScene extends Phaser.Scene {
       if (!this.localCharacter?.alive) return;
       this._fireBasicAttack(pointer.worldX, pointer.worldY);
     });
+
+    const kb = this.input.keyboard!;
+    kb.on('keydown-F', () => {
+      if (this.nearDropId != null) {
+        callReducer('pickup_card', () =>
+          this.conn.reducers.pickupCard({ dropId: this.nearDropId! }),
+        );
+      }
+    });
+    kb.on('keydown-E', () => {
+      if (this.nearSpirit) this.collectionPanel.open();
+    });
+    kb.on('keydown-C', () => this.collectionPanel.toggle());
   }
 
   // ── Tile collision helpers ────────────────────────────────────────────────────
@@ -1081,13 +1182,37 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  private _showDeathOverlay() {
+  private _showDeathOverlay(survived: string[] = [], lost: string[] = []) {
     this.isDead = true;
     this.emberCast.cancelIfHolding();
     this.moveLine.clear();
+    this.collectionPanel.close();
     this.deathOverlay.setVisible(true);
+
+    const W = this.cameras.main.width;
+    const H = this.cameras.main.height;
+    const lines = [
+      survived.length ? `Survived (attuned): ${survived.join(', ')}` : 'No cards were attuned.',
+      lost.length     ? `Lost: ${lost.join(', ')}` : '',
+    ].filter(Boolean).join('\n');
+    this.deathSummaryText = this.add
+      .text(W / 2, H / 2 - 140, lines, {
+        fontSize: '13px', color: '#aaaaaa', fontFamily: 'monospace',
+        align: 'center', lineSpacing: 6,
+      })
+      .setOrigin(0.5)
+      .setScrollFactor(0)
+      .setDepth(21);
+    this.time.delayedCall(3500, () => {
+      if (this.deathSummaryText) {
+        this.tweens.add({
+          targets: this.deathSummaryText, alpha: 0, duration: 500,
+          onComplete: () => { this.deathSummaryText?.destroy(); this.deathSummaryText = null; },
+        });
+      }
+    });
+
     this.deathText.setVisible(true);
-    // Delay the Return button by 2 s so the player reads the screen first
     this.time.delayedCall(2000, () => {
       if (this.isDead) this.returnBtn.setVisible(true);
     });
@@ -1095,6 +1220,8 @@ export class GameScene extends Phaser.Scene {
 
   private _hideDeathOverlay() {
     this.isDead = false;
+    this.deathSummaryText?.destroy();
+    this.deathSummaryText = null;
     this.deathOverlay.setVisible(false);
     this.deathText.setVisible(false);
     this.returnBtn.setVisible(false);
@@ -1206,6 +1333,115 @@ export class GameScene extends Phaser.Scene {
 
     if (this.localSpirit) {
       this.spiritLevelText.setText(`Spirit Lv ${this.localSpirit.level}`);
+    }
+  }
+
+  // ── Card drops ────────────────────────────────────────────────────────────────
+
+  private _onDropInsert(row: CardDrop) {
+    const def    = this._cardDefs.get(row.cardDefId);
+    const rarity = def ? _rarityTag(def.rarity) : 'Common';
+    const color  = DROP_COLORS[rarity] ?? 0xcccccc;
+
+    const gfx = this.add.graphics().setDepth(1);
+    gfx.fillStyle(color, 0.9);
+    gfx.fillCircle(row.posX, row.posY, 8);
+    gfx.lineStyle(1.5, 0xffffff, 0.5);
+    gfx.strokeCircle(row.posX, row.posY, 8);
+    this.tweens.add({
+      targets: gfx,
+      alpha: { from: 0.5, to: 1.0 },
+      duration: 700,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
+
+    const label = this.add
+      .text(row.posX, row.posY - 18, 'F', {
+        fontSize: '10px', color: '#ffffff', fontFamily: 'monospace',
+        backgroundColor: '#00000099',
+        padding: { x: 3, y: 1 },
+      })
+      .setOrigin(0.5)
+      .setDepth(3)
+      .setVisible(false);
+
+    this.worldDrops.set(row.dropId, { dropRow: row, gfx, label });
+  }
+
+  private _onDropDelete(row: CardDrop) {
+    const entry = this.worldDrops.get(row.dropId);
+    if (entry) {
+      this.tweens.killTweensOf(entry.gfx);
+      entry.gfx.destroy();
+      entry.label.destroy();
+      this.worldDrops.delete(row.dropId);
+    }
+  }
+
+  // ── Proximity update ──────────────────────────────────────────────────────────
+
+  private _updateProximity() {
+    if (!this.localCharacter?.alive) return;
+
+    const px = this.playerCircle.x;
+    const py = this.playerCircle.y;
+
+    // Spirit
+    const sdx = px - SPIRIT_X;
+    const sdy = py - SPIRIT_Y;
+    const nearSpirit = sdx * sdx + sdy * sdy < SPIRIT_PROX_R * SPIRIT_PROX_R;
+    if (nearSpirit !== this.nearSpirit) {
+      this.nearSpirit = nearSpirit;
+      this.collectionPanel.setNearSpirit(nearSpirit);
+      this.spiritLabel.setVisible(nearSpirit);
+    }
+
+    // Drops
+    let closestId: bigint | null = null;
+    let closestD2 = DROP_PICKUP_R * DROP_PICKUP_R;
+    for (const [id, { dropRow }] of this.worldDrops) {
+      const dx = px - dropRow.posX;
+      const dy = py - dropRow.posY;
+      const d2 = dx * dx + dy * dy;
+      if (d2 < closestD2) { closestD2 = d2; closestId = id; }
+    }
+    this.nearDropId = closestId;
+    for (const [id, { label }] of this.worldDrops) {
+      label.setVisible(id === closestId);
+    }
+  }
+
+  // ── Collection panel action handler ───────────────────────────────────────────
+
+  private _onPanelAction(action: string, payload: Record<string, unknown>) {
+    switch (action) {
+      case 'equip':
+        callReducer('equip_card', () =>
+          this.conn.reducers.equipCard({
+            cardInstanceId: payload.cardInstanceId as bigint,
+            slotType:       { tag: (payload.slotType as string) === 'active' ? 'Active' : 'Passive' },
+            slotIndex:      payload.slotIndex as number,
+          }),
+        );
+        break;
+      case 'unequip':
+        callReducer('unequip_card', () =>
+          this.conn.reducers.unequipCard({ equippedCardId: payload.equippedCardId as bigint }),
+        );
+        break;
+      case 'attune':
+      case 'unattune':
+        callReducer('toggle_attune', () =>
+          this.conn.reducers.toggleAttune({ cardInstanceId: payload.cardInstanceId as bigint }),
+        );
+        break;
+      case 'sacrifice':
+        callReducer('sacrifice_card', () =>
+          this.conn.reducers.sacrificeCard({ cardInstanceId: payload.cardInstanceId as bigint }),
+        );
+        break;
     }
   }
 
