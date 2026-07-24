@@ -22,6 +22,11 @@ const ENEMY_R  = 24;
 const MOVE_SPEED  = 180; // px/second
 const STOP_RADIUS = 60;
 
+// Enemy position smoothing: server ticks every 500ms, so this interpolation
+// speed just needs to comfortably out-pace the enemy's fastest server speed
+// (chase, 110 px/s) to avoid visibly lagging behind between ticks.
+const ENEMY_LERP_SPEED = 140; // px/second
+
 // Card slot dimensions
 const CARD_SW  = 52;
 const CARD_SH  = 72;
@@ -105,6 +110,8 @@ type EnemyGfx = {
   enemyId: bigint;
   x: number;
   y: number;
+  serverX: number;
+  serverY: number;
   hp: number;
   maxHp: number;
   alive: boolean;
@@ -112,7 +119,8 @@ type EnemyGfx = {
   hpBarGfx: Phaser.GameObjects.Graphics;
   castCircleGfx: Phaser.GameObjects.Graphics;
   castBarGfx: Phaser.GameObjects.Graphics;
-  castState: 'Idle' | 'Casting' | 'Cooldown';
+  aggroIndicatorGfx: Phaser.GameObjects.Graphics;
+  aggroState: 'Idle' | 'Chasing' | 'Casting' | 'Cooldown' | 'Resetting';
   castStartedAtMs: number | null;
   castDurationMs: number;
   castRadius: number;
@@ -282,6 +290,7 @@ export class GameScene extends Phaser.Scene {
 
   // Card lifecycle
   private collectionPanel!: CollectionPanel;
+  private spiritPanel!: CollectionPanel;
   private _cardDefs        = new Map<number, CardDefinition>();
   private localCardInst    = new Map<bigint, CardInstance>();
   private localEquipped    = new Map<bigint, EquippedCard>(); // key = equippedCardId
@@ -369,28 +378,35 @@ export class GameScene extends Phaser.Scene {
     this.conn.db.cardInstance.onInsert((_ctx, row) => {
       this.localCardInst.set(row.cardInstanceId, row);
       this.collectionPanel.onCardInsert(row);
+      this.spiritPanel.onCardInsert(row);
     });
     this.conn.db.cardInstance.onUpdate?.((_ctx, old, row) => {
       this.localCardInst.set(row.cardInstanceId, row);
       this.collectionPanel.onCardUpdate(old, row);
+      this.spiritPanel.onCardUpdate(old, row);
     });
     this.conn.db.cardInstance.onDelete((_ctx, row) => {
       this.localCardInst.delete(row.cardInstanceId);
       this.collectionPanel.onCardDelete(row);
+      this.spiritPanel.onCardDelete(row);
     });
 
     this.conn.db.equippedCard.onInsert((_ctx, row) => {
       this.localEquipped.set(row.equippedCardId, row);
       this.collectionPanel.onEquippedInsert(row);
+      this.spiritPanel.onEquippedInsert(row);
     });
     this.conn.db.equippedCard.onDelete((_ctx, row) => {
       this.localEquipped.delete(row.equippedCardId);
       this.collectionPanel.onEquippedDelete(row);
+      this.spiritPanel.onEquippedDelete(row);
     });
 
-    // ── CollectionPanel ────────────────────────────────────────────────────────
-    this.collectionPanel = new CollectionPanel();
+    // ── CollectionPanel / SpiritPanel ─────────────────────────────────────────
+    this.collectionPanel = new CollectionPanel({ mode: 'collection' });
+    this.spiritPanel     = new CollectionPanel({ mode: 'spirit' });
     this.collectionPanel.onAction = (action, payload) => this._onPanelAction(action, payload);
+    this.spiritPanel.onAction     = (action, payload) => this._onPanelAction(action, payload);
 
     // ── Spirit ─────────────────────────────────────────────────────────────────
     this.spiritGfx = this.add.graphics().setDepth(0.8);
@@ -470,6 +486,7 @@ export class GameScene extends Phaser.Scene {
 
     this._updateHud();
     this.emberCast.update();
+    this._updateEnemyMovement(delta);
     this._updateCastTelegraphs();
     this._updateProximity();
   }
@@ -557,6 +574,9 @@ export class GameScene extends Phaser.Scene {
     if (!this._isLocal(row.accountIdentity)) return;
     this.localSpirit = row;
     this.spiritLevelText.setText(`Spirit Lv ${row.level}`);
+    this.collectionPanel?.setSpiritLevel(row.level);
+    this.spiritPanel?.setSpiritLevel(row.level);
+    this.spiritPanel?.setSpiritName(row.name);
   }
 
   // ── Enemy table callbacks ──────────────────────────────────────────────────────
@@ -568,14 +588,17 @@ export class GameScene extends Phaser.Scene {
     bodyGfx.setPosition(row.posX, row.posY);
     bodyGfx.setDepth(1);
 
-    const hpBarGfx      = this.add.graphics().setDepth(2);
-    const castCircleGfx = this.add.graphics().setDepth(0.5).setVisible(false);
-    const castBarGfx    = this.add.graphics().setDepth(3).setVisible(false);
+    const hpBarGfx         = this.add.graphics().setDepth(2);
+    const castCircleGfx    = this.add.graphics().setDepth(0.5).setVisible(false);
+    const castBarGfx       = this.add.graphics().setDepth(3).setVisible(false);
+    const aggroIndicatorGfx = this.add.graphics().setDepth(2).setVisible(false);
 
     const data: EnemyGfx = {
       enemyId: row.enemyId,
       x: row.posX,
       y: row.posY,
+      serverX: row.posX,
+      serverY: row.posY,
       hp: row.currentHp,
       maxHp: row.maxHp,
       alive: row.alive,
@@ -583,7 +606,8 @@ export class GameScene extends Phaser.Scene {
       hpBarGfx,
       castCircleGfx,
       castBarGfx,
-      castState:       row.castState.tag as 'Idle' | 'Casting' | 'Cooldown',
+      aggroIndicatorGfx,
+      aggroState:      row.aggroState.tag as EnemyGfx['aggroState'],
       castStartedAtMs: row.castStartedAt
         ? Number(row.castStartedAt.microsSinceUnixEpoch) / 1000
         : null,
@@ -598,26 +622,29 @@ export class GameScene extends Phaser.Scene {
     const data = this.dbEnemies.get(row.enemyId);
     if (!data) return;
 
-    data.x     = row.posX;
-    data.y     = row.posY;
-    data.hp    = row.currentHp;
-    data.alive = row.alive;
+    // Position is smoothed toward the new server value each frame in
+    // _updateEnemyMovement rather than snapped here (see respawn handling below
+    // for the one case — teleporting home — where we do want an instant snap).
+    data.serverX = row.posX;
+    data.serverY = row.posY;
+    data.hp      = row.currentHp;
+    data.alive   = row.alive;
 
     const dmg = old.currentHp - row.currentHp;
     if (dmg > 0) {
       this._drawEnemyHpBar(data);
-      this._showFloatingDamage(data.x, data.y - ENEMY_R - 20, dmg, '#ffffff');
+      this._showFloatingDamage(data.x, data.y - ENEMY_R - 20, dmg, '#ff4444');
     }
 
-    // ── Cast state transitions ─────────────────────────────────────────────────
-    const wasCasting  = old.castState.tag === 'Casting';
-    const nowCasting  = row.castState.tag === 'Casting';
-    const nowCooldown = row.castState.tag === 'Cooldown';
-    const nowIdle     = row.castState.tag === 'Idle';
+    // ── Aggro/cast state transitions ────────────────────────────────────────────
+    const wasCasting  = old.aggroState.tag === 'Casting';
+    const nowCasting  = row.aggroState.tag === 'Casting';
+    const nowCooldown = row.aggroState.tag === 'Cooldown';
+    const nowIdle     = row.aggroState.tag === 'Idle';
 
     if (!wasCasting && nowCasting) {
-      // IDLE → CASTING: show telegraph
-      data.castState       = 'Casting';
+      // → CASTING: show telegraph
+      data.aggroState      = 'Casting';
       data.castStartedAtMs = row.castStartedAt
         ? Number(row.castStartedAt.microsSinceUnixEpoch) / 1000
         : Date.now();
@@ -626,7 +653,7 @@ export class GameScene extends Phaser.Scene {
       data.castBarGfx.setVisible(true);
     } else if (wasCasting && nowCooldown) {
       // CASTING → COOLDOWN: flash and remove telegraph
-      data.castState = 'Cooldown';
+      data.aggroState = 'Cooldown';
       data.castCircleGfx.clear();
       data.castCircleGfx.fillStyle(0xff0000, 0.6);
       data.castCircleGfx.fillCircle(data.x, data.y, data.castRadius);
@@ -636,21 +663,22 @@ export class GameScene extends Phaser.Scene {
         data.castCircleGfx.setVisible(false);
         data.castBarGfx.setVisible(false);
       });
-    } else if (nowIdle && data.castState !== 'Idle') {
-      // COOLDOWN → IDLE
-      data.castState       = 'Idle';
+    } else if (nowIdle && data.aggroState !== 'Idle') {
+      // → IDLE
+      data.aggroState      = 'Idle';
       data.castStartedAtMs = null;
       data.castCircleGfx.setVisible(false).clear();
       data.castBarGfx.setVisible(false).clear();
     } else {
-      data.castState = row.castState.tag as 'Idle' | 'Casting' | 'Cooldown';
+      data.aggroState = row.aggroState.tag as EnemyGfx['aggroState'];
     }
 
     if (!row.alive && old.alive) {
       // Death: cancel telegraph, flash white and fade
       data.castCircleGfx.clear().setVisible(false);
       data.castBarGfx.clear().setVisible(false);
-      data.castState = 'Idle';
+      data.aggroIndicatorGfx.clear().setVisible(false);
+      data.aggroState = 'Idle';
       data.hpBarGfx.setVisible(false);
       data.bodyGfx.clear();
       data.bodyGfx.fillStyle(0xffffff, 1);
@@ -665,11 +693,14 @@ export class GameScene extends Phaser.Scene {
     }
 
     if (row.alive && !old.alive) {
-      // Respawn: restore visuals at spawn position
-      data.castState       = 'Idle';
-      data.castStartedAtMs = null;
+      // Respawn: teleport home instantly (no slide-in) and restore visuals
+      data.x = data.serverX = row.posX;
+      data.y = data.serverY = row.posY;
+      data.aggroState       = 'Idle';
+      data.castStartedAtMs  = null;
       data.castCircleGfx.clear().setVisible(false);
       data.castBarGfx.clear().setVisible(false);
+      data.aggroIndicatorGfx.clear().setVisible(false);
       data.bodyGfx.setAlpha(1).setVisible(true);
       data.bodyGfx.clear();
       data.bodyGfx.fillStyle(0x8b0000, 1);
@@ -687,7 +718,48 @@ export class GameScene extends Phaser.Scene {
       data.hpBarGfx.destroy();
       data.castCircleGfx.destroy();
       data.castBarGfx.destroy();
+      data.aggroIndicatorGfx.destroy();
       this.dbEnemies.delete(row.enemyId);
+    }
+  }
+
+  /** Smoothly steps each enemy's rendered position toward its server-authoritative
+   *  position, repositions its GameObjects, and shows/hides the chase indicator. */
+  private _updateEnemyMovement(delta: number) {
+    for (const data of this.dbEnemies.values()) {
+      if (!data.alive) continue;
+
+      const dx   = data.serverX - data.x;
+      const dy   = data.serverY - data.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist > 0.5) {
+        const step = ENEMY_LERP_SPEED * (delta / 1000);
+        if (step >= dist) {
+          data.x = data.serverX;
+          data.y = data.serverY;
+        } else {
+          data.x += (dx / dist) * step;
+          data.y += (dy / dist) * step;
+        }
+      }
+
+      data.bodyGfx.setPosition(data.x, data.y);
+      this._drawEnemyHpBar(data);
+
+      data.aggroIndicatorGfx.clear();
+      if (data.aggroState === 'Chasing') {
+        data.aggroIndicatorGfx.setVisible(true);
+        const ix = data.x;
+        const iy = data.y - ENEMY_R - 32;
+        data.aggroIndicatorGfx.lineStyle(2, 0xff2222, 0.9);
+        data.aggroIndicatorGfx.beginPath();
+        data.aggroIndicatorGfx.moveTo(ix - 6, iy + 5);
+        data.aggroIndicatorGfx.lineTo(ix, iy - 5);
+        data.aggroIndicatorGfx.lineTo(ix + 6, iy + 5);
+        data.aggroIndicatorGfx.strokePath();
+      } else {
+        data.aggroIndicatorGfx.setVisible(false);
+      }
     }
   }
 
@@ -696,6 +768,7 @@ export class GameScene extends Phaser.Scene {
   private _onCardDefRow(row: CardDefinition) {
     this._cardDefs.set(row.cardDefId, row);
     this.collectionPanel?.onCardDefInsert(row);
+    this.spiritPanel?.onCardDefInsert(row);
     if (row.slug === 'ember-strike') {
       this.emberDef    = row;
       this.emberDamage = row.basePower;
@@ -755,15 +828,49 @@ export class GameScene extends Phaser.Scene {
     const kb = this.input.keyboard!;
     kb.on('keydown-F', () => {
       if (this.nearDropId != null) {
+        const entry = this.worldDrops.get(this.nearDropId);
+        const def   = entry ? this._cardDefs.get(entry.dropRow.cardDefId) : null;
         callReducer('pickup_card', () =>
           this.conn.reducers.pickupCard({ dropId: this.nearDropId! }),
         );
+        this._showToast(def ? `Picked up: ${def.name}` : 'Picked up card');
       }
     });
     kb.on('keydown-E', () => {
-      if (this.nearSpirit) this.collectionPanel.open();
+      if (this.nearSpirit) {
+        this.spiritPanel.open();
+      } else {
+        this._showToast('You must be near a spirit to manage your hand.');
+      }
     });
     kb.on('keydown-C', () => this.collectionPanel.toggle());
+  }
+
+  // ── Toast ─────────────────────────────────────────────────────────────────────
+
+  private _showToast(message: string) {
+    const W = this.cameras.main.width;
+    const txt = this.add
+      .text(W / 2, 100, message, {
+        fontSize: '14px',
+        color: '#ffffff',
+        fontFamily: 'monospace',
+        backgroundColor: '#000000cc',
+        padding: { x: 12, y: 8 },
+      })
+      .setOrigin(0.5)
+      .setScrollFactor(0)
+      .setDepth(30)
+      .setAlpha(0);
+
+    this.tweens.add({
+      targets: txt,
+      alpha: 1,
+      duration: 150,
+      yoyo: true,
+      hold: 1600,
+      onComplete: () => txt.destroy(),
+    });
   }
 
   // ── Tile collision helpers ────────────────────────────────────────────────────
@@ -827,7 +934,7 @@ export class GameScene extends Phaser.Scene {
   private _updateCastTelegraphs() {
     const now = this.time.now;
     for (const [, data] of this.dbEnemies) {
-      if (data.castState !== 'Casting' || data.castStartedAtMs === null) continue;
+      if (data.aggroState !== 'Casting' || data.castStartedAtMs === null) continue;
 
       const elapsed  = Date.now() - data.castStartedAtMs;
       const fraction = Math.min(elapsed / data.castDurationMs, 1.0);
@@ -1044,7 +1151,7 @@ export class GameScene extends Phaser.Scene {
 
   private _showFloatingDamage(x: number, y: number, amount: number, color: string) {
     const txt = this.add
-      .text(x, y, `+${amount}`, {
+      .text(x, y, `-${amount}`, {
         fontSize: '16px',
         color,
         fontFamily: 'monospace',
@@ -1187,6 +1294,7 @@ export class GameScene extends Phaser.Scene {
     this.emberCast.cancelIfHolding();
     this.moveLine.clear();
     this.collectionPanel.close();
+    this.spiritPanel.close();
     this.deathOverlay.setVisible(true);
 
     const W = this.cameras.main.width;
@@ -1395,7 +1503,9 @@ export class GameScene extends Phaser.Scene {
     if (nearSpirit !== this.nearSpirit) {
       this.nearSpirit = nearSpirit;
       this.collectionPanel.setNearSpirit(nearSpirit);
+      this.spiritPanel.setNearSpirit(nearSpirit);
       this.spiritLabel.setVisible(nearSpirit);
+      if (!nearSpirit) this.spiritPanel.close();
     }
 
     // Drops

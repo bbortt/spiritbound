@@ -10,6 +10,12 @@ import {
   type Infer as __Infer,
 } from "spacetimedb";
 
+import {
+  EnemyTickSchedule,
+} from "./types";
+
 export default {
-  dropId: __t.u64(),
+  get scheduleRow() {
+    return EnemyTickSchedule;
+  },
 };

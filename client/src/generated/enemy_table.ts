@@ -9,7 +9,11 @@ import {
   type AlgebraicTypeType as __AlgebraicTypeType,
   type Infer as __Infer,
 } from "spacetimedb";
-import { CastState, ShapeType } from "./types";
+import {
+  ShapeType,
+  AggroState,
+} from "./types";
+
 
 export default __t.row({
   enemyId: __t.u64().primaryKey().name("enemy_id"),
@@ -25,9 +29,11 @@ export default __t.row({
   attackRangePx: __t.f32().name("attack_range_px"),
   attackCooldownSeconds: __t.f32().name("attack_cooldown_seconds"),
   lastAttackAt: __t.option(__t.timestamp()).name("last_attack_at"),
-  get castState() {
-    return CastState.name("cast_state");
+  get aggroState() {
+    return AggroState.name("aggro_state");
   },
+  targetCharacterId: __t.option(__t.u64()).name("target_character_id"),
+  lastSeenTargetAt: __t.option(__t.timestamp()).name("last_seen_target_at"),
   castStartedAt: __t.option(__t.timestamp()).name("cast_started_at"),
   castDurationSeconds: __t.f32().name("cast_duration_seconds"),
   get castShape() {

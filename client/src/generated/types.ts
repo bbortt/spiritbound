@@ -18,6 +18,16 @@ export const AccountProgress = __t.object("AccountProgress", {
 });
 export type AccountProgress = __Infer<typeof AccountProgress>;
 
+// The tagged union or sum type for the algebraic type `AggroState`.
+export const AggroState = __t.enum("AggroState", {
+  Idle: __t.unit(),
+  Chasing: __t.unit(),
+  Casting: __t.unit(),
+  Cooldown: __t.unit(),
+  Resetting: __t.unit(),
+});
+export type AggroState = __Infer<typeof AggroState>;
+
 export const CardDefinition = __t.object("CardDefinition", {
   cardDefId: __t.u32(),
   slug: __t.string(),
@@ -45,6 +55,22 @@ export const CardDefinition = __t.object("CardDefinition", {
 });
 export type CardDefinition = __Infer<typeof CardDefinition>;
 
+export const CardDrop = __t.object("CardDrop", {
+  dropId: __t.u64(),
+  cardDefId: __t.u32(),
+  zoneId: __t.u32(),
+  posX: __t.f32(),
+  posY: __t.f32(),
+  createdAt: __t.timestamp(),
+});
+export type CardDrop = __Infer<typeof CardDrop>;
+
+export const CardDropCleanupSchedule = __t.object("CardDropCleanupSchedule", {
+  scheduledId: __t.u64(),
+  scheduledAt: __t.scheduleAt(),
+});
+export type CardDropCleanupSchedule = __Infer<typeof CardDropCleanupSchedule>;
+
 export const CardInstance = __t.object("CardInstance", {
   cardInstanceId: __t.u64(),
   ownerIdentity: __t.identity(),
@@ -60,50 +86,6 @@ export const CardType = __t.enum("CardType", {
   Passive: __t.unit(),
 });
 export type CardType = __Infer<typeof CardType>;
-
-// The tagged union or sum type for the algebraic type `CastState`.
-export const CastState = __t.enum("CastState", {
-  Idle: __t.unit(),
-  Casting: __t.unit(),
-  Cooldown: __t.unit(),
-});
-export type CastState = __Infer<typeof CastState>;
-
-export const Enemy = __t.object("Enemy", {
-  enemyId: __t.u64(),
-  zoneId: __t.u32(),
-  posX: __t.f32(),
-  posY: __t.f32(),
-  spawnX: __t.f32(),
-  spawnY: __t.f32(),
-  currentHp: __t.i32(),
-  maxHp: __t.i32(),
-  alive: __t.bool(),
-  damagePerHit: __t.i32(),
-  attackRangePx: __t.f32(),
-  attackCooldownSeconds: __t.f32(),
-  lastAttackAt: __t.option(__t.timestamp()),
-  get castState() {
-    return CastState;
-  },
-  castStartedAt: __t.option(__t.timestamp()),
-  castDurationSeconds: __t.f32(),
-  get castShape() {
-    return ShapeType;
-  },
-  castDamage: __t.i32(),
-});
-export type Enemy = __Infer<typeof Enemy>;
-
-export const CardDrop = __t.object("CardDrop", {
-  dropId: __t.u64(),
-  cardDefId: __t.u32(),
-  zoneId: __t.u32(),
-  posX: __t.f32(),
-  posY: __t.f32(),
-  createdAt: __t.timestamp(),
-});
-export type CardDrop = __Infer<typeof CardDrop>;
 
 export const Character = __t.object("Character", {
   characterId: __t.u64(),
@@ -127,6 +109,47 @@ export const DamageSchool = __t.enum("DamageSchool", {
   Magical: __t.unit(),
 });
 export type DamageSchool = __Infer<typeof DamageSchool>;
+
+export const Enemy = __t.object("Enemy", {
+  enemyId: __t.u64(),
+  zoneId: __t.u32(),
+  posX: __t.f32(),
+  posY: __t.f32(),
+  spawnX: __t.f32(),
+  spawnY: __t.f32(),
+  currentHp: __t.i32(),
+  maxHp: __t.i32(),
+  alive: __t.bool(),
+  damagePerHit: __t.i32(),
+  attackRangePx: __t.f32(),
+  attackCooldownSeconds: __t.f32(),
+  lastAttackAt: __t.option(__t.timestamp()),
+  get aggroState() {
+    return AggroState;
+  },
+  targetCharacterId: __t.option(__t.u64()),
+  lastSeenTargetAt: __t.option(__t.timestamp()),
+  castStartedAt: __t.option(__t.timestamp()),
+  castDurationSeconds: __t.f32(),
+  get castShape() {
+    return ShapeType;
+  },
+  castDamage: __t.i32(),
+});
+export type Enemy = __Infer<typeof Enemy>;
+
+export const EnemyRespawnSchedule = __t.object("EnemyRespawnSchedule", {
+  scheduledId: __t.u64(),
+  scheduledAt: __t.scheduleAt(),
+  enemyId: __t.u64(),
+});
+export type EnemyRespawnSchedule = __Infer<typeof EnemyRespawnSchedule>;
+
+export const EnemyTickSchedule = __t.object("EnemyTickSchedule", {
+  scheduledId: __t.u64(),
+  scheduledAt: __t.scheduleAt(),
+});
+export type EnemyTickSchedule = __Infer<typeof EnemyTickSchedule>;
 
 export const EquippedCard = __t.object("EquippedCard", {
   equippedCardId: __t.u64(),

@@ -7,21 +7,35 @@ import { type Infer as __Infer } from "spacetimedb";
 
 // Import all reducer arg schemas
 import ApplyDamageReducer from "../apply_damage_reducer";
+import CardDropCleanupReducer from "../card_drop_cleanup_reducer";
+import DamageEnemyReducer from "../damage_enemy_reducer";
+import EnemyTickReducer from "../enemy_tick_reducer";
 import EquipCardReducer from "../equip_card_reducer";
 import GrantXpReducer from "../grant_xp_reducer";
 import MoveReducer from "../move_reducer";
 import OnConnectReducer from "../on_connect_reducer";
+import PickupCardReducer from "../pickup_card_reducer";
+import RespawnEnemyReducer from "../respawn_enemy_reducer";
 import SacrificeCardReducer from "../sacrifice_card_reducer";
+import SeedCardsReducer from "../seed_cards_reducer";
+import SpawnEnemyReducer from "../spawn_enemy_reducer";
 import StartLifeReducer from "../start_life_reducer";
 import ToggleAttuneReducer from "../toggle_attune_reducer";
 import UnequipCardReducer from "../unequip_card_reducer";
 
 export type ApplyDamageParams = __Infer<typeof ApplyDamageReducer>;
+export type CardDropCleanupParams = __Infer<typeof CardDropCleanupReducer>;
+export type DamageEnemyParams = __Infer<typeof DamageEnemyReducer>;
+export type EnemyTickParams = __Infer<typeof EnemyTickReducer>;
 export type EquipCardParams = __Infer<typeof EquipCardReducer>;
 export type GrantXpParams = __Infer<typeof GrantXpReducer>;
 export type MoveParams = __Infer<typeof MoveReducer>;
 export type OnConnectParams = __Infer<typeof OnConnectReducer>;
+export type PickupCardParams = __Infer<typeof PickupCardReducer>;
+export type RespawnEnemyParams = __Infer<typeof RespawnEnemyReducer>;
 export type SacrificeCardParams = __Infer<typeof SacrificeCardReducer>;
+export type SeedCardsParams = __Infer<typeof SeedCardsReducer>;
+export type SpawnEnemyParams = __Infer<typeof SpawnEnemyReducer>;
 export type StartLifeParams = __Infer<typeof StartLifeReducer>;
 export type ToggleAttuneParams = __Infer<typeof ToggleAttuneReducer>;
 export type UnequipCardParams = __Infer<typeof UnequipCardReducer>;

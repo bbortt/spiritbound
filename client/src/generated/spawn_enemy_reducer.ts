@@ -11,5 +11,7 @@ import {
 } from "spacetimedb";
 
 export default {
-  dropId: __t.u64(),
+  zoneId: __t.u32(),
+  x: __t.f32(),
+  y: __t.f32(),
 };

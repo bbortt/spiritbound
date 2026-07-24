@@ -40,7 +40,7 @@ function schoolOf(def: CardDefinition): string {
 }
 
 const CSS = `
-#sb-collection-panel {
+.sb-panel {
   position: fixed;
   top: 0; right: -420px;
   width: 400px; height: 100vh;
@@ -56,7 +56,7 @@ const CSS = `
   padding: 12px;
   user-select: none;
 }
-#sb-collection-panel.open { right: 0; }
+.sb-panel.open { right: 0; }
 .sb-section { margin-bottom: 14px; }
 .sb-section-title {
   font-size: 11px; font-weight: 700; letter-spacing: 0.1em;
@@ -119,25 +119,35 @@ const CSS = `
 .sb-tooltip-flavor { font-style: italic; color: #666; margin-top: 4px; font-size: 10px; }
 `;
 
+export type CollectionPanelMode = 'collection' | 'spirit';
+
 export class CollectionPanel {
   private panel: HTMLDivElement;
+  private readonly _mode: CollectionPanelMode;
   private _open = false;
   private _nearSpirit = false;
   private _spiritLevel = 1;
+  private _spiritName = 'your spirit';
 
   private _cardDefs    = new Map<number, CardDefinition>();
   private _instances   = new Map<bigint, CardInstance>();
   private _equipped    = new Map<bigint, EquippedCard>();   // key = cardInstanceId
   private _selected: bigint | null = null;
 
-  constructor() {
-    // Inject CSS
-    const style = document.createElement('style');
-    style.textContent = CSS;
-    document.head.appendChild(style);
+  constructor(opts: { mode: CollectionPanelMode }) {
+    this._mode = opts.mode;
+
+    // Inject CSS once, shared by both panel instances.
+    if (!document.getElementById('sb-panel-css')) {
+      const style = document.createElement('style');
+      style.id = 'sb-panel-css';
+      style.textContent = CSS;
+      document.head.appendChild(style);
+    }
 
     this.panel = document.createElement('div');
-    this.panel.id = 'sb-collection-panel';
+    this.panel.id = this._mode === 'spirit' ? 'sb-spirit-panel' : 'sb-collection-panel';
+    this.panel.className = 'sb-panel';
     document.body.appendChild(this.panel);
 
     this._render();
@@ -166,6 +176,11 @@ export class CollectionPanel {
 
   setSpiritLevel(level: number) {
     this._spiritLevel = level;
+    this._render();
+  }
+
+  setSpiritName(name: string) {
+    this._spiritName = name;
     this._render();
   }
 
@@ -245,16 +260,22 @@ export class CollectionPanel {
     const selDef = sel ? this._cardDefs.get(sel.cardDefId) ?? null : null;
     const selEquip = this._selected != null ? this._equipped.get(this._selected) ?? null : null;
 
+    const isSpiritMode = this._mode === 'spirit';
+    const headerText = isSpiritMode
+      ? `Spirit — ${this._spiritName}, Lv ${this._spiritLevel}`
+      : 'Collection';
+
     this.panel.innerHTML = `
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-        <span style="font-size:15px;font-weight:700;color:#fff">Collection</span>
+        <span style="font-size:15px;font-weight:700;color:#fff">${headerText}</span>
         <span style="cursor:pointer;color:#888;font-size:18px" id="sb-close">✕</span>
       </div>
 
       ${this._renderSpiritInfo(maxAttune, attunedCount, rarityBudget)}
 
-      ${!this._nearSpirit ? `<div class="sb-near-notice">Visit a spirit to manage your hand</div>` : ''}
+      ${!isSpiritMode && !this._nearSpirit ? `<div class="sb-near-notice">Visit a spirit to manage your hand</div>` : ''}
 
+      ${isSpiritMode ? `
       <div class="sb-section">
         <div class="sb-section-title">Active Slots (${maxActive}/10)</div>
         <div class="sb-slots">${activeSlots.map((inst, i) => this._renderSlot(inst, i, 'active', maxActive)).join('')}</div>
@@ -264,6 +285,7 @@ export class CollectionPanel {
         <div class="sb-section-title">Passive Slots (${maxPassive}/5)</div>
         <div class="sb-slots">${passiveSlots.map((inst, i) => this._renderSlot(inst, i, 'passive', maxPassive)).join('')}</div>
       </div>
+      ` : ''}
 
       <div class="sb-section">
         <div class="sb-section-title">Collection (${this._instances.size})</div>

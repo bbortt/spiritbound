@@ -49,13 +49,20 @@ function _subscribeSlice(
   conn: DbConnection,
   onSubscribed?: (conn: DbConnection) => void,
 ): SubscriptionHandle {
+  // Card tables are in a separate subscription so a failure there doesn't
+  // break movement / combat.
+  _subscribeCards(conn);
+
   return conn
     .subscriptionBuilder()
     .onApplied(() => {
       console.log('[spacetime] subscription active');
       onSubscribed?.(conn);
     })
-    .onError((ctx) => console.error('[spacetime] subscription error:', ctx))
+    .onError((ctx) => {
+      const err = (ctx as any).event;
+      console.error('[spacetime] core subscription error:', err?.message ?? err);
+    })
     .subscribe([
       'SELECT * FROM character',
       'SELECT * FROM personal_spirit',
@@ -63,6 +70,18 @@ function _subscribeSlice(
       'SELECT * FROM zone',
       'SELECT * FROM enemy',
       'SELECT * FROM card_definition',
+    ]);
+}
+
+function _subscribeCards(conn: DbConnection): void {
+  conn
+    .subscriptionBuilder()
+    .onApplied(() => console.log('[spacetime] card subscription active'))
+    .onError((ctx) => {
+      const err = (ctx as any).event;
+      console.error('[spacetime] card subscription error:', err?.message ?? err);
+    })
+    .subscribe([
       'SELECT * FROM card_drop',
       'SELECT * FROM card_instance',
       'SELECT * FROM equipped_card',

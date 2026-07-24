@@ -35,12 +35,17 @@ import {
 
 // Import all reducer arg schemas
 import ApplyDamageReducer from "./apply_damage_reducer";
-import PickupCardReducer from "./pickup_card_reducer";
+import CardDropCleanupReducer from "./card_drop_cleanup_reducer";
 import DamageEnemyReducer from "./damage_enemy_reducer";
+import EnemyTickReducer from "./enemy_tick_reducer";
 import EquipCardReducer from "./equip_card_reducer";
 import GrantXpReducer from "./grant_xp_reducer";
 import MoveReducer from "./move_reducer";
+import PickupCardReducer from "./pickup_card_reducer";
+import RespawnEnemyReducer from "./respawn_enemy_reducer";
 import SacrificeCardReducer from "./sacrifice_card_reducer";
+import SeedCardsReducer from "./seed_cards_reducer";
+import SpawnEnemyReducer from "./spawn_enemy_reducer";
 import StartLifeReducer from "./start_life_reducer";
 import ToggleAttuneReducer from "./toggle_attune_reducer";
 import UnequipCardReducer from "./unequip_card_reducer";
@@ -49,11 +54,14 @@ import UnequipCardReducer from "./unequip_card_reducer";
 
 // Import all table schema definitions
 import AccountProgressRow from "./account_progress_table";
-import CardDropRow from "./card_drop_table";
 import CardDefinitionRow from "./card_definition_table";
+import CardDropRow from "./card_drop_table";
+import CardDropCleanupScheduleRow from "./card_drop_cleanup_schedule_table";
 import CardInstanceRow from "./card_instance_table";
 import CharacterRow from "./character_table";
 import EnemyRow from "./enemy_table";
+import EnemyRespawnScheduleRow from "./enemy_respawn_schedule_table";
+import EnemyTickScheduleRow from "./enemy_tick_schedule_table";
 import EquippedCardRow from "./equipped_card_table";
 import PersonalSpiritRow from "./personal_spirit_table";
 import ZoneRow from "./zone_table";
@@ -73,16 +81,6 @@ const tablesSchema = __schema({
       { name: 'account_progress_account_identity_key', constraint: 'unique', columns: ['accountIdentity'] },
     ],
   }, AccountProgressRow),
-  cardDrop: __table({
-    name: 'card_drop',
-    indexes: [
-      { accessor: 'dropId', name: 'card_drop_drop_id_idx_btree', algorithm: 'btree', columns: ['dropId'] },
-      { accessor: 'by_zone', name: 'card_drop_zone_id_idx_btree', algorithm: 'btree', columns: ['zoneId'] },
-    ],
-    constraints: [
-      { name: 'card_drop_drop_id_key', constraint: 'unique', columns: ['dropId'] },
-    ],
-  }, CardDropRow),
   cardDefinition: __table({
     name: 'card_definition',
     indexes: [
@@ -98,6 +96,31 @@ const tablesSchema = __schema({
       { name: 'card_definition_slug_key', constraint: 'unique', columns: ['slug'] },
     ],
   }, CardDefinitionRow),
+  cardDrop: __table({
+    name: 'card_drop',
+    indexes: [
+      { accessor: 'dropId', name: 'card_drop_drop_id_idx_btree', algorithm: 'btree', columns: [
+        'dropId',
+      ] },
+      { accessor: 'by_zone', name: 'card_drop_zone_id_idx_btree', algorithm: 'btree', columns: [
+        'zoneId',
+      ] },
+    ],
+    constraints: [
+      { name: 'card_drop_drop_id_key', constraint: 'unique', columns: ['dropId'] },
+    ],
+  }, CardDropRow),
+  cardDropCleanupSchedule: __table({
+    name: 'card_drop_cleanup_schedule',
+    indexes: [
+      { accessor: 'scheduledId', name: 'card_drop_cleanup_schedule_scheduled_id_idx_btree', algorithm: 'btree', columns: [
+        'scheduledId',
+      ] },
+    ],
+    constraints: [
+      { name: 'card_drop_cleanup_schedule_scheduled_id_key', constraint: 'unique', columns: ['scheduledId'] },
+    ],
+  }, CardDropCleanupScheduleRow),
   cardInstance: __table({
     name: 'card_instance',
     indexes: [
@@ -143,6 +166,28 @@ const tablesSchema = __schema({
       { name: 'enemy_enemy_id_key', constraint: 'unique', columns: ['enemyId'] },
     ],
   }, EnemyRow),
+  enemyRespawnSchedule: __table({
+    name: 'enemy_respawn_schedule',
+    indexes: [
+      { accessor: 'scheduledId', name: 'enemy_respawn_schedule_scheduled_id_idx_btree', algorithm: 'btree', columns: [
+        'scheduledId',
+      ] },
+    ],
+    constraints: [
+      { name: 'enemy_respawn_schedule_scheduled_id_key', constraint: 'unique', columns: ['scheduledId'] },
+    ],
+  }, EnemyRespawnScheduleRow),
+  enemyTickSchedule: __table({
+    name: 'enemy_tick_schedule',
+    indexes: [
+      { accessor: 'scheduledId', name: 'enemy_tick_schedule_scheduled_id_idx_btree', algorithm: 'btree', columns: [
+        'scheduledId',
+      ] },
+    ],
+    constraints: [
+      { name: 'enemy_tick_schedule_scheduled_id_key', constraint: 'unique', columns: ['scheduledId'] },
+    ],
+  }, EnemyTickScheduleRow),
   equippedCard: __table({
     name: 'equipped_card',
     indexes: [
@@ -184,15 +229,20 @@ const tablesSchema = __schema({
 /** The schema information for all reducers in this module. This is defined the same way as the reducers would have been defined in the server, except the body of the reducer is omitted in code generation. */
 const reducersSchema = __reducers(
   __reducerSchema("apply_damage", ApplyDamageReducer),
+  __reducerSchema("card_drop_cleanup", CardDropCleanupReducer),
   __reducerSchema("damage_enemy", DamageEnemyReducer),
+  __reducerSchema("enemy_tick", EnemyTickReducer),
   __reducerSchema("equip_card", EquipCardReducer),
   __reducerSchema("grant_xp", GrantXpReducer),
   __reducerSchema("move", MoveReducer),
+  __reducerSchema("pickup_card", PickupCardReducer),
+  __reducerSchema("respawn_enemy", RespawnEnemyReducer),
   __reducerSchema("sacrifice_card", SacrificeCardReducer),
+  __reducerSchema("seed_cards", SeedCardsReducer),
+  __reducerSchema("spawn_enemy", SpawnEnemyReducer),
   __reducerSchema("start_life", StartLifeReducer),
   __reducerSchema("toggle_attune", ToggleAttuneReducer),
   __reducerSchema("unequip_card", UnequipCardReducer),
-  __reducerSchema("pickup_card", PickupCardReducer),
 );
 
 /** The schema information for all procedures in this module. This is defined the same way as the procedures would have been defined in the server. */

@@ -73,7 +73,7 @@ const TCardType    = t.enum('CardType',    { active: t.unit(), passive: t.unit()
 const TPassiveKind = t.enum('PassiveKind', { ward: t.unit(), triggered: t.unit(), none: t.unit() });
 const TSchool      = t.enum('DamageSchool',{ physical: t.unit(), magical: t.unit() });
 const TShape       = t.enum('ShapeType',   { cone: t.unit(), line: t.unit(), arc: t.unit(), circle: t.unit() });
-const TCastState   = t.enum('CastState',   { idle: t.unit(), casting: t.unit(), cooldown: t.unit() });
+const TAggroState  = t.enum('AggroState',  { idle: t.unit(), chasing: t.unit(), casting: t.unit(), cooldown: t.unit(), resetting: t.unit() });
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CONTENT TABLES  (static game data — written by tooling, read by everyone)
@@ -142,7 +142,7 @@ const personalSpirit = table(
 const cardInstance = table(
   {
     name: 'card_instance',
-    public: false,
+    public: true,
     indexes: [{ accessor: 'by_owner', algorithm: 'btree', columns: ['ownerIdentity'] }],
   },
   {
@@ -227,8 +227,9 @@ const cardDrop = table(
 
 /**
  * Enemy — server-authoritative mob state.
- * Stationary "turret" enemies for the vertical slice: range-check + damage tick.
- * spawnX/spawnY stores the original position so the respawn reducer can reset.
+ * Chases players within aggro range, casts a telegraphed AoE in attack range,
+ * and resets back to its spawn point (healing as it goes) if it loses its target.
+ * spawnX/spawnY stores the original position so the respawn/reset logic can reset.
  */
 const enemy = table(
   {
@@ -252,7 +253,9 @@ const enemy = table(
     attackRangePx:         t.f32(),
     attackCooldownSeconds: t.f32(),
     lastAttackAt:          t.option(t.timestamp()),
-    castState:             TCastState,
+    aggroState:            TAggroState,
+    targetCharacterId:     t.option(t.u64()),
+    lastSeenTargetAt:      t.option(t.timestamp()),
     castStartedAt:         t.option(t.timestamp()),
     castDurationSeconds:   t.f32(),
     castShape:             TShape,
@@ -437,7 +440,9 @@ function _seedZone1Enemies(ctx: any): void {
       attackRangePx:         220,
       attackCooldownSeconds: 3.0,
       lastAttackAt:          undefined,
-      castState:             { tag: 'idle' },
+      aggroState:            { tag: 'idle' },
+      targetCharacterId:     undefined,
+      lastSeenTargetAt:      undefined,
       castStartedAt:         undefined,
       castDurationSeconds:   1.8,
       castShape:             { tag: 'circle' },
@@ -756,7 +761,9 @@ export const spawnEnemy = db.reducer(
       attackRangePx:         220,
       attackCooldownSeconds: 3.0,
       lastAttackAt:          undefined,
-      castState:             { tag: 'idle' },
+      aggroState:            { tag: 'idle' },
+      targetCharacterId:     undefined,
+      lastSeenTargetAt:      undefined,
       castStartedAt:         undefined,
       castDurationSeconds:   1.8,
       castShape:             { tag: 'circle' },
@@ -799,11 +806,11 @@ export const damageEnemy = db.reducer(
 
 /** Roll a ground card drop when an enemy dies. 70% chance, random eligible card. */
 function _dropCardFromEnemy(ctx: any, e: any, char: any): void {
-  if (Math.random() >= 0.7) return;
+  if (ctx.random() >= 0.7) return;
   const allDefs  = [...ctx.db.cardDefinition];
   const eligible = allDefs.filter((def: any) => def.minCharacterLevel <= char.level);
   if (eligible.length === 0) return;
-  const def = eligible[Math.floor(Math.random() * eligible.length)];
+  const def = eligible[ctx.random.integerInRange(0, eligible.length - 1)];
   ctx.db.cardDrop.insert({
     dropId:    0n,
     cardDefId: def.cardDefId,
@@ -856,9 +863,60 @@ export const cardDropCleanup = db.reducer(
   },
 );
 
+// ─── Chase AI tuning constants ────────────────────────────────────────────────
+const AGGRO_RANGE       = 300;  // px — enemy notices a player and starts chasing
+const ATTACK_RANGE      = 180;  // px — enemy stops and starts casting
+const DEAGGRO_RANGE     = 500;  // px — player has escaped, enemy resets
+const CHASE_SPEED       = 110;  // px/s — always slower than the player's 180 px/s
+const RESET_SPEED       = 80;   // px/s — walking back to spawn
+const RESET_HP_PER_TICK = 10;   // HP restored per tick while resetting
+const TICK_SECONDS      = 0.5;  // enemyTick fires every 500 ms
+
+function _distSq(ax: number, ay: number, bx: number, by: number): number {
+  const dx = ax - bx;
+  const dy = ay - by;
+  return dx * dx + dy * dy;
+}
+
+/** Step at most `maxStep` px from (fromX,fromY) toward (toX,toY); snaps if closer than that. */
+function _moveToward(fromX: number, fromY: number, toX: number, toY: number, maxStep: number) {
+  const dx = toX - fromX;
+  const dy = toY - fromY;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  if (dist <= maxStep) return { x: toX, y: toY };
+  return { x: fromX + (dx / dist) * maxStep, y: fromY + (dy / dist) * maxStep };
+}
+
+/** Closest alive character in the enemy's zone within AGGRO_RANGE, or null. */
+function _findAggroTarget(ctx: any, zoneId: number, posX: number, posY: number): any | null {
+  let closest: any = null;
+  let closestD2 = AGGRO_RANGE * AGGRO_RANGE;
+  for (const c of [...ctx.db.character.by_zone.filter(zoneId)]) {
+    if (!(c as any).alive) continue;
+    const d2 = _distSq(posX, posY, (c as any).posX, (c as any).posY);
+    if (d2 <= closestD2) { closest = c; closestD2 = d2; }
+  }
+  return closest;
+}
+
+/** Fire the telegraphed AoE: damage every alive character still within attackRangePx. */
+function _fireCast(ctx: any, e: any): void {
+  for (const c of [...ctx.db.character.by_zone.filter(e.zoneId)]) {
+    if (!(c as any).alive) continue;
+    if (_distSq((c as any).posX, (c as any).posY, e.posX, e.posY) > e.attackRangePx * e.attackRangePx) continue;
+    const newHp = (c as any).currentHp - e.castDamage;
+    if (newHp <= 0) {
+      _handleDeath(ctx, c);
+    } else {
+      ctx.db.character.characterId.update({ ...(c as any), currentHp: newHp });
+    }
+  }
+}
+
 /**
  * enemyTick — runs every 500 ms (Interval schedule, row never deleted).
- * Drives a three-state machine per enemy: idle → casting → cooldown → idle.
+ * Drives a five-state aggro machine per enemy:
+ *   idle → chasing → casting → cooldown → (chasing | casting) or resetting → idle
  * Damage fires only after castDurationSeconds, hitting every character in the AoE.
  */
 export const enemyTick = db.reducer(
@@ -867,62 +925,120 @@ export const enemyTick = db.reducer(
     for (const e of ctx.db.enemy) {
       if (!e.alive) continue;
 
-      const castTag = e.castState.tag as 'idle' | 'casting' | 'cooldown';
+      const state = e.aggroState.tag as 'idle' | 'chasing' | 'casting' | 'cooldown' | 'resetting';
 
-      if (castTag === 'idle') {
-        // Begin a cast when any character enters range
-        const nearby = [...ctx.db.character.by_zone.filter(e.zoneId)].some((c: any) => {
-          if (!c.alive) return false;
-          const dx = c.posX - e.posX;
-          const dy = c.posY - e.posY;
-          return dx * dx + dy * dy <= e.attackRangePx * e.attackRangePx;
-        });
-        if (nearby) {
+      if (state === 'idle') {
+        const target = _findAggroTarget(ctx, e.zoneId, e.posX, e.posY);
+        if (target) {
           ctx.db.enemy.enemyId.update({
             ...e,
-            castState:     { tag: 'casting' },
-            castStartedAt: ctx.timestamp,
+            aggroState:        { tag: 'chasing' },
+            targetCharacterId: (target as any).characterId,
           });
         }
 
-      } else if (castTag === 'casting') {
+      } else if (state === 'chasing') {
+        const target = e.targetCharacterId !== undefined
+          ? ctx.db.character.characterId.find(e.targetCharacterId)
+          : null;
+
+        if (!target || !target.alive) {
+          ctx.db.enemy.enemyId.update({
+            ...e,
+            aggroState:        { tag: 'resetting' },
+            targetCharacterId: undefined,
+          });
+          continue;
+        }
+
+        const d2 = _distSq(e.posX, e.posY, target.posX, target.posY);
+        if (d2 > DEAGGRO_RANGE * DEAGGRO_RANGE) {
+          ctx.db.enemy.enemyId.update({
+            ...e,
+            aggroState:       { tag: 'resetting' },
+            lastSeenTargetAt: ctx.timestamp,
+          });
+        } else if (d2 <= ATTACK_RANGE * ATTACK_RANGE) {
+          ctx.db.enemy.enemyId.update({
+            ...e,
+            aggroState:    { tag: 'casting' },
+            castStartedAt: ctx.timestamp,
+          });
+        } else {
+          const step = CHASE_SPEED * TICK_SECONDS;
+          const { x, y } = _moveToward(e.posX, e.posY, target.posX, target.posY, step);
+          ctx.db.enemy.enemyId.update({ ...e, posX: x, posY: y });
+        }
+
+      } else if (state === 'casting') {
         // Check whether the cast duration has elapsed
         if (e.castStartedAt === undefined) continue;
         const elapsedUs  = ctx.timestamp.microsSinceUnixEpoch - e.castStartedAt.microsSinceUnixEpoch;
         const durationUs = BigInt(Math.round(e.castDurationSeconds * 1_000_000));
         if (elapsedUs >= durationUs) {
-          // Fire: damage every alive character still in the AoE
-          for (const c of [...ctx.db.character.by_zone.filter(e.zoneId)]) {
-            if (!(c as any).alive) continue;
-            const dx = (c as any).posX - e.posX;
-            const dy = (c as any).posY - e.posY;
-            if (dx * dx + dy * dy > e.attackRangePx * e.attackRangePx) continue;
-            const newHp = (c as any).currentHp - e.castDamage;
-            if (newHp <= 0) {
-              _handleDeath(ctx, c);
-            } else {
-              ctx.db.character.characterId.update({ ...(c as any), currentHp: newHp });
-            }
-          }
+          _fireCast(ctx, e);
           ctx.db.enemy.enemyId.update({
             ...e,
-            castState:     { tag: 'cooldown' },
+            aggroState:    { tag: 'cooldown' },
             castStartedAt: undefined,
             lastAttackAt:  ctx.timestamp,
           });
         }
 
-      } else if (castTag === 'cooldown') {
-        // Return to idle once the cooldown window has passed
+      } else if (state === 'cooldown') {
+        const target = e.targetCharacterId !== undefined
+          ? ctx.db.character.characterId.find(e.targetCharacterId)
+          : null;
+
+        if (!target || !target.alive) {
+          ctx.db.enemy.enemyId.update({
+            ...e,
+            aggroState:        { tag: 'resetting' },
+            targetCharacterId: undefined,
+          });
+          continue;
+        }
+
+        if (_distSq(e.posX, e.posY, target.posX, target.posY) > ATTACK_RANGE * ATTACK_RANGE) {
+          // Target moved out of attack range mid-cooldown — re-engage by chasing.
+          ctx.db.enemy.enemyId.update({ ...e, aggroState: { tag: 'chasing' } });
+          continue;
+        }
+
+        // Still in range: return to idle-cooldown-wait, then recast once the timer elapses.
         if (e.lastAttackAt === undefined) continue;
         const elapsedUs  = ctx.timestamp.microsSinceUnixEpoch - e.lastAttackAt.microsSinceUnixEpoch;
         const cooldownUs = BigInt(Math.round(e.attackCooldownSeconds * 1_000_000));
         if (elapsedUs >= cooldownUs) {
           ctx.db.enemy.enemyId.update({
             ...e,
-            castState:     { tag: 'idle' },
-            castStartedAt: undefined,
+            aggroState:    { tag: 'casting' },
+            castStartedAt: ctx.timestamp,
           });
+        }
+
+      } else if (state === 'resetting') {
+        const step = RESET_SPEED * TICK_SECONDS;
+        const { x, y } = _moveToward(e.posX, e.posY, e.spawnX, e.spawnY, step);
+        const newHp = Math.min(e.maxHp, e.currentHp + RESET_HP_PER_TICK);
+
+        const reAggro = _findAggroTarget(ctx, e.zoneId, x, y);
+        if (reAggro) {
+          ctx.db.enemy.enemyId.update({
+            ...e,
+            posX: x, posY: y, currentHp: newHp,
+            aggroState:        { tag: 'chasing' },
+            targetCharacterId: (reAggro as any).characterId,
+          });
+        } else if (x === e.spawnX && y === e.spawnY) {
+          ctx.db.enemy.enemyId.update({
+            ...e,
+            posX: x, posY: y, currentHp: e.maxHp,
+            aggroState:        { tag: 'idle' },
+            targetCharacterId: undefined,
+          });
+        } else {
+          ctx.db.enemy.enemyId.update({ ...e, posX: x, posY: y, currentHp: newHp });
         }
       }
     }
@@ -941,13 +1057,15 @@ export const respawnEnemy = db.reducer(
     if (!e || e.alive) return;
     ctx.db.enemy.enemyId.update({
       ...e,
-      currentHp:     e.maxHp,
-      alive:         true,
-      posX:          e.spawnX,
-      posY:          e.spawnY,
-      lastAttackAt:  undefined,
-      castState:     { tag: 'idle' },
-      castStartedAt: undefined,
+      currentHp:         e.maxHp,
+      alive:              true,
+      posX:               e.spawnX,
+      posY:               e.spawnY,
+      lastAttackAt:       undefined,
+      aggroState:         { tag: 'idle' },
+      targetCharacterId:  undefined,
+      lastSeenTargetAt:   undefined,
+      castStartedAt:      undefined,
     });
   },
 );
