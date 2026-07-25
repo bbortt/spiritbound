@@ -358,6 +358,9 @@ Permanent progress that survives every death — *access and cosmetics, never po
 - Exact Soul Ember drop rate and spawn sources (owned by item-balancer).
 - Concrete balance numbers (stat conversion rates, avoidance caps, XP curve, scaling
   curves, gear stat budgets, drop rates) — all pending playtest.
+- Equipment system: fully designed and in data model, not yet implemented — next
+  major system after Jekyll site. Blocks: real stat system, gear economy, armor
+  weight classes.
 
 **Resolved:** control scheme (cursor-aimed, PoE-style) · weapon = geometry (range
 + width) + stat carrier · cards weapon-agnostic with scaling tags (emergent classes)
@@ -376,7 +379,15 @@ stack · hand starts 2/1, capped 10/5, slots granted by **spirit** not character
 level · some cards have min-character-level to equip · death retention via
 **rarity-tiered attunement slots** · PvP: none at launch (arena → open-world later)
 · evasion = glancing/partial with low caps · armor weight classes (cloth/chain/plate,
-bias only, no wear restriction).
+bias only, no wear restriction) · content pipeline: cards.json → Zod validator →
+unit tests → SpacetimeDB seeder (slug as idempotency key) · enemy telegraph system
+(cast bar + ground AoE indicator, client visual only, server decides damage) ·
+enemy chase AI (aggro/deaggro ranges, chase speed < player speed so a chase is
+always escapable, HP regen on reset) · card drops (enemy death → 70% drop roll →
+cardDrop row → 60s despawn; pickup via F key within 80px) · collection panel (C,
+always accessible, equip greyed outside spirit range) · spirit panel (E,
+proximity-gated, unlocks hand management) · death summary screen (shows survived
+vs lost cards) · held-key quick cast with live cone indicator.
 
 ## Tech Stack (decided)
 

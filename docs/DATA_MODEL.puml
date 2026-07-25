@@ -73,6 +73,13 @@ package "Enums" <<Frame>> {
     PLATE      ' biases physical_def
     ' bias telegraph only; anyone can wear anything (full-plate mage is legal)
   }
+  enum AggroState {
+    IDLE
+    CHASING
+    CASTING
+    COOLDOWN
+    RESETTING
+  }
 }
 
 ' ============================================================
@@ -282,6 +289,39 @@ package "Runtime (instances)" <<Frame>> {
     slot : EquipSlot
     slot_ordinal : u32               ' 0/1 for the two rings & two earrings
   }
+
+  class CardDrop {
+    drop_id : u64 {PK}               ' autoInc
+    card_def_id : u32 {FK}
+    zone_id : u32 {FK}
+    pos_x : f32
+    pos_y : f32
+    created_at : Timestamp
+    ' despawns 60s after created_at (cardDropCleanup, every 10s); pickup within 80px
+  }
+
+  class Enemy {
+    enemy_id : u64 {PK}              ' autoInc
+    zone_id : u32 {FK}
+    pos_x : f32
+    pos_y : f32
+    spawn_x : f32
+    spawn_y : f32
+    current_hp : i32
+    max_hp : i32
+    alive : bool
+    damage_per_hit : i32
+    attack_range_px : f32
+    attack_cooldown_seconds : f32
+    last_attack_at : Timestamp {optional}
+    aggro_state : AggroState
+    target_character_id : u64 {optional}
+    last_seen_target_at : Timestamp {optional}
+    cast_started_at : Timestamp {optional}
+    cast_duration_seconds : f32
+    cast_shape : ShapeType
+    cast_damage : i32
+  }
 }
 
 ' ============================================================
@@ -376,6 +416,10 @@ ItemInstance "*" -- "1" ItemDefinition : instance of >
 SpiritDefinition "*" -- "1" Zone : placed in >
 DungeonDefinition "*" -- "1" Zone : entrance in >
 
+Zone "1" -- "0..*" Enemy : hosts >
+Zone "1" -- "0..*" CardDrop : contains >
+CardDrop "*" -- "1" CardDefinition : instance of >
+
 ' Social
 Group "1" -- "2..6" GroupMember : has >
 GroupMember "*" -- "1" Character : is >
@@ -445,6 +489,24 @@ note as N_Leveling
   inventory -> consume ember, set hp=1. Non-tradeable enforced in rules.
   Revive card (TRIGGERED passive): fires on group member death IN dungeon
   only; once per dungeon instance; cannot target self.
+end note
+
+note bottom of Enemy
+  **Tick logic (enemyTick, rules/, runs every 500ms):**
+  IDLE -> CHASING if a player is within 300px (AGGRO_RANGE).
+  CHASING -> move toward target at 110px/s (always slower than
+    player's 180px/s, so a chase is always escapable);
+    -> CASTING once within 180px (ATTACK_RANGE);
+    -> RESETTING if target dies or leaves 500px (DEAGGRO_RANGE).
+  CASTING -> telegraphed client-side; damage fires to every
+    character still in attack_range_px once cast_duration_seconds
+    elapses, then -> COOLDOWN.
+  COOLDOWN -> recast (-> CASTING) after attack_cooldown_seconds
+    if target still in range; re-chases if target moved out;
+    resets if target died/left.
+  RESETTING -> walk back to spawn_x/y at 80px/s, healing 10HP/tick;
+    re-aggros if a player wanders in range; -> IDLE at spawn, full HP.
+  Client interpolates pos_x/pos_y between server ticks.
 end note
 
 note as N_Derived
