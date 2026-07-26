@@ -48,10 +48,11 @@ summary screen, and cursor-aimed combat with held-key quick cast — plus a
 player-facing Jekyll reference site (`site/`) generated from
 `content/cards.json`.
 
-1. **Equipment system** — fully designed in `DATA_MODEL.puml` and
-   `GAME_DESIGN.md`, not yet implemented. Next major system: real stat
-   system, gear economy, armor weight classes.
-2. Expand content: more cards/enemies/zones once equipment lands.
+1. **Equipment system** — content pipeline + server tables done
+   (`content/equipment.json`, `ItemDefinition`/`ItemInstance`/`EquippedItem`,
+   `seedItems`). Still needed: equip/unequip reducers, `effective_stats`
+   computation (race + gear + ward passives), gear drops.
+2. Expand content: more cards/enemies/zones/items once equip flow lands.
 
 ## Open Questions (for later)
 

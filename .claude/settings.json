@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(docker run *)",
+      "Bash(pnpm *)"
+    ]
+  },"deny": [
+  "Bash(git push *)"
+]
+}

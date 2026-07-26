@@ -130,3 +130,29 @@ every 10s). Pickup requires being within 80px (`pickupCard`).
 
 **Placeholder** — owned by `item-balancer` long-term; not yet tuned against
 an economy model.
+
+## Starter equipment (vertical slice)
+
+`content/equipment.json` — 6 common/uncommon items seeded via `seedItems`.
+No stat budget table exists yet (no gear drops or equip flow live), so these
+are first-pass numbers, not budget-derived. Validated only against the
+structural rules in `content/validateEquipment.ts` (main_hand needs full
+geometry, armorWeight null on weapons/off_hand, evasion < 0.20, moveSpeed <
+0.5, epic/legendary stat floors, and the power-vs-area rule below).
+
+| Item              | Slot      | Rarity   | Weight/Geometry              | Stat line |
+|-------------------|-----------|----------|-------------------------------|-----------|
+| Worn Dagger       | main_hand | common   | cone, width 0.3, range 120    | weaponDamage 12, physicalAttack 8, attackSpeed 1.1 |
+| Apprentice Staff  | main_hand | common   | circle, width 1.8, range 280  | weaponDamage 6, magicAttack 14, castingSpeed 1.1 |
+| Leather Cap       | head      | common   | cloth                         | magicDef 8, maxHp 15 |
+| Iron Chestplate   | chest     | common   | plate                         | physicalDef 18, maxHp 30 |
+| Traveller's Boots | boots     | common   | chain                         | moveSpeed 0.08, evasion 0.03 |
+| Spirit Focus      | off_hand  | uncommon | —                              | magicDef 10, magicResist 0.05, maxMp 25 |
+
+**Power-vs-area rule (main_hand only):** if `geometryWidth > 1.0`, then
+`weaponDamage + physicalAttack + magicAttack` must not exceed 20. Apprentice
+Staff sits exactly at the boundary (6 + 14 = 20, width 1.8) — the validator
+enforces `<= 20` (not a strict `<`) specifically so this starter item stays
+legal; tightening this to a strict `<` would retroactively break it. Flagged
+here rather than silently choosing one reading, since it's a real judgment
+call `item-balancer` may want to revisit once a real stat budget exists.

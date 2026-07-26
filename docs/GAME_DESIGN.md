@@ -358,9 +358,13 @@ Permanent progress that survives every death — *access and cosmetics, never po
 - Exact Soul Ember drop rate and spawn sources (owned by item-balancer).
 - Concrete balance numbers (stat conversion rates, avoidance caps, XP curve, scaling
   curves, gear stat budgets, drop rates) — all pending playtest.
-- Equipment system: fully designed and in data model, not yet implemented — next
-  major system after Jekyll site. Blocks: real stat system, gear economy, armor
-  weight classes.
+- Equipment system: content pipeline + server tables now implemented
+  (content/equipment.json → validated → seedItems → ItemDefinition/
+  ItemInstance/EquippedItem tables, 6 starter items for the vertical slice).
+  Not yet implemented: equip/unequip reducers, effective_stats computation
+  (race + gear + ward passives), gear drops, and armor weight classes as a
+  wear gate check (currently bias-only per design, no code path yet since
+  there's no equip flow). Blocks: real stat system, gear economy.
 
 **Resolved:** control scheme (cursor-aimed, PoE-style) · weapon = geometry (range
 + width) + stat carrier · cards weapon-agnostic with scaling tags (emergent classes)
@@ -387,7 +391,11 @@ always escapable, HP regen on reset) · card drops (enemy death → 70% drop rol
 cardDrop row → 60s despawn; pickup via F key within 80px) · collection panel (C,
 always accessible, equip greyed outside spirit range) · spirit panel (E,
 proximity-gated, unlocks hand management) · death summary screen (shows survived
-vs lost cards) · held-key quick cast with live cone indicator.
+vs lost cards) · held-key quick cast with live cone indicator · equipment
+content pipeline (equipment.json → Zod validator → unit tests → seedItems,
+slug as idempotency key — mirrors the cards.json pipeline exactly) with
+6 starter items (worn-dagger, apprentice-staff, leather-cap, iron-chestplate,
+traveller-boots, spirit-focus) for the vertical slice.
 
 ## Tech Stack (decided)
 

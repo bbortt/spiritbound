@@ -21,6 +21,11 @@ import { ScheduleAt } from 'spacetimedb';
 import cardsJson from '../../content/cards.json';
 import { parseCards } from '../../content/validate';
 
+// @ts-ignore — JSON import resolved by esbuild; the node:fs path in validateEquipment.ts
+// (loadEquipment) is tree-shaken from this bundle since only parseEquipment is used here.
+import equipmentJson from '../../content/equipment.json';
+import { parseEquipment } from '../../content/validateEquipment';
+
 import {
   computeSpiritLevel,
   computeAttunementSlots,
@@ -74,6 +79,15 @@ const TPassiveKind = t.enum('PassiveKind', { ward: t.unit(), triggered: t.unit()
 const TSchool      = t.enum('DamageSchool',{ physical: t.unit(), magical: t.unit() });
 const TShape       = t.enum('ShapeType',   { cone: t.unit(), line: t.unit(), arc: t.unit(), circle: t.unit() });
 const TAggroState  = t.enum('AggroState',  { idle: t.unit(), chasing: t.unit(), casting: t.unit(), cooldown: t.unit(), resetting: t.unit() });
+const TArmorWeight = t.enum('ArmorWeight', { cloth: t.unit(), chain: t.unit(), plate: t.unit() });
+const TItemCategory = t.enum('ItemCategory', {
+  equipment: t.unit(), consumable: t.unit(), material: t.unit(),
+  quest: t.unit(), revival: t.unit(), dungeon_key: t.unit(),
+});
+const TEquipSlot = t.enum('EquipSlot', {
+  head: t.unit(), chest: t.unit(), hands: t.unit(), legs: t.unit(), boots: t.unit(),
+  main_hand: t.unit(), off_hand: t.unit(), necklace: t.unit(), ring: t.unit(), earring: t.unit(),
+});
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CONTENT TABLES  (static game data — written by tooling, read by everyone)
@@ -112,6 +126,30 @@ const cardDefinition = table(
     mpCost:             t.i32(),
     minCharacterLevel:  t.u32(),
     flavor:             t.string(),
+  },
+);
+
+const itemDefinition = table(
+  {
+    name: 'item_definition',
+    public: true,
+    indexes: [{ accessor: 'slug', algorithm: 'btree', columns: ['slug'] }],
+    constraints: [{ name: 'item_definition_slug_key', constraint: 'unique', columns: ['slug'] }],
+  },
+  {
+    itemDefId:      t.u64().primaryKey().autoInc(),
+    slug:           t.string(),
+    name:           t.string(),
+    rarity:         TRarity,
+    category:       TItemCategory,
+    slot:           t.option(TEquipSlot),      // null unless EQUIPMENT
+    armorWeight:    t.option(TArmorWeight),    // armor pieces only
+    weaponSchool:   t.option(TSchool),         // main_hand weapons only
+    geometryShape:  t.option(TShape),          // main_hand weapons only
+    geometryWidth:  t.option(t.f32()),         // main_hand weapons only
+    geometryRange:  t.option(t.f32()),         // main_hand weapons only
+    statModifiers:  TStatBlock,                // additive stats this item grants
+    flavor:         t.string(),
   },
 );
 
@@ -197,6 +235,36 @@ const equippedCard = table(
     cardInstanceId:   t.u64(),
     slotType:         TCardType,
     slotIndex:        t.u32(),
+  },
+);
+
+/** Physical item owned by a CHARACTER (not account) — destroyed on death, the body. */
+const itemInstance = table(
+  {
+    name: 'item_instance',
+    public: false,
+    indexes: [{ accessor: 'by_character', algorithm: 'btree', columns: ['ownerCharacterId'] }],
+  },
+  {
+    itemInstanceId:    t.u64().primaryKey().autoInc(),
+    ownerCharacterId:  t.u64(),
+    itemDefId:         t.u64(),
+    quantity:          t.u32(),   // 1 for equipment, stackable for consumables
+  },
+);
+
+const equippedItem = table(
+  {
+    name: 'equipped_item',
+    public: false,
+    indexes: [{ accessor: 'by_character', algorithm: 'btree', columns: ['characterId'] }],
+  },
+  {
+    equippedItemId:  t.u64().primaryKey().autoInc(),
+    characterId:     t.u64(),
+    itemInstanceId:  t.u64(),
+    slot:            TEquipSlot,
+    slotOrdinal:     t.u32(),   // 0/1 for the two rings & two earrings
   },
 );
 
@@ -308,11 +376,14 @@ const enemyRespawnSchedule = table(
 const db = schema({
   zone,
   cardDefinition,
+  itemDefinition,
   accountProgress,
   personalSpirit,
   cardInstance,
   character,
   equippedCard,
+  itemInstance,
+  equippedItem,
   cardDrop,
   enemy,
   enemyTickSchedule,
@@ -325,6 +396,21 @@ export default db;
 // Validate card data at module load — module refuses to start if cards.json is invalid.
 // In Node.js contexts use loadCards() from content/validate; here we bundle the JSON statically.
 const CARD_DEFS = parseCards(cardsJson as unknown[]);
+
+// Validate equipment data at module load — module refuses to start if equipment.json is invalid.
+const ITEM_DEFS = parseEquipment(equipmentJson as unknown[]);
+
+// An item's `stats` in equipment.json is a partial StatBlock (only the fields it grants).
+// Missing fields default to 0 — these are additive MODIFIERS, not a character's base stats,
+// so (unlike a fresh character) an absent multiplier field means "no change", not "1.0".
+const ZERO_STAT_MODIFIERS: StatBlock = {
+  power: 0, knowledge: 0, health: 0, will: 0, agility: 0, precision: 0,
+  maxHp: 0, hpRegen: 0, maxMp: 0, mpRegen: 0, moveSpeed: 0,
+  weaponDamage: 0, physicalAttack: 0, magicAttack: 0,
+  attackSpeed: 0, castingSpeed: 0,
+  physicalCrit: 0, magicCrit: 0, accuracy: 0, magicAccuracy: 0, healingBoost: 0,
+  physicalDef: 0, magicDef: 0, evasion: 0, parry: 0, block: 0, magicResist: 0,
+};
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // LIFECYCLE HOOKS
@@ -342,9 +428,10 @@ export const onConnect = db.clientConnected((ctx) => {
   }
 });
 
-/** Runs once when the module is first published. Seeds cards + enemies and starts the damage ticker. */
+/** Runs once when the module is first published. Seeds cards/items + enemies and starts the damage ticker. */
 export const init = db.init((ctx) => {
   _doSeedCards(ctx);
+  _doSeedItems(ctx);
   _seedZone1Enemies(ctx);
   ctx.db.enemyTickSchedule.insert({
     scheduledId: 0n,
@@ -403,6 +490,52 @@ function _doSeedCards(ctx: any): void {
 export const seedCards = db.reducer(
   {},
   (ctx) => { _doSeedCards(ctx); },
+);
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// REDUCERS — item seeding
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function _doSeedItems(ctx: any): void {
+  let inserted = 0;
+  let updated  = 0;
+
+  for (const item of ITEM_DEFS) {
+    const rowData = {
+      slug:           item.slug,
+      name:           item.name,
+      rarity:         { tag: item.rarity },
+      category:       { tag: item.category },
+      slot:           item.slot          ? { tag: item.slot }          : undefined,
+      armorWeight:    item.armorWeight   ? { tag: item.armorWeight }   : undefined,
+      weaponSchool:   item.weaponSchool  ? { tag: item.weaponSchool }  : undefined,
+      geometryShape:  item.geometryShape ? { tag: item.geometryShape } : undefined,
+      geometryWidth:  item.geometryWidth  ?? undefined,
+      geometryRange:  item.geometryRange  ?? undefined,
+      statModifiers:  { ...ZERO_STAT_MODIFIERS, ...item.stats },
+      flavor:         item.flavor,
+    };
+
+    const existing = ctx.db.itemDefinition.slug.find(item.slug);
+    if (existing) {
+      ctx.db.itemDefinition.itemDefId.update({ itemDefId: existing.itemDefId, ...rowData });
+      updated++;
+    } else {
+      ctx.db.itemDefinition.insert({ itemDefId: 0n, ...rowData });
+      inserted++;
+    }
+  }
+
+  console.log(`[seedItems] ${inserted} inserted, ${updated} updated`);
+}
+
+/**
+ * seedItems — upserts all items from content/equipment.json into itemDefinition.
+ * TODO: restrict to module owner identity before shipping to production.
+ */
+export const seedItems = db.reducer(
+  {},
+  (ctx) => { _doSeedItems(ctx); },
 );
 
 // ═══════════════════════════════════════════════════════════════════════════════

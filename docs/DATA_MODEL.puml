@@ -41,6 +41,12 @@ package "Enums" <<Frame>> {
     MAGIC_ATTACK
     ' extensible: e.g. a HEALING tag scaling off magic_attack x healing_boost
   }
+  enum DamageSchool {
+    PHYSICAL
+    MAGICAL
+    ' the actual enum used in code (index.ts TSchool) for CardDefinition.scaling_school
+    ' and ItemDefinition.weapon_school; distinct from the StatType tag above.
+  }
   enum EquipSlot {
     HEAD
     CHEST
@@ -160,20 +166,20 @@ package "Definitions (content)" <<Frame>> {
   }
 
   class ItemDefinition {
-    item_def_id : u32 {PK}
+    item_def_id : u64 {PK}       ' autoInc
+    slug : String                ' unique; idempotency key for seedItems (mirrors CardDefinition)
     name : String
     rarity : Rarity
     category : ItemCategory
-    slot : EquipSlot             ' null unless EQUIPMENT
-    armor_weight : ArmorWeight   ' armor pieces only; bias telegraph, NOT a wear gate
-    stat_modifiers : StatBlock   ' additive stats granted
-    ' weapon-only (MAIN_HAND):
-    weapon_stat_type : StatType  ' what stat it feeds to cards (PHYSICAL/MAGIC)
-    geometry_modifier : ShapeType ' how it bends a card's base_shape
-    geometry_width : f32         ' wider = more area, less focus
-    geometry_range : f32         ' also bends reach (melee swing on a staff reaches further)
-    consumable_effect : String   ' null unless CONSUMABLE
-    set_id : u32 {FK}            ' null unless part of a set (see Sets)
+    slot : EquipSlot {optional}          ' null unless EQUIPMENT
+    armor_weight : ArmorWeight {optional} ' armor pieces only; bias telegraph, NOT a wear gate
+    ' weapon-only (MAIN_HAND) — all four optional, all required together:
+    weapon_school : DamageSchool {optional}  ' what stat school it feeds to cards
+    geometry_shape : ShapeType {optional}    ' how it bends a card's base_shape
+    geometry_width : f32 {optional}          ' wider = more area, less focus
+    geometry_range : f32 {optional}          ' also bends reach (melee swing on a staff reaches further)
+    stat_modifiers : StatBlock   ' additive stats this item grants (missing fields = 0, not 1.0)
+    flavor : String              ' lore-keeper domain
   }
 
   class SpiritDefinition {
@@ -278,9 +284,8 @@ package "Runtime (instances)" <<Frame>> {
   class ItemInstance {
     item_instance_id : u64 {PK}
     owner_character_id : u64 {FK}     ' CHARACTER-owned -> LOST on death (body)
-    item_def_id : u32 {FK}
-    quantity : u32                    ' for stackables (potions, materials)
-    rolled_modifiers : StatBlock      ' optional per-instance variance
+    item_def_id : u64 {FK}
+    quantity : u32                    ' 1 for equipment, stackable for consumables/materials
   }
 
   class EquippedItem {
@@ -428,7 +433,8 @@ AllianceGroup "*" -- "1" Group : is >
 
 ' Sets
 SetDefinition "1" -- "1..*" SetBonus : tiers >
-ItemDefinition "*" -- "0..1" SetDefinition : belongs to >
+' NOTE: ItemDefinition has no set_id yet — sets are still deferred (see Sets package comment).
+' Reintroduce "ItemDefinition -- SetDefinition : belongs to" once set membership is implemented.
 
 ' Card graph (self-referential over CardDefinition)
 CardDefinition "1" -- "0..*" CardChainLink : opener >
@@ -438,7 +444,6 @@ CardEvolution "*" -- "1" CardDefinition : evolves to >
 
 Race ..> StatBlock : base_stats
 ItemDefinition ..> StatBlock : stat_modifiers
-ItemInstance ..> StatBlock : rolled_modifiers
 Character ..> StatBlock : effective_stats
 SetBonus ..> StatBlock : bonus_stats
 
@@ -453,6 +458,17 @@ note bottom of CardInstance
   Same card: sword = narrow+strong, staff = wide+far+weak.
   Balance rule (ability-balancer): no weapon gives both
   high damage AND wide shape on one card.
+end note
+
+note bottom of ItemDefinition
+  **Content pipeline** (mirrors CardDefinition/cards.json exactly):
+  content/equipment.json -> Zod validator (content/validateEquipment.ts)
+  -> unit tests (content/equipment.test.ts) -> seedItems reducer,
+  upserted by slug (idempotency key), same as seedCards.
+  Balance rule (item-balancer, enforced in the validator): a main_hand
+  weapon with geometry_width > 1.0 (wide/forgiving) may not also have
+  high weapon_damage + physical_attack + magic_attack (narrow = strong,
+  wide = weak) — same power-vs-area tradeoff as CardInstance above.
 end note
 
 note bottom of PersonalSpirit

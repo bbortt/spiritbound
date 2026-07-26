@@ -3,6 +3,12 @@
   <component name="ChangeListManager">
     <list default="true" id="5b82f24a-a837-4858-bdad-b79b887f77ac" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CLAUDE.md" beforeDir="false" afterPath="$PROJECT_DIR$/CLAUDE.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/ARCHITECTURE.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/ARCHITECTURE.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/BALANCE.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/BALANCE.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/DATA_MODEL.puml" beforeDir="false" afterPath="$PROJECT_DIR$/docs/DATA_MODEL.puml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/GAME_DESIGN.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/GAME_DESIGN.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/spacetimedb/src/index.ts" beforeDir="false" afterPath="$PROJECT_DIR$/spacetimedb/src/index.ts" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -39,7 +45,9 @@
     &quot;javascript.preferred.runtime.type.id&quot;: &quot;node&quot;,
     &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
     &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.jshint&quot;: &quot;true&quot;,
     &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.jshint&quot;: &quot;&quot;,
     &quot;nodejs_package_manager_path&quot;: &quot;pnpm&quot;,
     &quot;npm.db:start.executor&quot;: &quot;Run&quot;,
     &quot;npm.dev.executor&quot;: &quot;Run&quot;,
@@ -138,6 +146,7 @@
       <workItem from="1784542657839" duration="284000" />
       <workItem from="1784545622466" duration="8641000" />
       <workItem from="1784898683370" duration="4582000" />
+      <workItem from="1785069416160" duration="3077000" />
     </task>
     <servers />
   </component>

@@ -128,3 +128,15 @@ generated from the same source.
 `content/cards.json` and the live `cardDefinition` table (and the public
 site) can't silently diverge. Re-running the seeder is always safe
 (idempotent upsert, not append).
+
+**Extended to equipment — 2026:** `content/equipment.json` follows the
+identical pattern (`content/validateEquipment.ts` Zod schema + cross-item
+rules, `content/equipment.test.ts`, `seedItems` reducer upserting
+`itemDefinition` by slug). One structural difference: the node:fs-touching
+`loadEquipment()` (and cards' `loadCards()`) live in a separate loader file
+(`equipmentLoader.ts` / `loader.ts`) from the pure Zod/validation code —
+`spacetimedb/src/index.ts` imports only the pure `parseEquipment`/`parseCards`
+functions, so esbuild's tree-shaking can drop `node:fs` from the bundle
+entirely. SpacetimeDB's JS runtime has no `node:fs`, so a single-file version
+that mixed the two failed at publish time with `Could not find module
+"node:fs"` — the split is load-bearing, not just style.

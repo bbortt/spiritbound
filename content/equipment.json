@@ -1,0 +1,107 @@
+[
+  {
+    "slug": "worn-dagger",
+    "name": "Worn Dagger",
+    "category": "equipment",
+    "slot": "main_hand",
+    "rarity": "common",
+    "armorWeight": null,
+    "weaponSchool": "physical",
+    "geometryShape": "cone",
+    "geometryWidth": 0.3,
+    "geometryRange": 120,
+    "stats": {
+      "weaponDamage": 12,
+      "physicalAttack": 8,
+      "attackSpeed": 1.1
+    },
+    "flavor": "Chipped at the edge, but it has seen you through worse."
+  },
+  {
+    "slug": "apprentice-staff",
+    "name": "Apprentice Staff",
+    "category": "equipment",
+    "slot": "main_hand",
+    "rarity": "common",
+    "armorWeight": null,
+    "weaponSchool": "magical",
+    "geometryShape": "circle",
+    "geometryWidth": 1.8,
+    "geometryRange": 280,
+    "stats": {
+      "weaponDamage": 6,
+      "magicAttack": 14,
+      "castingSpeed": 1.1
+    },
+    "flavor": "The wood hums faintly. Something remembers what it was."
+  },
+  {
+    "slug": "leather-cap",
+    "name": "Leather Cap",
+    "category": "equipment",
+    "slot": "head",
+    "rarity": "common",
+    "armorWeight": "cloth",
+    "weaponSchool": null,
+    "geometryShape": null,
+    "geometryWidth": null,
+    "geometryRange": null,
+    "stats": {
+      "magicDef": 8,
+      "maxHp": 15
+    },
+    "flavor": "Soft and worn. It smells faintly of pine."
+  },
+  {
+    "slug": "iron-chestplate",
+    "name": "Iron Chestplate",
+    "category": "equipment",
+    "slot": "chest",
+    "rarity": "common",
+    "armorWeight": "plate",
+    "weaponSchool": null,
+    "geometryShape": null,
+    "geometryWidth": null,
+    "geometryRange": null,
+    "stats": {
+      "physicalDef": 18,
+      "maxHp": 30
+    },
+    "flavor": "Heavy and honest. It does not promise anything clever."
+  },
+  {
+    "slug": "traveller-boots",
+    "name": "Traveller's Boots",
+    "category": "equipment",
+    "slot": "boots",
+    "rarity": "common",
+    "armorWeight": "chain",
+    "weaponSchool": null,
+    "geometryShape": null,
+    "geometryWidth": null,
+    "geometryRange": null,
+    "stats": {
+      "moveSpeed": 0.08,
+      "evasion": 0.03
+    },
+    "flavor": "Worn smooth by long roads. They know the way."
+  },
+  {
+    "slug": "spirit-focus",
+    "name": "Spirit Focus",
+    "category": "equipment",
+    "slot": "off_hand",
+    "rarity": "uncommon",
+    "armorWeight": null,
+    "weaponSchool": null,
+    "geometryShape": null,
+    "geometryWidth": null,
+    "geometryRange": null,
+    "stats": {
+      "magicDef": 10,
+      "magicResist": 0.05,
+      "maxMp": 25
+    },
+    "flavor": "A polished orb that pulses in time with your spirit's breath."
+  }
+]
