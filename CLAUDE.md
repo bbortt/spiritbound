@@ -15,6 +15,8 @@ Read `docs/GAME_DESIGN.md` first. The core pillars:
 - **`docs/GAME_DESIGN.md`** — complete design: mechanics, progression, death, social, economy, tech stack.
 - **`docs/LORE.md`** — canonical world: tone, cosmology, conspiracy, enemy types, story hooks.
 - **`docs/DATA_MODEL.puml`** — SpacetimeDB schema (PlantUML). Tables, enums, relationships, all rules live in plain TS functions.
+- **`docs/ARCHITECTURE.md`** — ADR-style log of system-structure decisions (where logic lives, how systems communicate).
+- **`docs/BALANCE.md`** — shared numeric reference for `ability-balancer` / `item-balancer` (XP curves, combat constants, drop rates).
 
 ## Skills (Claude Code context owners)
 
@@ -39,11 +41,17 @@ See the shared seam between ability-balancer and item-balancer in their `SKILL.m
 
 ## Next Steps
 
-1. **Data model → code:** SpacetimeDB tables from `DATA_MODEL.puml`,
-  + core reducers (`move`, `cast_ability`, `die`),
-  + core rules functions (`resolve_hit`, `on_death`).
-2. **Vertical slice:** one zone, a few cards, one spirit, combat loop, death loop.
-3. **Phaser client:** movement, ability cast-toward-cursor, basic UI.
+The original vertical slice is done: zone 1 with server-authoritative
+enemies (aggro/chase/telegraph), card drops + pickup, spirit-gated hand
+management (collection + spirit panels), death/retention loop with a death
+summary screen, and cursor-aimed combat with held-key quick cast — plus a
+player-facing Jekyll reference site (`site/`) generated from
+`content/cards.json`.
+
+1. **Equipment system** — fully designed in `DATA_MODEL.puml` and
+   `GAME_DESIGN.md`, not yet implemented. Next major system: real stat
+   system, gear economy, armor weight classes.
+2. Expand content: more cards/enemies/zones once equipment lands.
 
 ## Open Questions (for later)
 
