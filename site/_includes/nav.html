@@ -1,0 +1,18 @@
+<header class="site-nav">
+  <div class="site-nav__bar">
+    <a class="site-nav__brand" href="{{ '/' | relative_url }}">
+      <span class="site-nav__glyph">✦</span> Spiritbound
+    </a>
+    <label for="nav-toggle" class="site-nav__hamburger" aria-label="Toggle navigation">
+      <span></span><span></span><span></span>
+    </label>
+  </div>
+
+  <nav class="site-nav__links">
+    <a href="{{ '/world.html' | relative_url }}" {% if page.url == '/world.html' %}class="active"{% endif %}>The World</a>
+    <a href="{{ '/mechanics.html' | relative_url }}" {% if page.url == '/mechanics.html' %}class="active"{% endif %}>Mechanics</a>
+    <a href="{{ '/cards/' | relative_url }}" {% if page.url contains '/cards/' %}class="active"{% endif %}>Cards</a>
+    <a href="{{ '/controls.html' | relative_url }}" {% if page.url == '/controls.html' %}class="active"{% endif %}>Controls</a>
+    <a class="site-nav__github" href="{{ site.github_url }}" target="_blank" rel="noopener">GitHub ↗</a>
+  </nav>
+</header>

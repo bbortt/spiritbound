@@ -17,7 +17,10 @@
     "db:start": "docker run -d --name spiritbound-local -p 3000:3000 clockworklabs/spacetime:latest start --in-memory",
     "db:stop": "docker rm -f spiritbound-local",
     "db:restart": "pnpm run db:stop && pnpm run db:start",
-    "ui:start": "pnpm -C client dev"
+    "ui:start": "pnpm -C client dev",
+    "site:sync-cards": "node -e \"require('fs').copyFileSync('content/cards.json','site/_data/cards.json')\"",
+    "site:dev": "pnpm run site:sync-cards && cd site && bundle exec jekyll serve",
+    "site:build": "pnpm run site:sync-cards && cd site && bundle exec jekyll build"
   },
   "dependencies": {
     "spacetimedb": "2.6.*",

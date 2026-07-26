@@ -5,3 +5,8 @@ dist
 .DS_Store
 
 spacetime.local.json
+
+site/_site/
+site/.jekyll-cache/
+site/.jekyll-metadata
+site/vendor/

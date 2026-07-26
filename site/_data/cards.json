@@ -1,0 +1,42 @@
+[
+  {
+    "slug": "ember-strike",
+    "name": "Ember Strike",
+    "rarity": "common",
+    "type": "active",
+    "school": "physical",
+    "shape": "cone",
+    "basePower": 25,
+    "cooldownSeconds": 1.2,
+    "mpCost": 10,
+    "minLevel": 1,
+    "flavor": "A swift strike that sears the edge of the blade."
+  },
+  {
+    "slug": "spirit-ward",
+    "name": "Spirit Ward",
+    "rarity": "common",
+    "type": "passive",
+    "passiveKind": "ward",
+    "school": "magical",
+    "shape": "circle",
+    "basePower": 8,
+    "cooldownSeconds": 0,
+    "mpCost": 0,
+    "minLevel": 1,
+    "flavor": "The spirit breathes a quiet shield around you."
+  },
+  {
+    "slug": "soul-pulse",
+    "name": "Soul Pulse",
+    "rarity": "uncommon",
+    "type": "active",
+    "school": "magical",
+    "shape": "circle",
+    "basePower": 35,
+    "cooldownSeconds": 2.0,
+    "mpCost": 20,
+    "minLevel": 5,
+    "flavor": "A burst of spirit-energy that ripples outward."
+  }
+]

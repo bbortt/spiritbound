@@ -1,0 +1,30 @@
+title: Spiritbound
+tagline: Cards are your soul. Gear is your body.
+description: >-
+  A player's guide to Spiritbound — the world, the mechanics, the cards,
+  and the controls. A PvE fantasy where death is almost permanent.
+baseurl: ""
+url: ""
+
+github_url: "https://github.com/"
+
+markdown: kramdown
+kramdown:
+  input: GFM
+  syntax_highlighter: rouge
+
+sass:
+  style: compressed
+
+defaults:
+  - scope:
+      path: ""
+    values:
+      layout: page
+
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  - README.md
+  - node_modules
+  - vendor

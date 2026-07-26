@@ -1,0 +1,48 @@
+---
+layout: default
+---
+<article class="card-detail rarity-{{ page.rarity }}">
+  <p class="card-detail__breadcrumb"><a href="{{ '/cards/' | relative_url }}">← All cards</a></p>
+
+  <header class="card-detail__header">
+    <h1 class="card-detail__name">{{ page.name }}</h1>
+    <div class="card-detail__badges">
+      <span class="badge badge-rarity rarity-{{ page.rarity }}">{{ page.rarity }}</span>
+      <span class="badge badge-type">{{ page.type }}</span>
+      <span class="badge badge-school">
+        {% if page.school == "physical" %}⚔{% else %}✦{% endif %} {{ page.school }}
+      </span>
+    </div>
+  </header>
+
+  <p class="card-detail__flavor"><em>&ldquo;{{ page.flavor }}&rdquo;</em></p>
+
+  <dl class="card-detail__stats">
+    <div class="stat">
+      <dt>Shape</dt>
+      <dd>{{ page.shape }}</dd>
+    </div>
+    <div class="stat">
+      <dt>Base power</dt>
+      <dd>{{ page.basePower }}</dd>
+    </div>
+    <div class="stat">
+      <dt>Cooldown</dt>
+      <dd>{{ page.cooldownSeconds }}s</dd>
+    </div>
+    <div class="stat">
+      <dt>MP cost</dt>
+      <dd>{{ page.mpCost }}</dd>
+    </div>
+    <div class="stat">
+      <dt>Min. level</dt>
+      <dd>{{ page.minLevel }}</dd>
+    </div>
+    {% if page.passiveKind %}
+    <div class="stat">
+      <dt>Passive kind</dt>
+      <dd>{{ page.passiveKind }}</dd>
+    </div>
+    {% endif %}
+  </dl>
+</article>

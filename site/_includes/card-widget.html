@@ -1,0 +1,19 @@
+<a class="card-widget rarity-{{ include.card.rarity }}"
+   href="{{ site.baseurl }}/cards/{{ include.card.slug }}/"
+   data-rarity="{{ include.card.rarity }}"
+   data-type="{{ include.card.type }}">
+  <div class="card-widget__top"></div>
+  <div class="card-widget__body">
+    <div class="card-widget__row">
+      <span class="card-widget__name">{{ include.card.name }}</span>
+      <span class="badge badge-rarity rarity-{{ include.card.rarity }}">{{ include.card.rarity }}</span>
+    </div>
+    <div class="card-widget__meta">
+      <span class="card-widget__school">
+        {% if include.card.school == "physical" %}⚔{% else %}✦{% endif %}
+      </span>
+      <span class="card-widget__type">{{ include.card.type }}</span>
+    </div>
+    <p class="card-widget__flavor"><em>&ldquo;{{ include.card.flavor }}&rdquo;</em></p>
+  </div>
+</a>
