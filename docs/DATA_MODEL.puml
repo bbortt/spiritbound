@@ -305,6 +305,17 @@ package "Runtime (instances)" <<Frame>> {
     ' despawns 60s after created_at (cardDropCleanup, every 10s); pickup within 80px
   }
 
+  class ItemDrop {
+    item_drop_id : u64 {PK}          ' autoInc
+    item_def_id : u64 {FK}
+    zone_id : u32 {FK}
+    pos_x : f32
+    pos_y : f32
+    created_at : Timestamp
+    ' same lifecycle as CardDrop, swept by the same cardDropCleanup reducer.
+    ' 40% roll per enemy death (independent of the 70% card roll), common rarity only for now.
+  }
+
   class Enemy {
     enemy_id : u64 {PK}              ' autoInc
     zone_id : u32 {FK}
@@ -423,7 +434,9 @@ DungeonDefinition "*" -- "1" Zone : entrance in >
 
 Zone "1" -- "0..*" Enemy : hosts >
 Zone "1" -- "0..*" CardDrop : contains >
+Zone "1" -- "0..*" ItemDrop : contains >
 CardDrop "*" -- "1" CardDefinition : instance of >
+ItemDrop "*" -- "1" ItemDefinition : instance of >
 
 ' Social
 Group "1" -- "2..6" GroupMember : has >
@@ -452,12 +465,18 @@ SetBonus ..> StatBlock : bonus_stats
 ' ============================================================
 note bottom of CardInstance
   **Damage in play** = scaled_power(card, character.level)
-  evaluated against weapon.weapon_stat_type matching
-  card.scaling_tag, with shape = base_shape bent by
-  weapon geometry_modifier / geometry_width / geometry_range.
+  evaluated against weapon.weapon_school matching
+  card.scaling_school, with shape = base_shape bent by
+  weapon geometry_shape / geometry_width / geometry_range.
   Same card: sword = narrow+strong, staff = wide+far+weak.
   Balance rule (ability-balancer): no weapon gives both
   high damage AND wide shape on one card.
+  IMPLEMENTED: damageEnemy/applyDamage (index.ts) call
+  rules/combat.ts#resolveHit with real effectiveStats on
+  both sides (index.ts#buildEffectiveStats) — no more
+  client-trusted flat damage numbers. cardDefId 0 in
+  damageEnemy means a bare weapon swing (no card): its
+  "cardBasePower" is the weapon's own weaponDamage stat.
 end note
 
 note bottom of ItemDefinition
@@ -477,6 +496,13 @@ note bottom of PersonalSpirit
   attunement_by_rarity (rarity-tiered, so no hoarding
   10 legendaries). Un-attuned cards are lost. No RNG.
   Spirit is the only thing that crosses the death boundary.
+end note
+
+note bottom of EquippedItem
+  equipItem/unequipItem (index.ts) recompute maxHp/maxMp before and
+  after the gear change and rescale currentHp/currentMp by the same
+  ratio (never a hard clamp) via _withProportionalResourceUpdate —
+  gaining maxHp always feels like a gain, never a wasted overflow.
 end note
 
 note top of EquippedCard
@@ -527,11 +553,17 @@ end note
 
 note as N_Derived
   **Computed in rules/, not stored:**
-  effective_stats = race base + equipped gear + active SET BONUSES
-  (count equipped items sharing set_id vs SetBonus.pieces_required)
-  + ward-passive cards. Sets re-form each life (gear lost on death),
-  so they must be repeatably attainable. CHAIN/EVOLUTION are content
-  graphs over CardDefinition, giving skill-tree depth without point-buy.
+  effective_stats = race base + equipped gear, IMPLEMENTED in
+  rules/stats.ts (computeRaceBase + computeEffectiveStats) and wired
+  into resolveHit via index.ts#buildEffectiveStats. race base is
+  currently a single hard-coded stub (computeRaceBase ignores its
+  raceId arg) — the Race table/class above is still aspirational,
+  no race_id column exists on Character yet. Still deferred: SET
+  BONUSES (count equipped items sharing set_id vs pieces_required)
+  and ward-passive card stats. Sets re-form each life (gear lost on
+  death), so they must be repeatably attainable. CHAIN/EVOLUTION are
+  content graphs over CardDefinition, giving skill-tree depth without
+  point-buy.
 end note
 
 @enduml

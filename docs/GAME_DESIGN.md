@@ -358,13 +358,20 @@ Permanent progress that survives every death — *access and cosmetics, never po
 - Exact Soul Ember drop rate and spawn sources (owned by item-balancer).
 - Concrete balance numbers (stat conversion rates, avoidance caps, XP curve, scaling
   curves, gear stat budgets, drop rates) — all pending playtest.
-- Equipment system: content pipeline + server tables now implemented
-  (content/equipment.json → validated → seedItems → ItemDefinition/
-  ItemInstance/EquippedItem tables, 6 starter items for the vertical slice).
-  Not yet implemented: equip/unequip reducers, effective_stats computation
-  (race + gear + ward passives), gear drops, and armor weight classes as a
-  wear gate check (currently bias-only per design, no code path yet since
-  there's no equip flow). Blocks: real stat system, gear economy.
+- Equipment system: content pipeline + server tables + combat wiring now
+  implemented (content/equipment.json → validated → seedItems →
+  ItemDefinition/ItemInstance/EquippedItem tables; equipItem/unequipItem
+  reducers with proportional HP/MP rescaling; effective_stats = race base
+  + gear, computed in rules/stats.ts and wired into resolveHit for both
+  damageEnemy and enemy casts; item drops on enemy death, 40% common-only,
+  independent of the 70% card roll; gear destroyed on death). Not yet
+  implemented: a real Race table (computeRaceBase is a single hard-coded
+  stub), ward-passive card stats feeding effective_stats, set bonuses,
+  difficulty-based item rarity scaling, and armor weight classes as a wear
+  gate check (still bias-only per design — no code path needs one yet).
+  Also no client UI for inventory/equip yet (item_instance/equipped_item
+  are private tables by design — only ground item drops are client-visible
+  so far). Blocks: gear economy at scale, itemized build identity.
 
 **Resolved:** control scheme (cursor-aimed, PoE-style) · weapon = geometry (range
 + width) + stat carrier · cards weapon-agnostic with scaling tags (emergent classes)
@@ -395,7 +402,13 @@ vs lost cards) · held-key quick cast with live cone indicator · equipment
 content pipeline (equipment.json → Zod validator → unit tests → seedItems,
 slug as idempotency key — mirrors the cards.json pipeline exactly) with
 6 starter items (worn-dagger, apprentice-staff, leather-cap, iron-chestplate,
-traveller-boots, spirit-focus) for the vertical slice.
+traveller-boots, spirit-focus) for the vertical slice · gear stats wired
+into combat (effective_stats = race base + equipped gear, drives
+resolveHit for both player attacks and enemy casts; bare weapon swings
+use the weapon's own weaponDamage stat) · equip/unequip with proportional
+HP/MP rescaling · item drops (40% per enemy death, common-only, same
+despawn/pickup lifecycle as card drops) · gear destroyed on death
+("gear is your body," no exceptions).
 
 ## Tech Stack (decided)
 

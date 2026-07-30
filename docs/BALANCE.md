@@ -128,8 +128,48 @@ character's level qualifies for (`minCharacterLevel <= char.level`). Ground
 drops despawn 60s after `createdAt` (swept by `cardDropCleanup`, which runs
 every 10s). Pickup requires being within 80px (`pickupCard`).
 
+`spacetimedb/src/index.ts#_dropItemFromEnemy` — independent **40% chance**
+of a ground item drop per enemy death, uniformly random among **common**-
+rarity `ItemDefinition`s only (no difficulty-based rarity scaling yet).
+Same despawn/pickup lifecycle as card drops, via `pickupItem`.
+
 **Placeholder** — owned by `item-balancer` long-term; not yet tuned against
 an economy model.
+
+## Race base stats (vertical slice)
+
+`spacetimedb/src/rules/stats.ts#computeRaceBase` — one hard-coded human
+placeholder, ignores its `raceId` argument. This is the character's stat
+floor before any gear:
+
+| Field | Value | Field | Value |
+|-------|------:|-------|------:|
+| power / knowledge / will / agility / precision | 10 | health | 12 |
+| maxHp | 100 | maxMp | 60 |
+| hpRegen | 0.5 | mpRegen | 0.3 |
+| moveSpeed / attackSpeed / castingSpeed / healingBoost | 1.0 | everything else | 0 |
+
+**Behavior change:** `startLife` used to grant `100 + level*15` HP and
+`50 + level*8` MP (character level scaled starting resources directly).
+That placeholder is gone — a fresh character now always starts at exactly
+`computeRaceBase(0)`'s maxHp/maxMp (100/60) regardless of level, matching
+`GAME_DESIGN.md`'s stat model (Health/Will are race-seeded primaries, not
+level-seeded). Character level now only scales card damage
+(`LEVEL_SCALING_PER_LEVEL` above) — HP/MP growth is gear's job. Flagging
+this since it's a real gameplay-feel change, not just plumbing.
+
+## Bare weapon swing (no card)
+
+`spacetimedb/src/index.ts#damageEnemy` — `cardDefId: 0` means a bare weapon
+swing (right-click basic attack, no card cast). It's fed through the same
+`resolveHit` pipeline as a card cast, with `cardBasePower` set to the
+attacker's `weaponDamage` stat (0 unarmed) instead of a card's `basePower`,
+and `cardSchool`/`cardBaseShape` taken from the equipped main_hand weapon
+(defaults: physical, cone, width 0.4, range 150 if bare-handed). This is a
+judgment call — `resolveHit` itself doesn't consume `weaponDamage` anywhere
+else (card casts still scale off `physicalAttack`/`magicAttack` only, per
+`GAME_DESIGN.md`'s stat table), so `weaponDamage` would otherwise be a
+dead stat on every weapon in `equipment.json`.
 
 ## Starter equipment (vertical slice)
 

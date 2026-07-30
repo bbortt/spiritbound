@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import type { Identity } from 'spacetimedb';
 import { connect, callReducer, type DbConnection } from '../db';
-import type { Character, PersonalSpirit, Enemy, CardDefinition, CardDrop, CardInstance, EquippedCard } from '../db';
+import type { Character, PersonalSpirit, Enemy, CardDefinition, CardDrop, CardInstance, EquippedCard, ItemDefinition, ItemDrop } from '../db';
 import { CollectionPanel } from '../ui/CollectionPanel';
 
 // ── Tilemap constants ─────────────────────────────────────────────────────────
@@ -42,6 +42,10 @@ const DROP_COLORS: Record<string, number> = {
   Common: 0xcccccc, Uncommon: 0x44cc44, Rare: 0x4488ff, Epic: 0xaa44ff, Legendary: 0xffcc00,
 };
 
+// Item drops only seed common-rarity gear for now — flat warm-orange glow.
+// Rarer items get brighter colours once higher-rarity drops exist.
+const ITEM_DROP_COLOR = 0xff8c1a;
+
 function _rarityTag(tag: unknown): string {
   return String((tag as any)?.tag ?? tag).match(/^(\w+)/)?.[1] ?? 'Common';
 }
@@ -50,7 +54,6 @@ function _rarityTag(tag: unknown): string {
 const ATTACK_RANGE    = 280;
 const ATTACK_HALF_ANG = 15 * Math.PI / 180;
 const ATTACK_COOLDOWN = 500;
-const ATTACK_DAMAGE   = 10;
 
 // Card 1 — Ember Strike geometry (fixed; actual power values come from DB)
 const EMBER_RANGE    = 320;
@@ -271,7 +274,6 @@ export class GameScene extends Phaser.Scene {
 
   private emberCast!: CastController;
   private emberDef: CardDefinition | null = null;
-  private emberDamage = 25;   // default; overwritten when card_definition row arrives
   private emberMpCost = 10;   // default; overwritten when card_definition row arrives
   private slot1X = 0;
   private slot1Y = 0;
@@ -292,13 +294,16 @@ export class GameScene extends Phaser.Scene {
   private collectionPanel!: CollectionPanel;
   private spiritPanel!: CollectionPanel;
   private _cardDefs        = new Map<number, CardDefinition>();
+  private _itemDefs        = new Map<bigint, ItemDefinition>();
   private localCardInst    = new Map<bigint, CardInstance>();
   private localEquipped    = new Map<bigint, EquippedCard>(); // key = equippedCardId
   private worldDrops       = new Map<bigint, { dropRow: CardDrop; gfx: Phaser.GameObjects.Graphics; label: Phaser.GameObjects.Text }>();
+  private worldItemDrops   = new Map<bigint, { dropRow: ItemDrop; gfx: Phaser.GameObjects.Graphics; label: Phaser.GameObjects.Text }>();
+  // Nearest pickup within range, whichever is closer — card drop or item drop.
+  private nearInteractable: { kind: 'card' | 'item'; id: bigint } | null = null;
   private spiritGfx!: Phaser.GameObjects.Graphics;
   private spiritLabel!:  Phaser.GameObjects.Text;
   private nearSpirit      = false;
-  private nearDropId: bigint | null = null;
   private deathText!: Phaser.GameObjects.Text;
   private returnBtn!: Phaser.GameObjects.Text;
 
@@ -374,6 +379,11 @@ export class GameScene extends Phaser.Scene {
 
     this.conn.db.cardDrop.onInsert((_ctx, row) => this._onDropInsert(row));
     this.conn.db.cardDrop.onDelete((_ctx, row) => this._onDropDelete(row));
+
+    this.conn.db.itemDefinition.onInsert((_ctx, row) => this._onItemDefRow(row));
+    this.conn.db.itemDefinition.onUpdate?.((_ctx, _old, row) => this._onItemDefRow(row));
+    this.conn.db.itemDrop.onInsert((_ctx, row) => this._onItemDropInsert(row));
+    this.conn.db.itemDrop.onDelete((_ctx, row) => this._onItemDropDelete(row));
 
     this.conn.db.cardInstance.onInsert((_ctx, row) => {
       this.localCardInst.set(row.cardInstanceId, row);
@@ -771,11 +781,14 @@ export class GameScene extends Phaser.Scene {
     this.spiritPanel?.onCardDefInsert(row);
     if (row.slug === 'ember-strike') {
       this.emberDef    = row;
-      this.emberDamage = row.basePower;
       this.emberMpCost = row.mpCost;
       this.emberCast.setCooldown(row.baseCooldown * 1000);
       this.slot1Label?.setText(row.name);
     }
+  }
+
+  private _onItemDefRow(row: ItemDefinition) {
+    this._itemDefs.set(row.itemDefId, row);
   }
 
   // ── Cast controllers ──────────────────────────────────────────────────────────
@@ -827,13 +840,23 @@ export class GameScene extends Phaser.Scene {
 
     const kb = this.input.keyboard!;
     kb.on('keydown-F', () => {
-      if (this.nearDropId != null) {
-        const entry = this.worldDrops.get(this.nearDropId);
+      const near = this.nearInteractable;
+      if (!near) return;
+
+      if (near.kind === 'card') {
+        const entry = this.worldDrops.get(near.id);
         const def   = entry ? this._cardDefs.get(entry.dropRow.cardDefId) : null;
         callReducer('pickup_card', () =>
-          this.conn.reducers.pickupCard({ dropId: this.nearDropId! }),
+          this.conn.reducers.pickupCard({ dropId: near.id }),
         );
         this._showToast(def ? `Picked up: ${def.name}` : 'Picked up card');
+      } else {
+        const entry = this.worldItemDrops.get(near.id);
+        const def   = entry ? this._itemDefs.get(entry.dropRow.itemDefId) : null;
+        callReducer('pickup_item', () =>
+          this.conn.reducers.pickupItem({ dropId: near.id }),
+        );
+        this._showToast(def ? `${def.name} added to bag` : 'Item added to bag');
       }
     });
     kb.on('keydown-E', () => {
@@ -1063,11 +1086,11 @@ export class GameScene extends Phaser.Scene {
         for (const [, data] of this.dbEnemies) {
           if (!data.alive) continue;
           if (this._inCone(data.x, data.y, ox, oy, nx, ny, ATTACK_RANGE, ATTACK_HALF_ANG)) {
+            // cardDefId 0 = bare weapon swing (no card) — server resolves real damage.
             callReducer('damageEnemy', () =>
               this.conn.reducers.damageEnemy({
-                enemyId: data.enemyId,
-                damage:  ATTACK_DAMAGE,
-                school:  { tag: 'Physical' },
+                enemyId:   data.enemyId,
+                cardDefId: 0,
               }),
             );
             hitAny = true;
@@ -1103,13 +1126,14 @@ export class GameScene extends Phaser.Scene {
         for (const [, data] of this.dbEnemies) {
           if (!data.alive) continue;
           if (this._inCone(data.x, data.y, ox, oy, nx, ny, EMBER_RANGE, EMBER_HALF_ANG)) {
-            callReducer('damageEnemy', () =>
-              this.conn.reducers.damageEnemy({
-                enemyId: data.enemyId,
-                damage:  Math.round(this.emberDamage),
-                school:  this.emberDef?.scalingSchool ?? { tag: 'Physical' as const },
-              }),
-            );
+            if (this.emberDef) {
+              callReducer('damageEnemy', () =>
+                this.conn.reducers.damageEnemy({
+                  enemyId:   data.enemyId,
+                  cardDefId: this.emberDef!.cardDefId,
+                }),
+              );
+            }
             this._emberBurnFlash(data);
             hitAny = true;
           }
@@ -1488,6 +1512,46 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  // ── Item drops ───────────────────────────────────────────────────────────────
+
+  private _onItemDropInsert(row: ItemDrop) {
+    const gfx = this.add.graphics().setDepth(1);
+    gfx.fillStyle(ITEM_DROP_COLOR, 0.9);
+    gfx.fillCircle(row.posX, row.posY, 8);
+    gfx.lineStyle(1.5, 0xffffff, 0.5);
+    gfx.strokeCircle(row.posX, row.posY, 8);
+    this.tweens.add({
+      targets: gfx,
+      alpha: { from: 0.5, to: 1.0 },
+      duration: 700,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
+
+    const label = this.add
+      .text(row.posX, row.posY - 18, 'F', {
+        fontSize: '10px', color: '#ffffff', fontFamily: 'monospace',
+        backgroundColor: '#00000099',
+        padding: { x: 3, y: 1 },
+      })
+      .setOrigin(0.5)
+      .setDepth(3)
+      .setVisible(false);
+
+    this.worldItemDrops.set(row.itemDropId, { dropRow: row, gfx, label });
+  }
+
+  private _onItemDropDelete(row: ItemDrop) {
+    const entry = this.worldItemDrops.get(row.itemDropId);
+    if (entry) {
+      this.tweens.killTweensOf(entry.gfx);
+      entry.gfx.destroy();
+      entry.label.destroy();
+      this.worldItemDrops.delete(row.itemDropId);
+    }
+  }
+
   // ── Proximity update ──────────────────────────────────────────────────────────
 
   private _updateProximity() {
@@ -1508,18 +1572,27 @@ export class GameScene extends Phaser.Scene {
       if (!nearSpirit) this.spiritPanel.close();
     }
 
-    // Drops
-    let closestId: bigint | null = null;
+    // Drops — nearest interactable within pickup range, card or item, whichever is closer.
+    let closest: { kind: 'card' | 'item'; id: bigint } | null = null;
     let closestD2 = DROP_PICKUP_R * DROP_PICKUP_R;
     for (const [id, { dropRow }] of this.worldDrops) {
       const dx = px - dropRow.posX;
       const dy = py - dropRow.posY;
       const d2 = dx * dx + dy * dy;
-      if (d2 < closestD2) { closestD2 = d2; closestId = id; }
+      if (d2 < closestD2) { closestD2 = d2; closest = { kind: 'card', id }; }
     }
-    this.nearDropId = closestId;
+    for (const [id, { dropRow }] of this.worldItemDrops) {
+      const dx = px - dropRow.posX;
+      const dy = py - dropRow.posY;
+      const d2 = dx * dx + dy * dy;
+      if (d2 < closestD2) { closestD2 = d2; closest = { kind: 'item', id }; }
+    }
+    this.nearInteractable = closest;
     for (const [id, { label }] of this.worldDrops) {
-      label.setVisible(id === closestId);
+      label.setVisible(closest?.kind === 'card' && id === closest.id);
+    }
+    for (const [id, { label }] of this.worldItemDrops) {
+      label.setVisible(closest?.kind === 'item' && id === closest.id);
     }
   }
 

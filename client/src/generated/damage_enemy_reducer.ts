@@ -10,14 +10,7 @@ import {
   type Infer as __Infer,
 } from "spacetimedb";
 
-import {
-  DamageSchool,
-} from "./types";
-
 export default {
   enemyId: __t.u64(),
-  damage: __t.i32(),
-  get school() {
-    return DamageSchool;
-  },
+  cardDefId: __t.u32(),
 };

@@ -4,7 +4,8 @@
       "Bash(docker run *)",
       "Bash(pnpm *)"
     ]
-  },"deny": [
-  "Bash(git push *)"
-]
+  },
+  "deny": [
+    "Bash(git push *)"
+  ]
 }

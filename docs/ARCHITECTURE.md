@@ -109,6 +109,11 @@ server-authoritative and consistent for every observer — no client can see a
 drop that's already gone, or grab one out of range. Costs a small, constant
 per-tick table scan in the cleanup reducer (acceptable at current scale).
 
+**Extended to items — 2026:** `ItemDrop` follows the identical pattern
+(`_dropItemFromEnemy`, 40% independent roll, `pickupItem`). Rather than a
+second scheduled reducer, `cardDropCleanup` was extended to sweep both
+tables in the same 10s tick — one schedule, one age check, applied twice.
+
 ## Content pipeline: cards.json is the single source of truth — 2026
 
 **Context:** Card definitions need to be authored by a human (or
@@ -128,6 +133,31 @@ generated from the same source.
 `content/cards.json` and the live `cardDefinition` table (and the public
 site) can't silently diverge. Re-running the seeder is always safe
 (idempotent upsert, not append).
+
+## Gear stats wired into combat via resolveHit — 2026
+
+**Context:** `rules/combat.ts#resolveHit` and the `itemDefinition`/
+`itemInstance`/`equippedItem` tables existed, but nothing called
+`resolveHit` — `damageEnemy` and `applyDamage` took a client-computed flat
+`damage` number and subtracted it directly from HP, and the enemy's
+telegraphed cast (`_fireCast`) did the same. This meant gear stats had zero
+effect on combat, and (per the "client renders, server decides" ADR above)
+the server wasn't actually deciding damage at all.
+**Decision:** `rules/stats.ts` adds `computeRaceBase`/`computeEffectiveStats`
+(pure, race base + additive gear). `index.ts#buildEffectiveStats(ctx, char)`
+reads a character's `equippedItem` rows and derives their live `StatBlock`
+on every hit — never stored. `damageEnemy` now takes `cardDefId` (0 = bare
+weapon swing) instead of a damage number; `_fireCast` and `applyDamage`
+route through a shared `_resolveAndApplyDamage` helper. All three now call
+`resolveHit` with the real attacker/defender `StatBlock`s.
+**Consequences:** Client can no longer dictate damage — `GameScene.ts`'s two
+`damageEnemy` call sites now send only `cardDefId`, matching the existing
+hit-detection trust boundary (client confirms geometric connection, server
+resolves damage). Enemies still have no `StatBlock` of their own (flat
+`castDamage`/`damagePerHit`), so `EMPTY_STAT_BLOCK` stands in as their
+attacker/defender stats until enemies get real stats. `equipItem`/
+`unequipItem` (new) recompute maxHp/maxMp and proportionally rescale
+current HP/MP around every gear change, via `_withProportionalResourceUpdate`.
 
 **Extended to equipment — 2026:** `content/equipment.json` follows the
 identical pattern (`content/validateEquipment.ts` Zod schema + cross-item

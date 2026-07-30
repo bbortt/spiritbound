@@ -49,9 +49,10 @@ function _subscribeSlice(
   conn: DbConnection,
   onSubscribed?: (conn: DbConnection) => void,
 ): SubscriptionHandle {
-  // Card tables are in a separate subscription so a failure there doesn't
-  // break movement / combat.
+  // Card and item tables are in separate subscriptions so a failure there
+  // doesn't break movement / combat.
   _subscribeCards(conn);
+  _subscribeItems(conn);
 
   return conn
     .subscriptionBuilder()
@@ -85,6 +86,20 @@ function _subscribeCards(conn: DbConnection): void {
       'SELECT * FROM card_drop',
       'SELECT * FROM card_instance',
       'SELECT * FROM equipped_card',
+    ]);
+}
+
+function _subscribeItems(conn: DbConnection): void {
+  conn
+    .subscriptionBuilder()
+    .onApplied(() => console.log('[spacetime] item subscription active'))
+    .onError((ctx) => {
+      const err = (ctx as any).event;
+      console.error('[spacetime] item subscription error:', err?.message ?? err);
+    })
+    .subscribe([
+      'SELECT * FROM item_definition',
+      'SELECT * FROM item_drop',
     ]);
 }
 

@@ -48,11 +48,15 @@ summary screen, and cursor-aimed combat with held-key quick cast — plus a
 player-facing Jekyll reference site (`site/`) generated from
 `content/cards.json`.
 
-1. **Equipment system** — content pipeline + server tables done
-   (`content/equipment.json`, `ItemDefinition`/`ItemInstance`/`EquippedItem`,
-   `seedItems`). Still needed: equip/unequip reducers, `effective_stats`
-   computation (race + gear + ward passives), gear drops.
-2. Expand content: more cards/enemies/zones/items once equip flow lands.
+1. **Equipment system** — content pipeline, server tables, equip/unequip
+   reducers, `effective_stats` (race + gear), and gear drops are all done
+   (`content/equipment.json`, `ItemDefinition`/`ItemInstance`/`EquippedItem`/
+   `ItemDrop`, `rules/stats.ts`, `seedItems`). Combat (`damageEnemy`,
+   enemy casts) now runs through `resolveHit` with real gear stats instead
+   of client-trusted flat damage. Still needed: an inventory/equip UI on
+   the client (the tables are private — only ground item drops are
+   client-visible so far), a real Race table, ward-passive stats, sets.
+2. Expand content: more cards/enemies/zones/items once an equip UI lands.
 
 ## Open Questions (for later)
 

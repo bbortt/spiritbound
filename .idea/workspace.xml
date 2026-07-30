@@ -1,15 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="5b82f24a-a837-4858-bdad-b79b887f77ac" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/CLAUDE.md" beforeDir="false" afterPath="$PROJECT_DIR$/CLAUDE.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/docs/ARCHITECTURE.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/ARCHITECTURE.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/docs/BALANCE.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/BALANCE.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/docs/DATA_MODEL.puml" beforeDir="false" afterPath="$PROJECT_DIR$/docs/DATA_MODEL.puml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/docs/GAME_DESIGN.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/GAME_DESIGN.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/spacetimedb/src/index.ts" beforeDir="false" afterPath="$PROJECT_DIR$/spacetimedb/src/index.ts" afterDir="false" />
-    </list>
+    <list default="true" id="5b82f24a-a837-4858-bdad-b79b887f77ac" name="Changes" comment="" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -69,7 +61,7 @@
       <recent name="D:\dev\workspaces\fun\eldoria\src\core" />
     </key>
   </component>
-  <component name="RunManager" selected="npm.spacetime:publish:local">
+  <component name="RunManager" selected="npm.ui:start">
     <configuration name="db:start" type="js.build_tools.npm" temporary="true" nameIsGenerated="true">
       <package-json value="$PROJECT_DIR$/package.json" />
       <command value="run" />

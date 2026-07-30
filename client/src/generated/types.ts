@@ -28,6 +28,14 @@ export const AggroState = __t.enum("AggroState", {
 });
 export type AggroState = __Infer<typeof AggroState>;
 
+// The tagged union or sum type for the algebraic type `ArmorWeight`.
+export const ArmorWeight = __t.enum("ArmorWeight", {
+  Cloth: __t.unit(),
+  Chain: __t.unit(),
+  Plate: __t.unit(),
+});
+export type ArmorWeight = __Infer<typeof ArmorWeight>;
+
 export const CardDefinition = __t.object("CardDefinition", {
   cardDefId: __t.u32(),
   slug: __t.string(),
@@ -151,6 +159,21 @@ export const EnemyTickSchedule = __t.object("EnemyTickSchedule", {
 });
 export type EnemyTickSchedule = __Infer<typeof EnemyTickSchedule>;
 
+// The tagged union or sum type for the algebraic type `EquipSlot`.
+export const EquipSlot = __t.enum("EquipSlot", {
+  Head: __t.unit(),
+  Chest: __t.unit(),
+  Hands: __t.unit(),
+  Legs: __t.unit(),
+  Boots: __t.unit(),
+  MainHand: __t.unit(),
+  OffHand: __t.unit(),
+  Necklace: __t.unit(),
+  Ring: __t.unit(),
+  Earring: __t.unit(),
+});
+export type EquipSlot = __Infer<typeof EquipSlot>;
+
 export const EquippedCard = __t.object("EquippedCard", {
   equippedCardId: __t.u64(),
   characterId: __t.u64(),
@@ -161,6 +184,77 @@ export const EquippedCard = __t.object("EquippedCard", {
   slotIndex: __t.u32(),
 });
 export type EquippedCard = __Infer<typeof EquippedCard>;
+
+export const EquippedItem = __t.object("EquippedItem", {
+  equippedItemId: __t.u64(),
+  characterId: __t.u64(),
+  itemInstanceId: __t.u64(),
+  get slot() {
+    return EquipSlot;
+  },
+  slotOrdinal: __t.u32(),
+});
+export type EquippedItem = __Infer<typeof EquippedItem>;
+
+// The tagged union or sum type for the algebraic type `ItemCategory`.
+export const ItemCategory = __t.enum("ItemCategory", {
+  Equipment: __t.unit(),
+  Consumable: __t.unit(),
+  Material: __t.unit(),
+  Quest: __t.unit(),
+  Revival: __t.unit(),
+  DungeonKey: __t.unit(),
+});
+export type ItemCategory = __Infer<typeof ItemCategory>;
+
+export const ItemDefinition = __t.object("ItemDefinition", {
+  itemDefId: __t.u64(),
+  slug: __t.string(),
+  name: __t.string(),
+  get rarity() {
+    return Rarity;
+  },
+  get category() {
+    return ItemCategory;
+  },
+  get slot() {
+    return __t.option(EquipSlot);
+  },
+  get armorWeight() {
+    return __t.option(ArmorWeight);
+  },
+  get weaponSchool() {
+    return __t.option(DamageSchool);
+  },
+  get geometryShape() {
+    return __t.option(ShapeType);
+  },
+  geometryWidth: __t.option(__t.f32()),
+  geometryRange: __t.option(__t.f32()),
+  get statModifiers() {
+    return StatBlock;
+  },
+  flavor: __t.string(),
+});
+export type ItemDefinition = __Infer<typeof ItemDefinition>;
+
+export const ItemDrop = __t.object("ItemDrop", {
+  itemDropId: __t.u64(),
+  itemDefId: __t.u64(),
+  zoneId: __t.u32(),
+  posX: __t.f32(),
+  posY: __t.f32(),
+  createdAt: __t.timestamp(),
+});
+export type ItemDrop = __Infer<typeof ItemDrop>;
+
+export const ItemInstance = __t.object("ItemInstance", {
+  itemInstanceId: __t.u64(),
+  ownerCharacterId: __t.u64(),
+  itemDefId: __t.u64(),
+  quantity: __t.u32(),
+});
+export type ItemInstance = __Infer<typeof ItemInstance>;
 
 // The tagged union or sum type for the algebraic type `PassiveKind`.
 export const PassiveKind = __t.enum("PassiveKind", {
@@ -196,6 +290,37 @@ export const ShapeType = __t.enum("ShapeType", {
   Circle: __t.unit(),
 });
 export type ShapeType = __Infer<typeof ShapeType>;
+
+export const StatBlock = __t.object("StatBlock", {
+  power: __t.i32(),
+  knowledge: __t.i32(),
+  health: __t.i32(),
+  will: __t.i32(),
+  agility: __t.i32(),
+  precision: __t.i32(),
+  maxHp: __t.i32(),
+  hpRegen: __t.f32(),
+  maxMp: __t.i32(),
+  mpRegen: __t.f32(),
+  moveSpeed: __t.f32(),
+  weaponDamage: __t.i32(),
+  physicalAttack: __t.i32(),
+  magicAttack: __t.i32(),
+  attackSpeed: __t.f32(),
+  castingSpeed: __t.f32(),
+  physicalCrit: __t.f32(),
+  magicCrit: __t.f32(),
+  accuracy: __t.i32(),
+  magicAccuracy: __t.i32(),
+  healingBoost: __t.f32(),
+  physicalDef: __t.i32(),
+  magicDef: __t.i32(),
+  evasion: __t.f32(),
+  parry: __t.f32(),
+  block: __t.f32(),
+  magicResist: __t.f32(),
+});
+export type StatBlock = __Infer<typeof StatBlock>;
 
 export const Zone = __t.object("Zone", {
   zoneId: __t.u32(),

@@ -39,16 +39,20 @@ import CardDropCleanupReducer from "./card_drop_cleanup_reducer";
 import DamageEnemyReducer from "./damage_enemy_reducer";
 import EnemyTickReducer from "./enemy_tick_reducer";
 import EquipCardReducer from "./equip_card_reducer";
+import EquipItemReducer from "./equip_item_reducer";
 import GrantXpReducer from "./grant_xp_reducer";
 import MoveReducer from "./move_reducer";
 import PickupCardReducer from "./pickup_card_reducer";
+import PickupItemReducer from "./pickup_item_reducer";
 import RespawnEnemyReducer from "./respawn_enemy_reducer";
 import SacrificeCardReducer from "./sacrifice_card_reducer";
 import SeedCardsReducer from "./seed_cards_reducer";
+import SeedItemsReducer from "./seed_items_reducer";
 import SpawnEnemyReducer from "./spawn_enemy_reducer";
 import StartLifeReducer from "./start_life_reducer";
 import ToggleAttuneReducer from "./toggle_attune_reducer";
 import UnequipCardReducer from "./unequip_card_reducer";
+import UnequipItemReducer from "./unequip_item_reducer";
 
 // Import all procedure arg schemas
 
@@ -63,6 +67,10 @@ import EnemyRow from "./enemy_table";
 import EnemyRespawnScheduleRow from "./enemy_respawn_schedule_table";
 import EnemyTickScheduleRow from "./enemy_tick_schedule_table";
 import EquippedCardRow from "./equipped_card_table";
+import EquippedItemRow from "./equipped_item_table";
+import ItemDefinitionRow from "./item_definition_table";
+import ItemDropRow from "./item_drop_table";
+import ItemInstanceRow from "./item_instance_table";
 import PersonalSpiritRow from "./personal_spirit_table";
 import ZoneRow from "./zone_table";
 
@@ -202,6 +210,63 @@ const tablesSchema = __schema({
       { name: 'equipped_card_equipped_card_id_key', constraint: 'unique', columns: ['equippedCardId'] },
     ],
   }, EquippedCardRow),
+  equippedItem: __table({
+    name: 'equipped_item',
+    indexes: [
+      { accessor: 'by_character', name: 'equipped_item_character_id_idx_btree', algorithm: 'btree', columns: [
+        'characterId',
+      ] },
+      { accessor: 'equippedItemId', name: 'equipped_item_equipped_item_id_idx_btree', algorithm: 'btree', columns: [
+        'equippedItemId',
+      ] },
+    ],
+    constraints: [
+      { name: 'equipped_item_equipped_item_id_key', constraint: 'unique', columns: ['equippedItemId'] },
+    ],
+  }, EquippedItemRow),
+  itemDefinition: __table({
+    name: 'item_definition',
+    indexes: [
+      { accessor: 'itemDefId', name: 'item_definition_item_def_id_idx_btree', algorithm: 'btree', columns: [
+        'itemDefId',
+      ] },
+      { accessor: 'slug', name: 'item_definition_slug_idx_btree', algorithm: 'btree', columns: [
+        'slug',
+      ] },
+    ],
+    constraints: [
+      { name: 'item_definition_item_def_id_key', constraint: 'unique', columns: ['itemDefId'] },
+      { name: 'item_definition_slug_key', constraint: 'unique', columns: ['slug'] },
+    ],
+  }, ItemDefinitionRow),
+  itemDrop: __table({
+    name: 'item_drop',
+    indexes: [
+      { accessor: 'itemDropId', name: 'item_drop_item_drop_id_idx_btree', algorithm: 'btree', columns: [
+        'itemDropId',
+      ] },
+      { accessor: 'by_zone', name: 'item_drop_zone_id_idx_btree', algorithm: 'btree', columns: [
+        'zoneId',
+      ] },
+    ],
+    constraints: [
+      { name: 'item_drop_item_drop_id_key', constraint: 'unique', columns: ['itemDropId'] },
+    ],
+  }, ItemDropRow),
+  itemInstance: __table({
+    name: 'item_instance',
+    indexes: [
+      { accessor: 'itemInstanceId', name: 'item_instance_item_instance_id_idx_btree', algorithm: 'btree', columns: [
+        'itemInstanceId',
+      ] },
+      { accessor: 'by_character', name: 'item_instance_owner_character_id_idx_btree', algorithm: 'btree', columns: [
+        'ownerCharacterId',
+      ] },
+    ],
+    constraints: [
+      { name: 'item_instance_item_instance_id_key', constraint: 'unique', columns: ['itemInstanceId'] },
+    ],
+  }, ItemInstanceRow),
   personalSpirit: __table({
     name: 'personal_spirit',
     indexes: [
@@ -233,16 +298,20 @@ const reducersSchema = __reducers(
   __reducerSchema("damage_enemy", DamageEnemyReducer),
   __reducerSchema("enemy_tick", EnemyTickReducer),
   __reducerSchema("equip_card", EquipCardReducer),
+  __reducerSchema("equip_item", EquipItemReducer),
   __reducerSchema("grant_xp", GrantXpReducer),
   __reducerSchema("move", MoveReducer),
   __reducerSchema("pickup_card", PickupCardReducer),
+  __reducerSchema("pickup_item", PickupItemReducer),
   __reducerSchema("respawn_enemy", RespawnEnemyReducer),
   __reducerSchema("sacrifice_card", SacrificeCardReducer),
   __reducerSchema("seed_cards", SeedCardsReducer),
+  __reducerSchema("seed_items", SeedItemsReducer),
   __reducerSchema("spawn_enemy", SpawnEnemyReducer),
   __reducerSchema("start_life", StartLifeReducer),
   __reducerSchema("toggle_attune", ToggleAttuneReducer),
   __reducerSchema("unequip_card", UnequipCardReducer),
+  __reducerSchema("unequip_item", UnequipItemReducer),
 );
 
 /** The schema information for all procedures in this module. This is defined the same way as the procedures would have been defined in the server. */

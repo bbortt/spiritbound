@@ -37,7 +37,8 @@ import {
 } from './rules/death';
 
 import { resolveHit, resolveHeal } from './rules/combat';
-import type { StatBlock } from './types';
+import { EMPTY_STAT_BLOCK, type StatBlock } from './types';
+import { computeEffectiveStats, computeRaceBase } from './rules/stats';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CUSTOM SPACETIMEDB TYPES
@@ -289,6 +290,23 @@ const cardDrop = table(
   },
 );
 
+/** Ground drop — spawned on enemy death, despawned after 60 s or on pickup. */
+const itemDrop = table(
+  {
+    name: 'item_drop',
+    public: true,
+    indexes: [{ accessor: 'by_zone', algorithm: 'btree', columns: ['zoneId'] }],
+  },
+  {
+    itemDropId: t.u64().primaryKey().autoInc(),
+    itemDefId:  t.u64(),
+    zoneId:     t.u32(),
+    posX:       t.f32(),
+    posY:       t.f32(),
+    createdAt:  t.timestamp(),
+  },
+);
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // ENEMY TABLES
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -385,6 +403,7 @@ const db = schema({
   itemInstance,
   equippedItem,
   cardDrop,
+  itemDrop,
   enemy,
   enemyTickSchedule,
   enemyRespawnSchedule,
@@ -547,8 +566,95 @@ function activeCharacter(ctx: any) {
   return chars.find((c: any) => c.alive) ?? null;
 }
 
-function startingHp(level: number): number { return 100 + level * 15; }
-function startingMp(level: number): number { return  50 + level * 8; }
+// Vertical slice: one hard-coded race. Real Race table comes later (see rules/stats.ts).
+const RACE_BASE: StatBlock = computeRaceBase(0);
+
+/** All sources (race base + every equipped item) stacked additively. Never stored. */
+function buildEffectiveStats(ctx: any, character: any): StatBlock {
+  const slots = [...ctx.db.equippedItem.by_character.filter(character.characterId)];
+  const items: { statModifiers: StatBlock }[] = [];
+  for (const s of slots) {
+    const inst = ctx.db.itemInstance.itemInstanceId.find((s as any).itemInstanceId);
+    if (!inst) continue;
+    const def = ctx.db.itemDefinition.itemDefId.find(inst.itemDefId);
+    if (!def) continue;
+    items.push(def);
+  }
+  return computeEffectiveStats(RACE_BASE, items);
+}
+
+/** The character's equipped main_hand ItemDefinition, or null if bare-handed. */
+function _findEquippedWeapon(ctx: any, characterId: bigint): any | null {
+  const slots = [...ctx.db.equippedItem.by_character.filter(characterId)];
+  const mainHand = slots.find((s: any) => s.slot.tag === 'main_hand');
+  if (!mainHand) return null;
+  const inst = ctx.db.itemInstance.itemInstanceId.find((mainHand as any).itemInstanceId);
+  if (!inst) return null;
+  return ctx.db.itemDefinition.itemDefId.find(inst.itemDefId) ?? null;
+}
+
+/**
+ * Recompute a character's maxHp/maxMp before and after a gear-changing mutation,
+ * then scale currentHp/currentMp by the same ratio (never just clamp — gaining
+ * maxHp should feel like a gain, not a wasted overflow).
+ */
+function _withProportionalResourceUpdate(ctx: any, char: any, mutate: () => void): void {
+  const before = buildEffectiveStats(ctx, char);
+  mutate();
+  const after = buildEffectiveStats(ctx, char);
+  const fresh = ctx.db.character.characterId.find(char.characterId);
+  if (!fresh) return;
+
+  const hpRatio = before.maxHp > 0 ? after.maxHp / before.maxHp : 1;
+  const mpRatio = before.maxMp > 0 ? after.maxMp / before.maxMp : 1;
+  const newHp = Math.max(1, Math.min(after.maxHp, Math.round(fresh.currentHp * hpRatio)));
+  const newMp = Math.max(0, Math.min(after.maxMp, Math.round(fresh.currentMp * mpRatio)));
+
+  ctx.db.character.characterId.update({ ...fresh, currentHp: newHp, currentMp: newMp });
+}
+
+/**
+ * Shared damage path for anything that hits a character: resolves the hit through
+ * resolveHit() using the target's real effectiveStats for mitigation, then writes
+ * currentHp (or triggers death). cardBaseShape/weapon fields only affect the
+ * returned geometry, not the damage number, so safe defaults are fine here.
+ */
+function _resolveAndApplyDamage(
+  ctx: any,
+  target: any,
+  params: {
+    cardBasePower:  number;
+    cardSchool:     'physical' | 'magical';
+    cardBaseShape:  'cone' | 'line' | 'arc' | 'circle';
+    attackerStats:  StatBlock;
+    attackerLevel:  number;
+    weaponSchool?:  'physical' | 'magical';
+    weaponWidth?:   number;
+    weaponRange?:   number;
+  },
+): void {
+  const defenderStats = buildEffectiveStats(ctx, target);
+  const result = resolveHit({
+    cardBasePower:  params.cardBasePower,
+    cardMergeLevel: 0,
+    cardSchool:     params.cardSchool,
+    cardBaseShape:  params.cardBaseShape,
+    characterLevel: params.attackerLevel,
+    weaponSchool:   params.weaponSchool ?? params.cardSchool,
+    weaponWidth:    params.weaponWidth ?? 0.4,
+    weaponRange:    params.weaponRange ?? 150,
+    attackerStats:  params.attackerStats,
+    defenderStats,
+    randomRoll:     ctx.random(),
+  });
+
+  const newHp = target.currentHp - result.damage;
+  if (newHp <= 0) {
+    _handleDeath(ctx, target);
+  } else {
+    ctx.db.character.characterId.update({ ...target, currentHp: newHp });
+  }
+}
 
 function _seedZone1Enemies(ctx: any): void {
   const TILE = 48;
@@ -615,8 +721,8 @@ export const startLife = db.reducer(
       zoneId:           startZoneId,
       posX:             480,   // tile (10,8) — first enemy spawn area, grass
       posY:             432,
-      currentHp:        startingHp(startLevel),
-      currentMp:        startingMp(startLevel),
+      currentHp:        RACE_BASE.maxHp,
+      currentMp:        RACE_BASE.maxMp,
       alive:            true,
       createdAt:        ctx.timestamp,
       diedAt:           undefined,
@@ -683,17 +789,21 @@ export const grantXp = db.reducer(
 );
 
 export const applyDamage = db.reducer(
-  { targetCharacterId: t.u64(), rawDamage: t.i32() },
-  (ctx, { targetCharacterId, rawDamage }) => {
+  { targetCharacterId: t.u64(), rawDamage: t.i32(), school: TSchool },
+  (ctx, { targetCharacterId, rawDamage, school }) => {
     const char = ctx.db.character.characterId.find(targetCharacterId);
     if (!char || !char.alive) return;
 
-    const newHp = char.currentHp - rawDamage;
-    if (newHp <= 0) {
-      _handleDeath(ctx, char);
-    } else {
-      ctx.db.character.characterId.update({ ...char, currentHp: newHp });
-    }
+    // No attacker character behind rawDamage (e.g. a scripted/world source), so it
+    // gets no level scaling or attack-stat bonus — it's still run through the
+    // target's real effectiveStats so gear (physicalDef/evasion/etc.) mitigates it.
+    _resolveAndApplyDamage(ctx, char, {
+      cardBasePower: rawDamage,
+      cardSchool:    school.tag as 'physical' | 'magical',
+      cardBaseShape: 'circle',
+      attackerStats: EMPTY_STAT_BLOCK,
+      attackerLevel: 0,
+    });
   },
 );
 
@@ -710,6 +820,18 @@ function _handleDeath(ctx: any, char: any): void {
   const hand = [...ctx.db.equippedCard.by_character.filter(char.characterId)];
   for (const slot of hand) {
     ctx.db.equippedCard.equippedCardId.delete(slot.equippedCardId);
+  }
+
+  // "Gear is your body" — no exceptions. Equipped items and the underlying
+  // ItemInstances (character-owned, unlike account-owned CardInstances) are
+  // destroyed outright, not retained like attuned cards.
+  const gear = [...ctx.db.equippedItem.by_character.filter(char.characterId)];
+  for (const g of gear) {
+    ctx.db.equippedItem.equippedItemId.delete(g.equippedItemId);
+  }
+  const items = [...ctx.db.itemInstance.by_character.filter(char.characterId)];
+  for (const it of items) {
+    ctx.db.itemInstance.itemInstanceId.delete(it.itemInstanceId);
   }
 
   const spirit = ctx.db.personalSpirit.accountIdentity.find(char.accountIdentity);
@@ -870,6 +992,57 @@ export const unequipCard = db.reducer(
 );
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// REDUCERS — equipment
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export const equipItem = db.reducer(
+  { itemInstanceId: t.u64(), slotOrdinal: t.u32() },
+  (ctx, { itemInstanceId, slotOrdinal }) => {
+    const char = activeCharacter(ctx);
+    if (!char) throw new SenderError('No active character');
+
+    const inst = ctx.db.itemInstance.itemInstanceId.find(itemInstanceId);
+    if (!inst || inst.ownerCharacterId !== char.characterId)
+      throw new SenderError('Item not found or not owned');
+
+    const def = ctx.db.itemDefinition.itemDefId.find(inst.itemDefId);
+    if (!def || !def.slot) throw new SenderError('Item is not equippable');
+
+    _withProportionalResourceUpdate(ctx, char, () => {
+      const existing = [...ctx.db.equippedItem.by_character.filter(char.characterId)]
+        .find((s: any) => s.slot.tag === def.slot!.tag && s.slotOrdinal === slotOrdinal);
+      if (existing) {
+        ctx.db.equippedItem.equippedItemId.delete(existing.equippedItemId);
+      }
+
+      ctx.db.equippedItem.insert({
+        equippedItemId: 0n,
+        characterId:    char.characterId,
+        itemInstanceId,
+        slot:           def.slot!,
+        slotOrdinal,
+      });
+    });
+  },
+);
+
+export const unequipItem = db.reducer(
+  { equippedItemId: t.u64() },
+  (ctx, { equippedItemId }) => {
+    const char = activeCharacter(ctx);
+    if (!char) throw new SenderError('No active character');
+
+    const slot = ctx.db.equippedItem.equippedItemId.find(equippedItemId);
+    if (!slot || slot.characterId !== char.characterId)
+      throw new SenderError('Equipped item not found on this character');
+
+    _withProportionalResourceUpdate(ctx, char, () => {
+      ctx.db.equippedItem.equippedItemId.delete(equippedItemId);
+    });
+  },
+);
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // REDUCERS — enemy combat
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -906,13 +1079,15 @@ export const spawnEnemy = db.reducer(
 );
 
 /**
- * damageEnemy — apply player-initiated damage to an enemy.
- * Client sends enemyId + damage amount after confirming a geometric hit locally.
- * Server validates that the caller is alive and in the same zone.
+ * damageEnemy — resolve a player-initiated hit against an enemy.
+ * Client confirms the geometric connection locally (aim + weapon shape vs target
+ * position) and tells the server which card (if any) it hit with; the server is
+ * the sole authority on how much damage that becomes — cardDefId 0 means a bare
+ * weapon swing (no card), matching cardDefinition's 1-based ids.
  */
 export const damageEnemy = db.reducer(
-  { enemyId: t.u64(), damage: t.i32(), school: TSchool },
-  (ctx, { enemyId, damage }) => {
+  { enemyId: t.u64(), cardDefId: t.u32() },
+  (ctx, { enemyId, cardDefId }) => {
     const char = activeCharacter(ctx);
     if (!char) throw new SenderError('No active character');
 
@@ -920,7 +1095,45 @@ export const damageEnemy = db.reducer(
     if (!e || !e.alive) return;
     if (e.zoneId !== char.zoneId) throw new SenderError('Enemy not in same zone');
 
-    const newHp = e.currentHp - damage;
+    const weapon       = _findEquippedWeapon(ctx, char.characterId);
+    const weaponSchool = (weapon?.weaponSchool?.tag ?? 'physical') as 'physical' | 'magical';
+    const weaponWidth   = weapon?.geometryWidth ?? 0.4;
+    const weaponRange   = weapon?.geometryRange ?? 150;
+    const attackerStats = buildEffectiveStats(ctx, char);
+
+    let cardBasePower: number;
+    let cardSchool:    'physical' | 'magical';
+    let cardBaseShape: 'cone' | 'line' | 'arc' | 'circle';
+
+    if (cardDefId !== 0) {
+      const def = ctx.db.cardDefinition.cardDefId.find(cardDefId);
+      if (!def) throw new SenderError('Card definition not found');
+      cardBasePower = def.basePower;
+      cardSchool    = def.scalingSchool.tag as 'physical' | 'magical';
+      cardBaseShape = def.baseShape.tag as 'cone' | 'line' | 'arc' | 'circle';
+    } else {
+      // Bare weapon swing — no card. Feeds the weapon's own weaponDamage stat
+      // through the same scaling/mitigation pipeline as a card cast.
+      cardBasePower = attackerStats.weaponDamage;
+      cardSchool    = weaponSchool;
+      cardBaseShape = (weapon?.geometryShape?.tag ?? 'cone') as 'cone' | 'line' | 'arc' | 'circle';
+    }
+
+    const result = resolveHit({
+      cardBasePower,
+      cardMergeLevel: 0,
+      cardSchool,
+      cardBaseShape,
+      characterLevel: char.level,
+      weaponSchool,
+      weaponWidth,
+      weaponRange,
+      attackerStats,
+      defenderStats: EMPTY_STAT_BLOCK,   // enemies have no gear/stats yet
+      randomRoll:    ctx.random(),
+    });
+
+    const newHp = e.currentHp - result.damage;
     if (newHp <= 0) {
       ctx.db.enemy.enemyId.update({ ...e, currentHp: 0, alive: false });
       // Schedule respawn 15 s from now
@@ -929,8 +1142,9 @@ export const damageEnemy = db.reducer(
         scheduledAt: ScheduleAt.time(ctx.timestamp.microsSinceUnixEpoch + 15_000_000n),
         enemyId:     e.enemyId,
       });
-      // Roll a card drop (70% chance)
+      // Independent drop rolls: 70% card, 40% common gear.
       _dropCardFromEnemy(ctx, e, char);
+      _dropItemFromEnemy(ctx, e);
     } else {
       ctx.db.enemy.enemyId.update({ ...e, currentHp: newHp });
     }
@@ -951,6 +1165,25 @@ function _dropCardFromEnemy(ctx: any, e: any, char: any): void {
     posX:      e.posX,
     posY:      e.posY,
     createdAt: ctx.timestamp,
+  });
+}
+
+/**
+ * Roll a ground item drop when an enemy dies. 40% chance, random common item.
+ * Independent of the card drop roll. Difficulty-based rarity scaling comes later.
+ */
+function _dropItemFromEnemy(ctx: any, e: any): void {
+  if (ctx.random() >= 0.4) return;
+  const commonDefs = [...ctx.db.itemDefinition].filter((def: any) => def.rarity.tag === 'common');
+  if (commonDefs.length === 0) return;
+  const def = commonDefs[ctx.random.integerInRange(0, commonDefs.length - 1)];
+  ctx.db.itemDrop.insert({
+    itemDropId: 0n,
+    itemDefId:  def.itemDefId,
+    zoneId:     e.zoneId,
+    posX:       e.posX,
+    posY:       e.posY,
+    createdAt:  ctx.timestamp,
   });
 }
 
@@ -983,7 +1216,40 @@ export const pickupCard = db.reducer(
   },
 );
 
-/** cardDropCleanup — runs every 10 s, deletes drops older than 60 s. */
+/**
+ * pickupItem — player picks up a ground item drop within 80 px.
+ * ItemInstance is CHARACTER-owned (unlike CardInstance, which is account-owned) —
+ * it dies with the character on permadeath, so ownerCharacterId is always the FK
+ * that matters here, not the account identity.
+ */
+export const pickupItem = db.reducer(
+  { dropId: t.u64() },
+  (ctx, { dropId }) => {
+    const char = activeCharacter(ctx);
+    if (!char) throw new SenderError('No active character');
+
+    const drop = ctx.db.itemDrop.itemDropId.find(dropId);
+    if (!drop) throw new SenderError('Drop not found');
+    if (drop.zoneId !== char.zoneId) throw new SenderError('Drop not in same zone');
+
+    const dx = char.posX - drop.posX;
+    const dy = char.posY - drop.posY;
+    if (dx * dx + dy * dy > 80 * 80) throw new SenderError('Too far from drop');
+
+    ctx.db.itemInstance.insert({
+      itemInstanceId:   0n,
+      ownerCharacterId: char.characterId,
+      itemDefId:        drop.itemDefId,
+      quantity:         1,
+    });
+    ctx.db.itemDrop.itemDropId.delete(dropId);
+
+    const def = ctx.db.itemDefinition.itemDefId.find(drop.itemDefId);
+    console.log(`[pickup] ${def?.name ?? '?'} → ${ctx.sender.toHexString().slice(0, 8)}...`);
+  },
+);
+
+/** cardDropCleanup — runs every 10 s, deletes card AND item drops older than 60 s. */
 export const cardDropCleanup = db.reducer(
   { scheduleRow: cardDropCleanupRow },
   (ctx, _args: any) => {
@@ -991,6 +1257,11 @@ export const cardDropCleanup = db.reducer(
     for (const drop of ctx.db.cardDrop) {
       if (ctx.timestamp.microsSinceUnixEpoch - drop.createdAt.microsSinceUnixEpoch >= maxAgeUs) {
         ctx.db.cardDrop.dropId.delete(drop.dropId);
+      }
+    }
+    for (const drop of ctx.db.itemDrop) {
+      if (ctx.timestamp.microsSinceUnixEpoch - drop.createdAt.microsSinceUnixEpoch >= maxAgeUs) {
+        ctx.db.itemDrop.itemDropId.delete(drop.itemDropId);
       }
     }
   },
@@ -1037,12 +1308,15 @@ function _fireCast(ctx: any, e: any): void {
   for (const c of [...ctx.db.character.by_zone.filter(e.zoneId)]) {
     if (!(c as any).alive) continue;
     if (_distSq((c as any).posX, (c as any).posY, e.posX, e.posY) > e.attackRangePx * e.attackRangePx) continue;
-    const newHp = (c as any).currentHp - e.castDamage;
-    if (newHp <= 0) {
-      _handleDeath(ctx, c);
-    } else {
-      ctx.db.character.characterId.update({ ...(c as any), currentHp: newHp });
-    }
+    // Enemies have no gear/stats yet (flat castDamage), so attackerLevel 0 skips
+    // level scaling — the defender's real effectiveStats still mitigate the hit.
+    _resolveAndApplyDamage(ctx, c, {
+      cardBasePower: e.castDamage,
+      cardSchool:    'physical',
+      cardBaseShape: e.castShape.tag,
+      attackerStats: EMPTY_STAT_BLOCK,
+      attackerLevel: 0,
+    });
   }
 }
 
