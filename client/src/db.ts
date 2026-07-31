@@ -100,6 +100,8 @@ function _subscribeItems(conn: DbConnection): void {
     .subscribe([
       'SELECT * FROM item_definition',
       'SELECT * FROM item_drop',
+      'SELECT * FROM item_instance',
+      'SELECT * FROM equipped_item',
     ]);
 }
 

@@ -243,7 +243,7 @@ const equippedCard = table(
 const itemInstance = table(
   {
     name: 'item_instance',
-    public: false,
+    public: true,
     indexes: [{ accessor: 'by_character', algorithm: 'btree', columns: ['ownerCharacterId'] }],
   },
   {
@@ -257,7 +257,7 @@ const itemInstance = table(
 const equippedItem = table(
   {
     name: 'equipped_item',
-    public: false,
+    public: true,
     indexes: [{ accessor: 'by_character', algorithm: 'btree', columns: ['characterId'] }],
   },
   {
@@ -996,8 +996,8 @@ export const unequipCard = db.reducer(
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export const equipItem = db.reducer(
-  { itemInstanceId: t.u64(), slotOrdinal: t.u32() },
-  (ctx, { itemInstanceId, slotOrdinal }) => {
+  { itemInstanceId: t.u64(), slot: TEquipSlot, slotOrdinal: t.u32() },
+  (ctx, { itemInstanceId, slot, slotOrdinal }) => {
     const char = activeCharacter(ctx);
     if (!char) throw new SenderError('No active character');
 
@@ -1007,10 +1007,12 @@ export const equipItem = db.reducer(
 
     const def = ctx.db.itemDefinition.itemDefId.find(inst.itemDefId);
     if (!def || !def.slot) throw new SenderError('Item is not equippable');
+    if (def.slot.tag !== slot.tag)
+      throw new SenderError(`Item belongs in ${def.slot.tag}, not ${slot.tag}`);
 
     _withProportionalResourceUpdate(ctx, char, () => {
       const existing = [...ctx.db.equippedItem.by_character.filter(char.characterId)]
-        .find((s: any) => s.slot.tag === def.slot!.tag && s.slotOrdinal === slotOrdinal);
+        .find((s: any) => s.slot.tag === slot.tag && s.slotOrdinal === slotOrdinal);
       if (existing) {
         ctx.db.equippedItem.equippedItemId.delete(existing.equippedItemId);
       }
@@ -1019,7 +1021,7 @@ export const equipItem = db.reducer(
         equippedItemId: 0n,
         characterId:    char.characterId,
         itemInstanceId,
-        slot:           def.slot!,
+        slot,
         slotOrdinal,
       });
     });

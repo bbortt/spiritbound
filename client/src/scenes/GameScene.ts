@@ -1,8 +1,11 @@
 import Phaser from 'phaser';
 import type { Identity } from 'spacetimedb';
 import { connect, callReducer, type DbConnection } from '../db';
-import type { Character, PersonalSpirit, Enemy, CardDefinition, CardDrop, CardInstance, EquippedCard, ItemDefinition, ItemDrop } from '../db';
+import type { Character, PersonalSpirit, Enemy, CardDefinition, CardDrop, CardInstance, EquippedCard, ItemDefinition, ItemDrop, ItemInstance, EquippedItem } from '../db';
 import { CollectionPanel } from '../ui/CollectionPanel';
+import { InventoryPanel } from '../ui/InventoryPanel';
+import { CharacterSheet } from '../ui/CharacterSheet';
+import { computeEffectiveStats } from '../effectiveStats';
 
 // ── Tilemap constants ─────────────────────────────────────────────────────────
 const TILE_SIZE  = 48;
@@ -60,8 +63,6 @@ const EMBER_RANGE    = 320;
 const EMBER_HALF_ANG = 30 * Math.PI / 180;
 const EMBER_MP_REGEN = 2;
 
-const maxHp = (level: number) => 100 + level * 15;
-const maxMp = (level: number) => 50 + level * 8;
 
 // ── Map layout ────────────────────────────────────────────────────────────────
 
@@ -293,8 +294,12 @@ export class GameScene extends Phaser.Scene {
   // Card lifecycle
   private collectionPanel!: CollectionPanel;
   private spiritPanel!: CollectionPanel;
+  private inventoryPanel!: InventoryPanel;
+  private characterSheet!: CharacterSheet;
   private _cardDefs        = new Map<number, CardDefinition>();
   private _itemDefs        = new Map<bigint, ItemDefinition>();
+  private localItemInst    = new Map<bigint, ItemInstance>();
+  private localEquippedItem = new Map<bigint, EquippedItem>(); // key = equippedItemId
   private localCardInst    = new Map<bigint, CardInstance>();
   private localEquipped    = new Map<bigint, EquippedCard>(); // key = equippedCardId
   private worldDrops       = new Map<bigint, { dropRow: CardDrop; gfx: Phaser.GameObjects.Graphics; label: Phaser.GameObjects.Text }>();
@@ -418,6 +423,36 @@ export class GameScene extends Phaser.Scene {
     this.collectionPanel.onAction = (action, payload) => this._onPanelAction(action, payload);
     this.spiritPanel.onAction     = (action, payload) => this._onPanelAction(action, payload);
 
+    // ── InventoryPanel / CharacterSheet ────────────────────────────────────────
+    this.inventoryPanel  = new InventoryPanel();
+    this.characterSheet  = new CharacterSheet();
+    this.inventoryPanel.onAction = (action, payload) => this._onPanelAction(action, payload);
+    this.characterSheet.onAction = (action, payload) => this._onPanelAction(action, payload);
+
+    this.conn.db.itemInstance.onInsert((_ctx, row) => {
+      if (row.ownerCharacterId !== this.localCharacter?.characterId) return;
+      this.localItemInst.set(row.itemInstanceId, row);
+      this.inventoryPanel.onInstanceInsert(row);
+      this.characterSheet.onInstanceInsert(row);
+    });
+    this.conn.db.itemInstance.onDelete((_ctx, row) => {
+      this.localItemInst.delete(row.itemInstanceId);
+      this.inventoryPanel.onInstanceDelete(row);
+      this.characterSheet.onInstanceDelete(row);
+    });
+
+    this.conn.db.equippedItem.onInsert((_ctx, row) => {
+      if (row.characterId !== this.localCharacter?.characterId) return;
+      this.localEquippedItem.set(row.equippedItemId, row);
+      this.inventoryPanel.onEquippedInsert(row);
+      this.characterSheet.onEquippedInsert(row);
+    });
+    this.conn.db.equippedItem.onDelete((_ctx, row) => {
+      this.localEquippedItem.delete(row.equippedItemId);
+      this.inventoryPanel.onEquippedDelete(row);
+      this.characterSheet.onEquippedDelete(row);
+    });
+
     // ── Spirit ─────────────────────────────────────────────────────────────────
     this.spiritGfx = this.add.graphics().setDepth(0.8);
     this.spiritGfx.fillStyle(0xffd700, 0.25);
@@ -490,7 +525,7 @@ export class GameScene extends Phaser.Scene {
       // ── MP regen ────────────────────────────────────────────────────────────
       this.clientMp = Math.min(
         this.clientMp + EMBER_MP_REGEN * (delta / 1000),
-        maxMp(this.localCharacter.level),
+        this._localMaxResources().maxMp,
       );
     }
 
@@ -507,6 +542,20 @@ export class GameScene extends Phaser.Scene {
     return !!this.conn.identity?.isEqual(id);
   }
 
+  // ── Effective stats (race base + equipped gear; see effectiveStats.ts) ────────
+
+  /** maxHp/maxMp no longer scale with character level — they come from race base + gear. */
+  private _localMaxResources(): { maxHp: number; maxMp: number } {
+    const defs: ItemDefinition[] = [];
+    for (const eq of this.localEquippedItem.values()) {
+      const inst = this.localItemInst.get(eq.itemInstanceId);
+      const def  = inst ? this._itemDefs.get(inst.itemDefId) : null;
+      if (def) defs.push(def);
+    }
+    const stats = computeEffectiveStats(defs);
+    return { maxHp: stats.maxHp, maxMp: stats.maxMp };
+  }
+
   // ── Character table callbacks ─────────────────────────────────────────────────
 
   private _onCharInsert(row: Character) {
@@ -519,6 +568,7 @@ export class GameScene extends Phaser.Scene {
       this.playerCircle.setPosition(row.posX, row.posY);
       if (this.isDead) this._hideDeathOverlay();
       this._updateHud();
+      this.characterSheet?.setCharacter(row);
     } else if (row.zoneId === (this.localCharacter?.zoneId ?? 1)) {
       this._addOtherPlayer(row);
     }
@@ -553,6 +603,7 @@ export class GameScene extends Phaser.Scene {
         }
       }
       this._updateHud();
+      this.characterSheet?.setCharacter(row);
     } else {
       this.otherCircles.get(row.characterId)?.setPosition(row.posX, row.posY);
     }
@@ -587,6 +638,7 @@ export class GameScene extends Phaser.Scene {
     this.collectionPanel?.setSpiritLevel(row.level);
     this.spiritPanel?.setSpiritLevel(row.level);
     this.spiritPanel?.setSpiritName(row.name);
+    this.characterSheet?.setSpiritLevel(row.level);
   }
 
   // ── Enemy table callbacks ──────────────────────────────────────────────────────
@@ -789,6 +841,8 @@ export class GameScene extends Phaser.Scene {
 
   private _onItemDefRow(row: ItemDefinition) {
     this._itemDefs.set(row.itemDefId, row);
+    this.inventoryPanel?.onItemDefRow(row);
+    this.characterSheet?.onItemDefRow(row);
   }
 
   // ── Cast controllers ──────────────────────────────────────────────────────────
@@ -867,6 +921,9 @@ export class GameScene extends Phaser.Scene {
       }
     });
     kb.on('keydown-C', () => this.collectionPanel.toggle());
+    kb.on('keydown-I', () => this.inventoryPanel.toggle());
+    kb.on('keydown-P', () => this.characterSheet.toggle());
+    kb.on('keydown-ESC', () => { if (this.characterSheet.isOpen()) this.characterSheet.close(); });
   }
 
   // ── Toast ─────────────────────────────────────────────────────────────────────
@@ -1449,8 +1506,7 @@ export class GameScene extends Phaser.Scene {
     if (c) {
       const hp  = Math.max(0, c.currentHp);
       const mp  = Math.max(0, Math.floor(this.clientMp));
-      const mhp = maxHp(c.level);
-      const mmp = maxMp(c.level);
+      const { maxHp: mhp, maxMp: mmp } = this._localMaxResources();
 
       if (hp > 0) this.hudBars.fillStyle(0xef5350, 1).fillRect(X, 12, BAR_W * (hp / mhp), BAR_H);
       if (mp > 0) this.hudBars.fillStyle(0x42a5f5, 1).fillRect(X, 38, BAR_W * (mp / mmp), BAR_H);
@@ -1624,6 +1680,23 @@ export class GameScene extends Phaser.Scene {
         callReducer('sacrifice_card', () =>
           this.conn.reducers.sacrificeCard({ cardInstanceId: payload.cardInstanceId as bigint }),
         );
+        break;
+      case 'equipItem':
+        callReducer('equip_item', () =>
+          this.conn.reducers.equipItem({
+            itemInstanceId: payload.itemInstanceId as bigint,
+            slot:           { tag: payload.slot as any },
+            slotOrdinal:    payload.slotOrdinal as number,
+          }),
+        );
+        break;
+      case 'unequipItem':
+        callReducer('unequip_item', () =>
+          this.conn.reducers.unequipItem({ equippedItemId: payload.equippedItemId as bigint }),
+        );
+        break;
+      case 'browseSlot':
+        this.inventoryPanel.openForSlot(payload.slot as string);
         break;
     }
   }
