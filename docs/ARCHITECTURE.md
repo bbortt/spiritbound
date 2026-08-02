@@ -114,6 +114,53 @@ per-tick table scan in the cleanup reducer (acceptable at current scale).
 second scheduled reducer, `cardDropCleanup` was extended to sweep both
 tables in the same 10s tick — one schedule, one age check, applied twice.
 
+## ItemInstance/EquippedItem made public for the inventory UI — 2026
+
+**Context:** The previous session deliberately made `itemInstance` and
+`equippedItem` `public: false` ("character-owned, private"). Building
+InventoryPanel/CharacterSheet requires the client to subscribe to a
+character's own bag and gear, but this SDK's `public: false` means *no*
+client subscription at all — there's no way to expose rows to only their
+owner that way.
+**Decision:** Flip both tables to `public: true`, matching the existing
+`cardInstance`/`equippedCard` precedent (also owned-but-public, with the
+client filtering to `ownerCharacterId === localCharacter.characterId` /
+`characterId === ...` itself in `GameScene.ts`). No row-level security is
+applied.
+**Consequences:** Any connected client can subscribe to every character's
+bag and equipped gear, not just their own — the same exposure `cardInstance`
+already had, so this isn't a new class of leak for this codebase, just
+extending an accepted one. The SDK does support real server-enforced
+row-level security (`schema().clientVisibilityFilter.sql(...)`, found via
+`node_modules/spacetimedb/src/server/schema.ts`) that could scope this to
+`owner_character_id`'s account — not applied here to keep this change small
+and consistent with the existing pattern; worth revisiting before anything
+beyond a local vertical slice ships.
+
+## Client-side effectiveStats duplication (CharacterSheet) — 2026
+
+**Context:** `effective_stats` is explicitly a derived value that's "computed
+in rules/ and never stored" (see this file's header comment on
+`index.ts`). CharacterSheet needs to show a stat total, but SpacetimeDB has
+no query-style RPC — only table subscriptions and reducer calls — so there
+is no way for the client to ask the server "what are my effective stats"
+without the server writing them to a row (which the architecture rule
+forbids).
+**Decision:** `client/src/effectiveStats.ts` re-implements
+`rules/stats.ts#computeRaceBase`/`computeEffectiveStats` byte-for-byte in
+TypeScript, imported by both `CharacterSheet.ts` and `GameScene.ts` (for the
+top HP/MP HUD bar, which — before this change — used a stale
+`100 + level*15` formula left over from before gear-based stats existed).
+**Consequences:** Two copies of the same pure math, one per language
+boundary, with no compiler or test enforcing they match — a real
+sync-by-hand risk if `rules/stats.ts` changes. This is not a new pattern:
+`CollectionPanel.ts` already duplicates `computeHandSlots`/
+`computeAttunementSlots` from `rules/death.ts` with different (drifted)
+numbers, which this change did not touch or fix — flagging it here since
+it's now a second instance of the same risk class. If this keeps
+recurring, worth a real fix (e.g. a reducer that returns computed values
+via its own dedicated row, or a shared package built from `rules/`).
+
 ## Content pipeline: cards.json is the single source of truth — 2026
 
 **Context:** Card definitions need to be authored by a human (or

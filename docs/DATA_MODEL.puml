@@ -286,6 +286,9 @@ package "Runtime (instances)" <<Frame>> {
     owner_character_id : u64 {FK}     ' CHARACTER-owned -> LOST on death (body)
     item_def_id : u64 {FK}
     quantity : u32                    ' 1 for equipment, stackable for consumables/materials
+    ' table(public: true) — required for InventoryPanel/CharacterSheet to subscribe.
+    ' No row-level security yet: any client can subscribe to every character's bag,
+    ' same exposure as the pre-existing CardInstance. See ARCHITECTURE.md.
   }
 
   class EquippedItem {
@@ -293,6 +296,7 @@ package "Runtime (instances)" <<Frame>> {
     item_instance_id : u64 {FK}
     slot : EquipSlot
     slot_ordinal : u32               ' 0/1 for the two rings & two earrings
+    ' table(public: true) — same visibility note as ItemInstance above.
   }
 
   class CardDrop {

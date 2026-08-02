@@ -369,9 +369,14 @@ Permanent progress that survives every death — *access and cosmetics, never po
   stub), ward-passive card stats feeding effective_stats, set bonuses,
   difficulty-based item rarity scaling, and armor weight classes as a wear
   gate check (still bias-only per design — no code path needs one yet).
-  Also no client UI for inventory/equip yet (item_instance/equipped_item
-  are private tables by design — only ground item drops are client-visible
-  so far). Blocks: gear economy at scale, itemized build identity.
+  Client inventory/equip UI now exists: InventoryPanel (I key, bag grid
+  with rarity/armor-weight/slot badges, hover tooltips, click-to-equip/
+  replace/unequip) and CharacterSheet (P key, 12-slot body-silhouette
+  equipment diagram + grouped stat totals with race-base-vs-gear-bonus
+  breakdown). item_instance/equipped_item are now public tables (no
+  row-level security yet — see ARCHITECTURE.md) so the client can
+  subscribe to them. Blocks: gear economy at scale, itemized build
+  identity.
 
 **Resolved:** control scheme (cursor-aimed, PoE-style) · weapon = geometry (range
 + width) + stat carrier · cards weapon-agnostic with scaling tags (emergent classes)
@@ -408,7 +413,9 @@ resolveHit for both player attacks and enemy casts; bare weapon swings
 use the weapon's own weaponDamage stat) · equip/unequip with proportional
 HP/MP rescaling · item drops (40% per enemy death, common-only, same
 despawn/pickup lifecycle as card drops) · gear destroyed on death
-("gear is your body," no exceptions).
+("gear is your body," no exceptions) · inventory panel (I, bag grid with
+rarity/armor/slot badges + hover tooltips + click-to-equip) · character
+sheet (P, 12-slot equipment diagram + grouped stat totals with tooltips).
 
 ## Tech Stack (decided)
 
