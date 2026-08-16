@@ -108,6 +108,7 @@ export const Character = __t.object("Character", {
   alive: __t.bool(),
   createdAt: __t.timestamp(),
   diedAt: __t.option(__t.timestamp()),
+  lastLevelUpAt: __t.option(__t.timestamp()),
 });
 export type Character = __Infer<typeof Character>;
 
@@ -143,6 +144,7 @@ export const Enemy = __t.object("Enemy", {
     return ShapeType;
   },
   castDamage: __t.i32(),
+  xpReward: __t.u64(),
 });
 export type Enemy = __Infer<typeof Enemy>;
 
@@ -214,6 +216,7 @@ export const ItemDefinition = __t.object("ItemDefinition", {
   get rarity() {
     return Rarity;
   },
+  minLevel: __t.u32(),
   get category() {
     return ItemCategory;
   },

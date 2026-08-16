@@ -363,8 +363,9 @@ Permanent progress that survives every death — *access and cosmetics, never po
   ItemDefinition/ItemInstance/EquippedItem tables; equipItem/unequipItem
   reducers with proportional HP/MP rescaling; effective_stats = race base
   + gear, computed in rules/stats.ts and wired into resolveHit for both
-  damageEnemy and enemy casts; item drops on enemy death, 40% common-only,
-  independent of the 70% card roll; gear destroyed on death). Not yet
+  damageEnemy and enemy casts; item drops on enemy death (ITEM_DROP_CHANCE,
+  rarity-weighted + min_level-gated by killer's level), independent of the
+  card roll; gear destroyed on death). Not yet
   implemented: a real Race table (computeRaceBase is a single hard-coded
   stub), ward-passive card stats feeding effective_stats, set bonuses,
   difficulty-based item rarity scaling, and armor weight classes as a wear
@@ -399,8 +400,10 @@ bias only, no wear restriction) · content pipeline: cards.json → Zod validato
 unit tests → SpacetimeDB seeder (slug as idempotency key) · enemy telegraph system
 (cast bar + ground AoE indicator, client visual only, server decides damage) ·
 enemy chase AI (aggro/deaggro ranges, chase speed < player speed so a chase is
-always escapable, HP regen on reset) · card drops (enemy death → 70% drop roll →
-cardDrop row → 60s despawn; pickup via F key within 80px) · collection panel (C,
+always escapable, HP regen on reset) · card drops (enemy death → CARD_DROP_CHANCE
+(25%) roll, rarity-weighted + min-level-gated by killer's level, legendary
+excluded from trash-mob drops → cardDrop row → 60s despawn; pickup via F key
+within 80px) · collection panel (C,
 always accessible, equip greyed outside spirit range) · spirit panel (E,
 proximity-gated, unlocks hand management) · death summary screen (shows survived
 vs lost cards) · held-key quick cast with live cone indicator · equipment
@@ -411,11 +414,21 @@ traveller-boots, spirit-focus) for the vertical slice · gear stats wired
 into combat (effective_stats = race base + equipped gear, drives
 resolveHit for both player attacks and enemy casts; bare weapon swings
 use the weapon's own weaponDamage stat) · equip/unequip with proportional
-HP/MP rescaling · item drops (40% per enemy death, common-only, same
-despawn/pickup lifecycle as card drops) · gear destroyed on death
-("gear is your body," no exceptions) · inventory panel (I, bag grid with
-rarity/armor/slot badges + hover tooltips + click-to-equip) · character
-sheet (P, 12-slot equipment diagram + grouped stat totals with tooltips).
+HP/MP rescaling · item drops (ITEM_DROP_CHANCE (20%) per enemy death,
+rarity-weighted + min-level-gated, same despawn/pickup lifecycle as card
+drops) · gear destroyed on death ("gear is your body," no exceptions) ·
+inventory panel (I, bag grid with rarity/armor/slot badges + hover
+tooltips + click-to-equip) · character sheet (P, 3-column/7-row paper-doll
+equipment diagram — weapons top row, earrings flanking head, rings
+flanking hands, body line down the center — + grouped stat totals with
+tooltips) · **XP-from-kills progression loop** (enemy.xpReward, 25 per
+zone-1 kill, granted via a shared `_grantXp` helper; character.xp and
+account_progress.total_xp_all_lives both update, the latter surviving
+death; level-up refills HP/MP and stamps `lastLevelUpAt` for the client's
+golden-flash/"LEVEL N" VFX; client XP bar + floating "+N XP" text) ·
+**level-gated drops** (both card and item drop pools filtered to the
+killer's level before the rarity-weighted pick, so e.g. a level-5-gated
+card can't drop for a level-1 character).
 
 ## Tech Stack (decided)
 

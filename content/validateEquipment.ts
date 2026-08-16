@@ -53,6 +53,7 @@ export const ItemSchema = z
     category:       z.enum(CATEGORY),
     slot:           z.enum(SLOT).nullable(),
     rarity:         z.enum(RARITY),
+    minLevel:       z.number().int().nonnegative(),
     armorWeight:    z.enum(ARMOR_WEIGHT).nullable(),
     weaponSchool:   z.enum(SCHOOL).nullable(),
     geometryShape:  z.enum(SHAPE).nullable(),

@@ -6,6 +6,7 @@ import { CollectionPanel } from '../ui/CollectionPanel';
 import { InventoryPanel } from '../ui/InventoryPanel';
 import { CharacterSheet } from '../ui/CharacterSheet';
 import { computeEffectiveStats } from '../effectiveStats';
+import { xpProgress } from '../levelCurve';
 
 // ── Tilemap constants ─────────────────────────────────────────────────────────
 const TILE_SIZE  = 48;
@@ -285,6 +286,8 @@ export class GameScene extends Phaser.Scene {
   private mpText!: Phaser.GameObjects.Text;
   private levelText!: Phaser.GameObjects.Text;
   private spiritLevelText!: Phaser.GameObjects.Text;
+  private xpBarGfx!: Phaser.GameObjects.Graphics;
+  private xpBarText!: Phaser.GameObjects.Text;
 
   // Death overlay
   private isDead = false;
@@ -582,6 +585,11 @@ export class GameScene extends Phaser.Scene {
       if (row.alive && old.alive) {
         const hpLost = old.currentHp - row.currentHp;
         if (hpLost > 0) this._showPlayerHitFeedback(hpLost);
+
+        // lastLevelUpAt is the server's official level-up signal; comparing
+        // level numbers directly is equivalent (the server always bumps both
+        // together) and sidesteps Timestamp equality checks.
+        if (row.level > old.level) this._triggerLevelUp(old.level, row.level);
       }
 
       if (!row.alive && wasAlive) {
@@ -736,6 +744,8 @@ export class GameScene extends Phaser.Scene {
     }
 
     if (!row.alive && old.alive) {
+      this._showFloatingXp(data.x, data.y - ENEMY_R - 20, row.xpReward);
+
       // Death: cancel telegraph, flash white and fade
       data.castCircleGfx.clear().setVisible(false);
       data.castBarGfx.clear().setVisible(false);
@@ -1252,6 +1262,136 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  /** Floating "+N XP" text over an enemy corpse — same style as damage numbers, yellow. */
+  private _showFloatingXp(x: number, y: number, amount: bigint) {
+    const txt = this.add
+      .text(x, y, `+${amount} XP`, {
+        fontSize: '16px',
+        color: '#ffdd55',
+        fontFamily: 'monospace',
+        stroke: '#000000',
+        strokeThickness: 2,
+      })
+      .setOrigin(0.5)
+      .setDepth(10);
+
+    this.tweens.add({
+      targets: txt,
+      y: y - 40,
+      alpha: 0,
+      duration: 1000,
+      ease: 'Quad.easeOut',
+      onComplete: () => txt.destroy(),
+    });
+  }
+
+  /**
+   * Mirrors spacetimedb/src/rules/death.ts#computeHandSlots exactly. NOTE: the
+   * real mechanic grants hand slots from the personal SPIRIT's level, not
+   * character level (see GAME_DESIGN.md — "slots are granted by your spirit,
+   * not character level"). This is reused here purely as a cosmetic signal for
+   * the level-up flourish's "new card slot unlocked" line; it does not control
+   * any actual slot unlock, which still only ever comes from the server via
+   * spirit level.
+   */
+  private _computeHandSlotsLocal(level: number): { active: number; passive: number } {
+    return {
+      active:  Math.min(10, 2 + Math.floor(level * 0.2)),
+      passive: Math.min(5,  1 + Math.floor(level * 0.1)),
+    };
+  }
+
+  private _triggerLevelUp(oldLevel: number, newLevel: number) {
+    const x = this.playerCircle.x;
+    const y = this.playerCircle.y;
+
+    // Golden flash expanding from the player sprite.
+    const flash = this.add.graphics().setPosition(x, y).setDepth(5);
+    flash.lineStyle(4, 0xffd700, 1);
+    flash.strokeCircle(0, 0, PLAYER_R);
+    this.tweens.add({
+      targets: flash,
+      scaleX: 6,
+      scaleY: 6,
+      alpha: 0,
+      duration: 600,
+      ease: 'Quad.easeOut',
+      onComplete: () => flash.destroy(),
+    });
+
+    // Large centred "LEVEL N" text, fading in and out over ~1.5s.
+    const camW = this.cameras.main.width;
+    const camH = this.cameras.main.height;
+    const txt = this.add
+      .text(camW / 2, camH / 2 - 60, `LEVEL ${newLevel}`, {
+        fontSize: '48px',
+        color: '#ffd700',
+        fontFamily: 'monospace',
+        fontStyle: 'bold',
+        stroke: '#000000',
+        strokeThickness: 6,
+      })
+      .setOrigin(0.5)
+      .setScrollFactor(0)
+      .setDepth(30)
+      .setAlpha(0);
+    this.tweens.add({
+      targets: txt,
+      alpha: 1,
+      duration: 300,
+      yoyo: true,
+      hold: 900,
+      onComplete: () => txt.destroy(),
+    });
+
+    // HP/MP already refilled server-side (see index.ts#_grantXp) — the HUD bars
+    // pick that up on the next _updateHud() call, same as any other char update.
+
+    const oldSlots = this._computeHandSlotsLocal(oldLevel);
+    const newSlots = this._computeHandSlotsLocal(newLevel);
+    if (newSlots.active > oldSlots.active) {
+      const sub = this.add
+        .text(camW / 2, camH / 2 - 18, 'New card slot unlocked', {
+          fontSize: '16px',
+          color: '#ffffff',
+          fontFamily: 'monospace',
+          stroke: '#000000',
+          strokeThickness: 3,
+        })
+        .setOrigin(0.5)
+        .setScrollFactor(0)
+        .setDepth(30)
+        .setAlpha(0);
+      this.tweens.add({
+        targets: sub,
+        alpha: 1,
+        duration: 300,
+        yoyo: true,
+        hold: 900,
+        onComplete: () => sub.destroy(),
+      });
+
+      this._flashHandSlot(oldSlots.active); // 0-indexed: the newly unlocked slot
+    }
+  }
+
+  /** Briefly flash the outline of one active-hand-slot rectangle (see _drawCardSlots). */
+  private _flashHandSlot(index: number) {
+    const rectX = this.slot1X + index * (CARD_SW + CARD_GAP);
+    const rectY = this.slot1Y;
+    const g = this.add.graphics().setScrollFactor(0).setDepth(12);
+    g.lineStyle(3, 0xffd700, 1);
+    g.strokeRect(rectX, rectY, CARD_SW, CARD_SH);
+    this.tweens.add({
+      targets: g,
+      alpha: { from: 1, to: 0.2 },
+      duration: 300,
+      yoyo: true,
+      repeat: 3,
+      onComplete: () => g.destroy(),
+    });
+  }
+
   private _muzzleFlash(x: number, y: number) {
     const flash = this.add.graphics();
     flash.fillStyle(0xffffff, 1);
@@ -1451,6 +1591,14 @@ export class GameScene extends Phaser.Scene {
       .setScrollFactor(0)
       .setDepth(11);
 
+    // XP bar — thin strip along the bottom edge, full width.
+    this.xpBarGfx = this.add.graphics().setScrollFactor(0).setDepth(10);
+    this.xpBarText = this.add
+      .text(W / 2, H - 16, '', { fontSize: '11px', color: '#ffffff', fontFamily: 'monospace' })
+      .setOrigin(0.5)
+      .setScrollFactor(0)
+      .setDepth(11);
+
     this._drawCardSlots(W, H);
     this._updateHud();
   }
@@ -1514,9 +1662,27 @@ export class GameScene extends Phaser.Scene {
       this.hpText.setText(`HP  ${hp} / ${mhp}`);
       this.mpText.setText(`MP  ${mp} / ${mmp}`);
       this.levelText.setText(`Lv ${c.level}`);
+
+      const { level, levelStart, levelEnd } = xpProgress(c.xp);
+      const span     = levelEnd - levelStart;
+      const progress = c.xp - levelStart;
+      const frac     = span > 0n ? Number(progress) / Number(span) : 1;
+
+      const barW = this.cameras.main.width;
+      const barH = 6;
+      const barY = this.cameras.main.height - barH;
+      this.xpBarGfx.clear();
+      this.xpBarGfx.fillStyle(0x1a1a2a, 0.9).fillRect(0, barY, barW, barH);
+      this.xpBarGfx.fillStyle(0xffdd55, 1).fillRect(0, barY, barW * Math.max(0, Math.min(1, frac)), barH);
+      this.xpBarText.setPosition(barW / 2, barY - 10);
+      this.xpBarText.setText(
+        level >= 50 ? `Lv ${level} — MAX` : `Lv ${level} — ${progress} / ${span} XP`,
+      );
     } else {
       this.hpText.setText('HP  ---');
       this.mpText.setText('MP  ---');
+      this.xpBarGfx.clear();
+      this.xpBarText.setText('');
     }
 
     if (this.localSpirit) {

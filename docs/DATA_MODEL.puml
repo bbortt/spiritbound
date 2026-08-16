@@ -162,6 +162,7 @@ package "Definitions (content)" <<Frame>> {
     base_cooldown : f32
     mp_cost : i32
     min_character_level : u32    ' level gate to EQUIP (kept thru death, re-earned)
+                                  ' ALSO gates drop eligibility (killer's level), see note
     flavor : String              ' lore-keeper domain
   }
 
@@ -178,6 +179,7 @@ package "Definitions (content)" <<Frame>> {
     geometry_shape : ShapeType {optional}    ' how it bends a card's base_shape
     geometry_width : f32 {optional}          ' wider = more area, less focus
     geometry_range : f32 {optional}          ' also bends reach (melee swing on a staff reaches further)
+    min_level : u32               ' level gate on drop eligibility (killer's level); default 1
     stat_modifiers : StatBlock   ' additive stats this item grants (missing fields = 0, not 1.0)
     flavor : String              ' lore-keeper domain
   }
@@ -261,6 +263,7 @@ package "Runtime (instances)" <<Frame>> {
     alive : bool                      ' false = permadeath; new Character created
     created_at : Timestamp
     died_at : Timestamp               ' null while alive
+    last_level_up_at : Timestamp {optional} ' set by _grantXp on a level increase; client watches this to trigger the level-up flash
     effective_stats : StatBlock {derived} ' race base + equipped gear, in rules/
   }
 
@@ -317,7 +320,8 @@ package "Runtime (instances)" <<Frame>> {
     pos_y : f32
     created_at : Timestamp
     ' same lifecycle as CardDrop, swept by the same cardDropCleanup reducer.
-    ' 40% roll per enemy death (independent of the 70% card roll), common rarity only for now.
+    ' ITEM_DROP_CHANCE (20%) roll per enemy death, independent of the card roll;
+    ' rarity-weighted + min_level-gated by killer's level, see N_Leveling note.
   }
 
   class Enemy {
@@ -341,6 +345,7 @@ package "Runtime (instances)" <<Frame>> {
     cast_duration_seconds : f32
     cast_shape : ShapeType
     cast_damage : i32
+    xp_reward : u64                  ' awarded to the killer via _grantXp; 25 default for zone-1
   }
 }
 
@@ -492,6 +497,9 @@ note bottom of ItemDefinition
   weapon with geometry_width > 1.0 (wide/forgiving) may not also have
   high weapon_damage + physical_attack + magic_attack (narrow = strong,
   wide = weak) — same power-vs-area tradeoff as CardInstance above.
+  min_level (validator-enforced, nonnegative int; default 1 for all six
+  starter items) gates drop eligibility the same way CardDefinition's
+  min_character_level does — see N_Leveling note.
 end note
 
 note bottom of PersonalSpirit
@@ -527,14 +535,33 @@ end note
 
 note as N_Leveling
   **Leveling rules (rules/):**
-  XP gained -> character.xp; on threshold -> level up.
-  account_progress.total_xp_all_lives += XP always (never resets).
+  IMPLEMENTED: enemy.xp_reward (25 default, zone-1) is granted to the
+  killer on death via a shared _grantXp(ctx, character, amount) helper
+  (index.ts), used by both damageEnemy and the public grantXp reducer.
+  XP gained -> character.xp (per-life); on threshold (computeCharacterLevel)
+  -> level up -> currentHp/currentMp refilled to max, last_level_up_at
+  stamped (client watches this field to trigger the level-up flash).
+  account_progress.total_xp_all_lives += XP always (never resets, survives
+  death — verified across a real death+respawn cycle).
+  computeCharacterLevel is duplicated byte-for-byte in
+  client/src/levelCurve.ts so the client's XP bar never disagrees with the
+  server — see docs/ARCHITECTURE.md for the duplication risk/rationale.
   On death: check AccountMilestone thresholds -> auto-claim new milestones.
   tutorial_completed at level 10 -> unlocks level-10 start for next char.
   Soul Ember (REVIVAL item): on take_damage -> if would_die and ember in
   inventory -> consume ember, set hp=1. Non-tradeable enforced in rules.
   Revive card (TRIGGERED passive): fires on group member death IN dungeon
   only; once per dungeon instance; cannot target self.
+
+  **Drop gating (IMPLEMENTED, index.ts):** CARD_DROP_CHANCE=0.25 /
+  ITEM_DROP_CHANCE=0.20 (down from 0.70/0.40). On a hit, eligible content is
+  filtered to CardDefinition.min_character_level / ItemDefinition.min_level
+  <= killer's level, then a rarity tier is chosen by weight (common 60%,
+  uncommon 25%, rare 12%, epic 3%, legendary 0% — legendaries never drop
+  from trash mobs, reserved for bosses/dungeons) before sampling within
+  tier. Empty tier -> falls back to the full eligible pool; empty pool ->
+  no drop (never errors). Duplicate drops are intentional (merge fuel +
+  spirit-sacrifice fodder), not a bug — see BALANCE.md.
 end note
 
 note bottom of Enemy

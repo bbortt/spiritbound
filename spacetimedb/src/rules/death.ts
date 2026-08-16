@@ -135,6 +135,10 @@ export function computeRetention(
  * Design goals: 1-10 fast, 10-30 medium, 30-50 slower.
  * After death, reaching prior level should take ~40-50% of original time.
  * Stub — replace with real XP table after playtest.
+ *
+ * Duplicated byte-for-byte at client/src/levelCurve.ts (the client's XP bar
+ * needs this curve but can't import across the client/server module boundary
+ * — see ARCHITECTURE.md). Keep both copies in sync by hand.
  */
 export function computeCharacterLevel(xp: bigint): number {
   const x = Number(xp);

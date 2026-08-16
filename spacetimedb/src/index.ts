@@ -41,6 +41,24 @@ import { EMPTY_STAT_BLOCK, type StatBlock } from './types';
 import { computeEffectiveStats, computeRaceBase } from './rules/stats';
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// TUNABLE CONSTANTS  (owned by item-balancer/ability-balancer, see BALANCE.md)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** Chance of a ground card drop per enemy death. */
+const CARD_DROP_CHANCE = 0.25;
+/** Chance of a ground item drop per enemy death — independent of the card roll. */
+const ITEM_DROP_CHANCE = 0.20;
+
+/**
+ * Rarity weights for both card and item drop rolls. Legendary is 0 — trash
+ * mobs never drop legendaries, reserved for bosses/dungeon tiers (BALANCE.md).
+ */
+const RARITY_DROP_WEIGHTS: Record<string, number> = {
+  common: 0.60, uncommon: 0.25, rare: 0.12, epic: 0.03, legendary: 0,
+};
+const RARITY_DROP_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary'] as const;
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // CUSTOM SPACETIMEDB TYPES
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -142,6 +160,7 @@ const itemDefinition = table(
     slug:           t.string(),
     name:           t.string(),
     rarity:         TRarity,
+    minLevel:       t.u32(),                  // level-gates item drops, mirrors CardDefinition.minCharacterLevel
     category:       TItemCategory,
     slot:           t.option(TEquipSlot),      // null unless EQUIPMENT
     armorWeight:    t.option(TArmorWeight),    // armor pieces only
@@ -219,6 +238,7 @@ const character = table(
     alive:            t.bool(),
     createdAt:        t.timestamp(),
     diedAt:           t.option(t.timestamp()),
+    lastLevelUpAt:    t.option(t.timestamp()),  // client watches this to trigger the level-up effect
   },
 );
 
@@ -346,6 +366,7 @@ const enemy = table(
     castDurationSeconds:   t.f32(),
     castShape:             TShape,
     castDamage:            t.i32(),
+    xpReward:              t.u64(),
   },
 );
 
@@ -524,6 +545,7 @@ function _doSeedItems(ctx: any): void {
       slug:           item.slug,
       name:           item.name,
       rarity:         { tag: item.rarity },
+      minLevel:       item.minLevel,
       category:       { tag: item.category },
       slot:           item.slot          ? { tag: item.slot }          : undefined,
       armorWeight:    item.armorWeight   ? { tag: item.armorWeight }   : undefined,
@@ -656,6 +678,47 @@ function _resolveAndApplyDamage(
   }
 }
 
+/**
+ * Award XP to a character — bumps character.xp/level AND
+ * accountProgress.totalXpAllLives (which never resets, even across deaths).
+ * Shared by the public grantXp reducer and the kill-XP path in damageEnemy,
+ * so there is exactly one place this logic lives.
+ */
+function _grantXp(ctx: any, char: any, amount: bigint): void {
+  const newXp     = char.xp + amount;
+  const newLevel  = computeCharacterLevel(newXp);
+  const leveledUp = newLevel > char.level;
+
+  // Leveling up refills HP/MP to the new max. This is done here (server-side,
+  // persisted) rather than as a client-side illusion, since currentHp is
+  // permadeath-sensitive and must stay authoritative — the client's level-up
+  // flourish just reacts to lastLevelUpAt/currentHp changing, it doesn't set them.
+  let currentHp = char.currentHp;
+  let currentMp = char.currentMp;
+  if (leveledUp) {
+    const maxes = buildEffectiveStats(ctx, char);
+    currentHp = maxes.maxHp;
+    currentMp = maxes.maxMp;
+  }
+
+  ctx.db.character.characterId.update({
+    ...char,
+    xp:            newXp,
+    level:         newLevel,
+    currentHp,
+    currentMp,
+    lastLevelUpAt: leveledUp ? ctx.timestamp : char.lastLevelUpAt,
+  });
+
+  const progress = ctx.db.accountProgress.accountIdentity.find(char.accountIdentity);
+  if (progress) {
+    ctx.db.accountProgress.accountIdentity.update({
+      ...progress,
+      totalXpAllLives: progress.totalXpAllLives + amount,
+    });
+  }
+}
+
 function _seedZone1Enemies(ctx: any): void {
   const TILE = 48;
   const half = TILE / 2;
@@ -686,6 +749,7 @@ function _seedZone1Enemies(ctx: any): void {
       castDurationSeconds:   1.8,
       castShape:             { tag: 'circle' },
       castDamage:            15,
+      xpReward:              25n,
     });
   }
 }
@@ -726,6 +790,7 @@ export const startLife = db.reducer(
       alive:            true,
       createdAt:        ctx.timestamp,
       diedAt:           undefined,
+      lastLevelUpAt:    undefined,
     });
 
     // First-ever life: grant the tutorial starting hand (1 active card, auto-equipped).
@@ -773,18 +838,7 @@ export const grantXp = db.reducer(
   (ctx, { amount }) => {
     const char = activeCharacter(ctx);
     if (!char) return;
-
-    const newXp    = char.xp + amount;
-    const newLevel = computeCharacterLevel(newXp);
-    ctx.db.character.characterId.update({ ...char, xp: newXp, level: newLevel });
-
-    const progress = ctx.db.accountProgress.accountIdentity.find(ctx.sender);
-    if (progress) {
-      ctx.db.accountProgress.accountIdentity.update({
-        ...progress,
-        totalXpAllLives: progress.totalXpAllLives + amount,
-      });
-    }
+    _grantXp(ctx, char, amount);
   },
 );
 
@@ -1076,6 +1130,7 @@ export const spawnEnemy = db.reducer(
       castDurationSeconds:   1.8,
       castShape:             { tag: 'circle' },
       castDamage:            15,
+      xpReward:              25n,
     });
   },
 );
@@ -1144,22 +1199,51 @@ export const damageEnemy = db.reducer(
         scheduledAt: ScheduleAt.time(ctx.timestamp.microsSinceUnixEpoch + 15_000_000n),
         enemyId:     e.enemyId,
       });
-      // Independent drop rolls: 70% card, 40% common gear.
+      _grantXp(ctx, char, e.xpReward);
+      // Independent drop rolls, level-gated + rarity-weighted (see BALANCE.md).
       _dropCardFromEnemy(ctx, e, char);
-      _dropItemFromEnemy(ctx, e);
+      _dropItemFromEnemy(ctx, e, char);
     } else {
       ctx.db.enemy.enemyId.update({ ...e, currentHp: newHp });
     }
   },
 );
 
-/** Roll a ground card drop when an enemy dies. 70% chance, random eligible card. */
+/**
+ * Roll a rarity tier weighted by RARITY_DROP_WEIGHTS (common-heavy, legendary
+ * never rolls since its weight is 0 — trash mobs don't drop legendaries).
+ */
+function _pickWeightedRarity(ctx: any): string {
+  const roll = ctx.random();
+  let cumulative = 0;
+  for (const rarity of RARITY_DROP_ORDER) {
+    cumulative += RARITY_DROP_WEIGHTS[rarity];
+    if (roll < cumulative) return rarity;
+  }
+  return 'common'; // fallback for float rounding at the top of the range
+}
+
+/**
+ * Pick one def from `eligible` (already level-filtered), preferring a def that
+ * matches the rolled rarity tier; falls back to any eligible def if that tier
+ * is empty at this level (e.g. no epics unlocked yet), and to nothing at all
+ * if `eligible` itself is empty — never errors, just drops nothing.
+ */
+function _pickLevelAndRarityGated(ctx: any, eligible: any[]): any | null {
+  if (eligible.length === 0) return null;
+  const rarity = _pickWeightedRarity(ctx);
+  const pool = eligible.filter((def: any) => def.rarity.tag === rarity);
+  const finalPool = pool.length > 0 ? pool : eligible;
+  return finalPool[ctx.random.integerInRange(0, finalPool.length - 1)];
+}
+
+/** Roll a ground card drop when an enemy dies. Level-gated, rarity-weighted. */
 function _dropCardFromEnemy(ctx: any, e: any, char: any): void {
-  if (ctx.random() >= 0.7) return;
+  if (ctx.random() >= CARD_DROP_CHANCE) return;
   const allDefs  = [...ctx.db.cardDefinition];
   const eligible = allDefs.filter((def: any) => def.minCharacterLevel <= char.level);
-  if (eligible.length === 0) return;
-  const def = eligible[ctx.random.integerInRange(0, eligible.length - 1)];
+  const def = _pickLevelAndRarityGated(ctx, eligible);
+  if (!def) return;
   ctx.db.cardDrop.insert({
     dropId:    0n,
     cardDefId: def.cardDefId,
@@ -1171,14 +1255,15 @@ function _dropCardFromEnemy(ctx: any, e: any, char: any): void {
 }
 
 /**
- * Roll a ground item drop when an enemy dies. 40% chance, random common item.
- * Independent of the card drop roll. Difficulty-based rarity scaling comes later.
+ * Roll a ground item drop when an enemy dies. Level-gated, rarity-weighted,
+ * independent of the card drop roll.
  */
-function _dropItemFromEnemy(ctx: any, e: any): void {
-  if (ctx.random() >= 0.4) return;
-  const commonDefs = [...ctx.db.itemDefinition].filter((def: any) => def.rarity.tag === 'common');
-  if (commonDefs.length === 0) return;
-  const def = commonDefs[ctx.random.integerInRange(0, commonDefs.length - 1)];
+function _dropItemFromEnemy(ctx: any, e: any, char: any): void {
+  if (ctx.random() >= ITEM_DROP_CHANCE) return;
+  const allDefs  = [...ctx.db.itemDefinition];
+  const eligible = allDefs.filter((def: any) => def.minLevel <= char.level);
+  const def = _pickLevelAndRarityGated(ctx, eligible);
+  if (!def) return;
   ctx.db.itemDrop.insert({
     itemDropId: 0n,
     itemDefId:  def.itemDefId,

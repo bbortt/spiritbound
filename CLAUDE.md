@@ -58,7 +58,15 @@ player-facing Jekyll reference site (`site/`) generated from
    `equippedItem` are public tables now (client needs to subscribe) with
    no row-level security yet — see `ARCHITECTURE.md`. Still needed: a real
    Race table, ward-passive stats feeding effective_stats, sets.
-2. Expand content: more cards/enemies/zones/items now that gear is fully wired.
+2. **XP-from-kills progression loop** — done. Enemies award `xpReward`
+   (25, zone-1) on death via a shared `_grantXp` helper; character XP,
+   account-wide `totalXpAllLives`, and level-ups (with HP/MP refill) all
+   work, plus a client XP bar, floating "+N XP" text, and level-up VFX.
+   Drops are now level-gated and rarity-weighted (both cards and items),
+   and drop rates were rebalanced down (25%/20%, from 70%/40%) — see
+   `BALANCE.md`. Still needed: enemy difficulty tiers (flat 25 XP / 100 HP
+   everywhere), a merge UI to make duplicate drops feel useful.
+3. Expand content: more cards/enemies/zones/items now that gear is fully wired.
 
 ## Open Questions (for later)
 

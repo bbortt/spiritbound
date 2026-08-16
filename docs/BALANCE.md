@@ -122,19 +122,68 @@ real player stats yet.
 
 ## Drop rates
 
-`spacetimedb/src/index.ts#_dropCardFromEnemy` — **70% chance** of a ground
-card drop per enemy death, uniformly random among cards the killing
-character's level qualifies for (`minCharacterLevel <= char.level`). Ground
-drops despawn 60s after `createdAt` (swept by `cardDropCleanup`, which runs
-every 10s). Pickup requires being within 80px (`pickupCard`).
+`spacetimedb/src/index.ts` — top-of-file named constants:
 
-`spacetimedb/src/index.ts#_dropItemFromEnemy` — independent **40% chance**
-of a ground item drop per enemy death, uniformly random among **common**-
-rarity `ItemDefinition`s only (no difficulty-based rarity scaling yet).
-Same despawn/pickup lifecycle as card drops, via `pickupItem`.
+```
+CARD_DROP_CHANCE = 0.25   // was 0.70
+ITEM_DROP_CHANCE = 0.20   // was 0.40
+```
+
+`_dropCardFromEnemy` rolls `CARD_DROP_CHANCE` per enemy death; on a hit, the
+eligible pool is `cardDefinition` rows with `minCharacterLevel <= killer's
+level`, then a rarity tier is picked via `_pickWeightedRarity` before
+sampling within that tier:
+
+| Rarity    | Weight |
+|-----------|-------:|
+| common    | 60%    |
+| uncommon  | 25%    |
+| rare      | 12%    |
+| epic      | 3%     |
+| legendary | 0%     |
+
+**Legendary cards never drop from trash mobs** — the weight is 0 by design;
+they're reserved for bosses and dungeon tiers (not yet implemented). If the
+picked tier has no eligible cards at the killer's level, selection falls
+back to the full eligible pool; if that's empty too, the enemy drops
+nothing rather than erroring.
+
+`_dropItemFromEnemy` follows the identical shape: `ITEM_DROP_CHANCE` roll,
+then `itemDefinition` rows filtered by `minLevel <= killer's level`, same
+rarity-weighted tier pick and same nothing-rather-than-error fallback.
+
+Ground drops despawn 60s after `createdAt` (swept by `cardDropCleanup`,
+every 10s). Pickup requires being within 80px (`pickupCard` / `pickupItem`).
+
+**Duplicates are intentional, not a bug.** A second copy of a card you
+already own is merge fuel (future merge system) and spirit-sacrifice fodder
+(`SACRIFICE_XP` above, live today). They currently feel like dead weight
+only because the merge UI doesn't exist yet — that's a missing feature, not
+a reason to suppress duplicate drops.
 
 **Placeholder** — owned by `item-balancer` long-term; not yet tuned against
-an economy model.
+an economy model. The percentages above are a first rebalance pass (down
+from 70%/40%) to make drops feel earned rather than guaranteed; still
+pending real playtest data.
+
+## XP from kills
+
+`spacetimedb/src/index.ts` — `enemy.xpReward` (`u64`, default `25n` for
+every zone-1 enemy, set on both `_seedZone1Enemies` and `spawnEnemy`) is
+awarded to the killing character in `damageEnemy` when an enemy's HP hits
+0, via a shared `_grantXp(ctx, character, amount)` helper (also used by the
+public `grantXp` reducer). `_grantXp`:
+
+- increases `character.xp` (per-life, resets on death)
+- increases `accountProgress.totalXpAllLives` (never resets, survives death)
+- recomputes level via `computeCharacterLevel` (see the character level XP
+  curve above) and, on a level increase, refills `currentHp`/`currentMp` to
+  the character's max and stamps `character.lastLevelUpAt` — the client
+  watches that field to trigger the level-up flash/text.
+
+flat `25` XP per kill is a placeholder — no scaling by enemy difficulty
+yet, since only one enemy tier exists. See `docs/ARCHITECTURE.md` for the
+client/server level-curve duplication this feature depends on.
 
 ## Race base stats (vertical slice)
 

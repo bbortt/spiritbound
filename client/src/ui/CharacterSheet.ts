@@ -16,19 +16,22 @@ const ARMOR_TINT: Record<string, string> = {
 };
 
 // [slotTag, ordinal, gridArea, placeholder label]
+// Paper-doll layout: weapons flank the top row, the centre column is the
+// body line (head -> neck -> chest -> hands -> legs -> boots), and paired
+// accessories flank the body part they're worn near (earrings-head, rings-hands).
 const BODY_SLOTS: [string, number, string, string][] = [
-  ['Head', 0, 'head', 'Head'],
   ['OffHand', 0, 'off', 'Off'],
-  ['Chest', 0, 'chest', 'Chest'],
   ['MainHand', 0, 'main', 'Main'],
+  ['Earring', 0, 'ear0', 'Earring'],
+  ['Head', 0, 'head', 'Head'],
+  ['Earring', 1, 'ear1', 'Earring'],
+  ['Necklace', 0, 'neck', 'Neck'],
+  ['Chest', 0, 'chest', 'Chest'],
+  ['Ring', 0, 'ring0', 'Ring'],
   ['Hands', 0, 'hands', 'Hands'],
+  ['Ring', 1, 'ring1', 'Ring'],
   ['Legs', 0, 'legs', 'Legs'],
   ['Boots', 0, 'boots', 'Boots'],
-  ['Ring', 0, 'ring0', 'Ring'],
-  ['Necklace', 0, 'neck', 'Neck'],
-  ['Ring', 1, 'ring1', 'Ring'],
-  ['Earring', 0, 'ear0', 'Earring'],
-  ['Earring', 1, 'ear1', 'Earring'],
 ];
 
 const PERCENT_FIELDS = new Set<keyof StatBlock>(['evasion', 'parry', 'block', 'magicResist', 'physicalCrit', 'magicCrit']);
@@ -115,13 +118,13 @@ const CSS = `
   grid-template-columns: 72px 72px 72px;
   grid-template-rows: repeat(7, 54px);
   grid-template-areas:
-    ".    head  ."
-    "off  chest main"
-    ".    hands ."
-    ".    legs  ."
-    ".    boots ."
-    "ring0 neck ring1"
-    "ear0  .    ear1";
+    "off   .     main"
+    "ear0  head  ear1"
+    ".     neck  ."
+    ".     chest ."
+    "ring0 hands ring1"
+    ".     legs  ."
+    ".     boots .";
   gap: 6px; justify-content: center; margin-top: 8px;
 }
 .sb-body-slot {

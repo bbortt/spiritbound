@@ -23,4 +23,5 @@ export default __t.row({
   alive: __t.bool(),
   createdAt: __t.timestamp().name("created_at"),
   diedAt: __t.option(__t.timestamp()).name("died_at"),
+  lastLevelUpAt: __t.option(__t.timestamp()).name("last_level_up_at"),
 });

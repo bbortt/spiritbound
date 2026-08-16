@@ -1,7 +1,20 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="5b82f24a-a837-4858-bdad-b79b887f77ac" name="Changes" comment="" />
+    <list default="true" id="5b82f24a-a837-4858-bdad-b79b887f77ac" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.claude/settings.json" beforeDir="false" afterPath="$PROJECT_DIR$/.claude/settings.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/generated/character_table.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/generated/character_table.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/generated/enemy_table.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/generated/enemy_table.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/generated/item_definition_table.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/generated/item_definition_table.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/generated/types.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/generated/types.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/scenes/GameScene.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/scenes/GameScene.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/ui/CharacterSheet.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/ui/CharacterSheet.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/content/equipment.json" beforeDir="false" afterPath="$PROJECT_DIR$/content/equipment.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/content/validateEquipment.ts" beforeDir="false" afterPath="$PROJECT_DIR$/content/validateEquipment.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/spacetimedb/src/index.ts" beforeDir="false" afterPath="$PROJECT_DIR$/spacetimedb/src/index.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/spacetimedb/src/rules/death.ts" beforeDir="false" afterPath="$PROJECT_DIR$/spacetimedb/src/rules/death.ts" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -108,7 +121,7 @@
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
-        <option value="bundled-jdk-30f59d01ecdd-63390994e64e-intellij.indexing.shared.core-IU-262.8665.258" />
+        <option value="bundled-jdk-30f59d01ecdd-34e2839f716b-intellij.indexing.shared.core-IU-262.9437.185" />
       </set>
     </attachedChunks>
   </component>
@@ -139,6 +152,9 @@
       <workItem from="1784545622466" duration="8641000" />
       <workItem from="1784898683370" duration="4582000" />
       <workItem from="1785069416160" duration="3077000" />
+      <workItem from="1785686122821" duration="1040000" />
+      <workItem from="1785687366109" duration="2542000" />
+      <workItem from="1786888760180" duration="6065000" />
     </task>
     <servers />
   </component>

@@ -40,4 +40,5 @@ export default __t.row({
     return ShapeType.name("cast_shape");
   },
   castDamage: __t.i32().name("cast_damage"),
+  xpReward: __t.u64().name("xp_reward"),
 });

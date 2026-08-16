@@ -27,6 +27,7 @@ export default __t.row({
   get rarity() {
     return Rarity;
   },
+  minLevel: __t.u32().name("min_level"),
   get category() {
     return ItemCategory;
   },

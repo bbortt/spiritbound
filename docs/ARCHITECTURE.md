@@ -161,6 +161,55 @@ it's now a second instance of the same risk class. If this keeps
 recurring, worth a real fix (e.g. a reducer that returns computed values
 via its own dedicated row, or a shared package built from `rules/`).
 
+## Client-side computeCharacterLevel duplication (XP bar) — 2026
+
+**Context:** The client needs to render an XP bar (current level's progress
+toward the next) and detect level-ups reactively, but — same constraint as
+the `effectiveStats` ADR above — SpacetimeDB has no query-style RPC, only
+table subscriptions and reducer calls, and the architecture rule is that
+derived values (a level computed from XP) are never stored on a row. The
+server does store `character.xp` and now `character.level`/
+`lastLevelUpAt` directly (since level is checked and written by `_grantXp`
+on every kill), but the *thresholds* (how much XP each level boundary
+needs) are only known by evaluating `computeCharacterLevel` — the client
+has no way to ask the server "how much XP until level 6."
+**Decision:** `client/src/levelCurve.ts` duplicates
+`rules/death.ts#computeCharacterLevel` byte-for-byte, then derives
+`xpForLevel` (binary search over the duplicated function, rather than
+hand-inverting the curve as a second formula) and `xpProgress` (current
+level + XP band) on top of it. Both copies carry a comment pointing at the
+other file.
+**Consequences:** A second sync-by-hand risk of the same class as the
+`effectiveStats` duplication — if `rules/death.ts#computeCharacterLevel`'s
+curve shape changes, the client's XP bar will silently show wrong
+thresholds until someone remembers to copy the change over. Deriving
+`xpForLevel` by binary search (instead of algebraically inverting the
+curve) means at least the *inversion* can never drift even if the curve
+itself does — only the one duplicated function needs to stay in sync, not
+two independently-written ones. Same long-term fix as the `effectiveStats`
+entry: a shared package built from `rules/`, or a server-computed row, if
+this pattern keeps recurring (it's now the third instance, alongside
+`effectiveStats.ts` and `CollectionPanel.ts`'s drifted hand-slot copy).
+
+## HP/MP refill on level-up implemented server-side, not client-side — 2026
+
+**Context:** The level-up feature spec described HP/MP refill under a
+"CLIENT" heading (alongside the level-up VFX), but `currentHp`/`currentMp`
+are permadeath-sensitive values that only the server may write, per the
+"client renders, server decides" trust boundary established for combat
+above.
+**Decision:** The refill happens inside `_grantXp` (server-side,
+`index.ts`) at the moment a level-up is detected — `currentHp`/`currentMp`
+are set to the character's new max via `buildEffectiveStats`, in the same
+write as the XP/level/`lastLevelUpAt` update. The client only reacts to the
+resulting `character` row change (already full HP/MP by the time it sees
+the update) to play the refill visually; it never computes or requests the
+refill itself.
+**Consequences:** A deliberate deviation from the literal spec wording,
+consistent with every other HP-writing path in this codebase (combat,
+gear-swap rescaling). Keeps the invariant "only the server ever writes
+currentHp/currentMp" exception-free.
+
 ## Content pipeline: cards.json is the single source of truth — 2026
 
 **Context:** Card definitions need to be authored by a human (or
