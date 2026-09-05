@@ -8,7 +8,7 @@
     "db:restart": "pnpm run db:stop && pnpm run db:start",
     "db:start": "docker run -d --name spiritbound-local -p 3000:3000 clockworklabs/spacetime:latest start --in-memory",
     "db:stop": "docker rm -f spiritbound-local",
-    "lint:markdown": "markdownlint --rules markdownlint-sentences-per-line -- **/*.md",
+    "lint:markdown": "markdownlint --rules markdownlint-sentences-per-line -d -- **/*.md",
     "prepare": "husky",
     "prettier": "prettier \"{,**/}*.{cjs,js,json,md,mjs,ts,tsx,xml,yaml,yml}\"",
     "prettier:check": "npm run prettier -- --list-different",

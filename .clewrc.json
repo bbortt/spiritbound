@@ -1,0 +1,63 @@
+{
+  "idGeneration": {
+    "mode": "sequential",
+    "padding": 3
+  },
+  "lenses": [
+    {
+      "id": "STK",
+      "description": "Stakeholder spec — what a stakeholder needs from the system."
+    },
+    {
+      "id": "SYS",
+      "description": "System spec — a capability or behaviour at the system level."
+    },
+    {
+      "id": "SW",
+      "description": "Software spec — observable, verifiable behaviour of a component."
+    },
+    {
+      "id": "ARCH",
+      "description": "Architecture spec — a structural rule or design decision."
+    },
+    {
+      "id": "NF",
+      "description": "Non-functional spec — a quality attribute such as performance or security."
+    },
+    {
+      "id": "CON",
+      "description": "Constraint — an invariant that must always hold."
+    }
+  ],
+  "layout": {
+    "stories": {
+      "dir": "docs/spec/stories",
+      "prefix": "STR"
+    },
+    "specs": {
+      "dir": "docs/spec/specs"
+    },
+    "drafts": {
+      "dir": "docs/spec/drafts"
+    },
+    "state": {
+      "file": ".clew/state.json"
+    }
+  },
+  "generators": [
+    {
+      "type": "typescript"
+    }
+  ],
+  "schemas": {
+    "story": "docs/spec/schemas/story.schema.yaml",
+    "spec": "docs/spec/schemas/spec.schema.yaml"
+  },
+  "waivers": [],
+  "agent": {
+    "type": "claude",
+    "skillsDir": ".claude/skills",
+    "governanceDir": ".claude/.ai-project-context",
+    "entryFile": "CLAUDE.md"
+  }
+}

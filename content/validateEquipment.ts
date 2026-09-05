@@ -1,4 +1,10 @@
 import { z } from 'zod';
+import {
+  realizes,
+  concerns,
+  ConTraceables,
+  SysTraceables,
+} from '../src/clew/traceables/clew';
 
 export { loadEquipment } from './equipmentLoader';
 
@@ -54,175 +60,189 @@ export const StatModifiersSchema = z.object({
 
 export type StatModifiers = z.infer<typeof StatModifiersSchema>;
 
-export const ItemSchema = z
-  .object({
-    slug: z
-      .string()
-      .regex(/^[a-z0-9_-]+$/, 'must be lowercase (a-z, 0-9, -, _)'),
-    name: z.string().min(1),
-    category: z.enum(CATEGORY),
-    slot: z.enum(SLOT).nullable(),
-    rarity: z.enum(RARITY),
-    minLevel: z.number().int().nonnegative(),
-    armorWeight: z.enum(ARMOR_WEIGHT).nullable(),
-    weaponSchool: z.enum(SCHOOL).nullable(),
-    geometryShape: z.enum(SHAPE).nullable(),
-    geometryWidth: z.number().positive().nullable(),
-    geometryRange: z.number().positive().nullable(),
-    stats: StatModifiersSchema,
-    flavor: z.string().min(1),
-  })
-  .superRefine((item, ctx) => {
-    const isMainHand = item.slot === 'main_hand';
+export const ItemSchema = realizes(
+  ConTraceables.CON_009_MAIN_HAND_ITEMS_REQUIRE_FULL_WEAPON_GEOMETRY_EVERYTHING_ELSE_FORBIDS_IT,
+  z
+    .object({
+      slug: z
+        .string()
+        .regex(/^[a-z0-9_-]+$/, 'must be lowercase (a-z, 0-9, -, _)'),
+      name: z.string().min(1),
+      category: z.enum(CATEGORY),
+      slot: z.enum(SLOT).nullable(),
+      rarity: z.enum(RARITY),
+      minLevel: z.number().int().nonnegative(),
+      armorWeight: z.enum(ARMOR_WEIGHT).nullable(),
+      weaponSchool: z.enum(SCHOOL).nullable(),
+      geometryShape: z.enum(SHAPE).nullable(),
+      geometryWidth: z.number().positive().nullable(),
+      geometryRange: z.number().positive().nullable(),
+      stats: StatModifiersSchema,
+      flavor: z.string().min(1),
+    })
+    .superRefine((item, ctx) => {
+      const isMainHand = item.slot === 'main_hand';
 
-    if (isMainHand) {
-      if (item.weaponSchool === null) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['weaponSchool'],
-          message: 'weaponSchool is required for main_hand items',
-        });
+      if (isMainHand) {
+        if (item.weaponSchool === null) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['weaponSchool'],
+            message: 'weaponSchool is required for main_hand items',
+          });
+        }
+        if (item.geometryShape === null) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['geometryShape'],
+            message: 'geometryShape is required for main_hand items',
+          });
+        }
+        if (item.geometryWidth === null) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['geometryWidth'],
+            message: 'geometryWidth is required for main_hand items',
+          });
+        }
+        if (item.geometryRange === null) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['geometryRange'],
+            message: 'geometryRange is required for main_hand items',
+          });
+        }
+      } else {
+        if (item.weaponSchool !== null) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['weaponSchool'],
+            message: 'weaponSchool must be null unless slot is main_hand',
+          });
+        }
+        if (
+          item.geometryShape !== null ||
+          item.geometryWidth !== null ||
+          item.geometryRange !== null
+        ) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['geometryShape'],
+            message: 'geometry fields must be null unless slot is main_hand',
+          });
+        }
       }
-      if (item.geometryShape === null) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['geometryShape'],
-          message: 'geometryShape is required for main_hand items',
-        });
-      }
-      if (item.geometryWidth === null) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['geometryWidth'],
-          message: 'geometryWidth is required for main_hand items',
-        });
-      }
-      if (item.geometryRange === null) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['geometryRange'],
-          message: 'geometryRange is required for main_hand items',
-        });
-      }
-    } else {
-      if (item.weaponSchool !== null) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['weaponSchool'],
-          message: 'weaponSchool must be null unless slot is main_hand',
-        });
-      }
-      if (
-        item.geometryShape !== null ||
-        item.geometryWidth !== null ||
-        item.geometryRange !== null
-      ) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['geometryShape'],
-          message: 'geometry fields must be null unless slot is main_hand',
-        });
-      }
-    }
-  });
+    }),
+);
 
 export type ItemDef = z.infer<typeof ItemSchema>;
 
 // Cross-item + item-balancer rules that don't fit cleanly into per-field schema shape.
-function crossCheck(items: ItemDef[]): string[] {
-  const errors: string[] = [];
+const crossCheck = realizes(
+  [
+    ConTraceables.CON_010_ARMOR_WEIGHT_IS_FORBIDDEN_ON_MAIN_HAND_AND_OFF_HAND_ITEMS,
+    ConTraceables.CON_011_EPIC_ITEMS_NEED_A_STAT_OF_TWENTY_LEGENDARY_ITEMS_NEED_FORTY,
+    ConTraceables.CON_012_PER_ITEM_MOVESPEED_AND_EVASION_MODIFIERS_ARE_CAPPED,
+    ConTraceables.CON_013_A_WIDE_MAIN_HAND_WEAPON_CAPS_ITS_TOTAL_DAMAGE_STATS_AT_TWENTY,
+  ] as const,
+  function crossCheck(items: ItemDef[]): string[] {
+    const errors: string[] = [];
 
-  const slugs = items.map((i) => i.slug);
-  const dupes = slugs.filter((s, i) => slugs.indexOf(s) !== i);
-  if (dupes.length > 0) {
-    errors.push(`Duplicate slugs: ${[...new Set(dupes)].join(', ')}`);
-  }
-
-  for (const item of items) {
-    // Weapons and focuses aren't cloth/chain/plate — armor weight only applies to armor slots.
-    if (
-      item.armorWeight !== null &&
-      (item.slot === 'main_hand' || item.slot === 'off_hand')
-    ) {
-      errors.push(
-        `${item.slug}: armorWeight must be null for ${item.slot} items (weapons/focuses aren't cloth/chain/plate)`,
-      );
+    const slugs = items.map((i) => i.slug);
+    const dupes = slugs.filter((s, i) => slugs.indexOf(s) !== i);
+    if (dupes.length > 0) {
+      errors.push(`Duplicate slugs: ${[...new Set(dupes)].join(', ')}`);
     }
 
-    const statValues = Object.values(item.stats) as number[];
-    const maxStat = statValues.length > 0 ? Math.max(...statValues) : 0;
-
-    if (item.rarity === 'epic' && maxStat < 20) {
-      errors.push(
-        `${item.slug}: epic item must have at least one stat >= 20 (max found: ${maxStat})`,
-      );
-    }
-    if (item.rarity === 'legendary' && maxStat < 40) {
-      errors.push(
-        `${item.slug}: legendary item must have at least one stat >= 40 (max found: ${maxStat})`,
-      );
-    }
-
-    if (item.stats.moveSpeed !== undefined && item.stats.moveSpeed >= 0.5) {
-      errors.push(
-        `${item.slug}: moveSpeed is a multiplier and must be < 0.5 (got ${item.stats.moveSpeed})`,
-      );
-    }
-    if (item.stats.evasion !== undefined && item.stats.evasion >= 0.2) {
-      errors.push(
-        `${item.slug}: evasion is capped at 0.20 per item (got ${item.stats.evasion})`,
-      );
-    }
-
-    // Balance rule (item-balancer seam): wide area = lower damage. A main_hand weapon
-    // may not have both a wide/forgiving shape (width > 1.0) AND high damage output.
-    if (
-      item.slot === 'main_hand' &&
-      item.geometryWidth !== null &&
-      item.geometryWidth > 1.0
-    ) {
-      const totalDamage =
-        (item.stats.weaponDamage ?? 0) +
-        (item.stats.physicalAttack ?? 0) +
-        (item.stats.magicAttack ?? 0);
-      if (totalDamage > 20) {
+    for (const item of items) {
+      // Weapons and focuses aren't cloth/chain/plate — armor weight only applies to armor slots.
+      if (
+        item.armorWeight !== null &&
+        (item.slot === 'main_hand' || item.slot === 'off_hand')
+      ) {
         errors.push(
-          `weapon ${item.slug} has wide geometry (width > 1.0) but high damage — violates ` +
-            `the power-vs-area balance rule. Reduce damage or narrow the shape.`,
+          `${item.slug}: armorWeight must be null for ${item.slot} items (weapons/focuses aren't cloth/chain/plate)`,
         );
       }
-    }
-  }
 
-  return errors;
-}
+      const statValues = Object.values(item.stats) as number[];
+      const maxStat = statValues.length > 0 ? Math.max(...statValues) : 0;
 
-export function validateEquipment(items: unknown[]): {
-  valid: boolean;
-  errors: string[];
-} {
-  const errors: string[] = [];
-  const valid: ItemDef[] = [];
-
-  for (const item of items) {
-    const result = ItemSchema.safeParse(item);
-    if (!result.success) {
-      const slug =
-        typeof (item as Record<string, unknown>)?.slug === 'string'
-          ? ((item as Record<string, unknown>).slug as string)
-          : '(unknown)';
-      for (const issue of result.error.issues) {
-        const path = issue.path.join('.') || 'root';
-        errors.push(`${slug}: ${path}: ${issue.message}`);
+      if (item.rarity === 'epic' && maxStat < 20) {
+        errors.push(
+          `${item.slug}: epic item must have at least one stat >= 20 (max found: ${maxStat})`,
+        );
       }
-    } else {
-      valid.push(result.data);
-    }
-  }
+      if (item.rarity === 'legendary' && maxStat < 40) {
+        errors.push(
+          `${item.slug}: legendary item must have at least one stat >= 40 (max found: ${maxStat})`,
+        );
+      }
 
-  errors.push(...crossCheck(valid));
-  return { valid: errors.length === 0, errors };
-}
+      if (item.stats.moveSpeed !== undefined && item.stats.moveSpeed >= 0.5) {
+        errors.push(
+          `${item.slug}: moveSpeed is a multiplier and must be < 0.5 (got ${item.stats.moveSpeed})`,
+        );
+      }
+      if (item.stats.evasion !== undefined && item.stats.evasion >= 0.2) {
+        errors.push(
+          `${item.slug}: evasion is capped at 0.20 per item (got ${item.stats.evasion})`,
+        );
+      }
+
+      // Balance rule (item-balancer seam): wide area = lower damage. A main_hand weapon
+      // may not have both a wide/forgiving shape (width > 1.0) AND high damage output.
+      if (
+        item.slot === 'main_hand' &&
+        item.geometryWidth !== null &&
+        item.geometryWidth > 1.0
+      ) {
+        const totalDamage =
+          (item.stats.weaponDamage ?? 0) +
+          (item.stats.physicalAttack ?? 0) +
+          (item.stats.magicAttack ?? 0);
+        if (totalDamage > 20) {
+          errors.push(
+            `weapon ${item.slug} has wide geometry (width > 1.0) but high damage — violates ` +
+              `the power-vs-area balance rule. Reduce damage or narrow the shape.`,
+          );
+        }
+      }
+    }
+
+    return errors;
+  },
+);
+
+export const validateEquipment = concerns(
+  SysTraceables.SYS_008_CONTENT_IS_AUTHORED_AS_JSON_VALIDATED_THEN_IDEMPOTENTLY_SEEDED,
+  function validateEquipment(items: unknown[]): {
+    valid: boolean;
+    errors: string[];
+  } {
+    const errors: string[] = [];
+    const valid: ItemDef[] = [];
+
+    for (const item of items) {
+      const result = ItemSchema.safeParse(item);
+      if (!result.success) {
+        const slug =
+          typeof (item as Record<string, unknown>)?.slug === 'string'
+            ? ((item as Record<string, unknown>).slug as string)
+            : '(unknown)';
+        for (const issue of result.error.issues) {
+          const path = issue.path.join('.') || 'root';
+          errors.push(`${slug}: ${path}: ${issue.message}`);
+        }
+      } else {
+        valid.push(result.data);
+      }
+    }
+
+    errors.push(...crossCheck(valid));
+    return { valid: errors.length === 0, errors };
+  },
+);
 
 export function parseEquipment(raw: unknown[]): ItemDef[] {
   const { valid, errors } = validateEquipment(raw);

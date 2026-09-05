@@ -1,8 +1,46 @@
 import { describe, it, expect } from 'vitest';
-import { validateCards } from './validate';
+import { validateCards, type CardDef } from './validate';
 import { loadCards } from './loader';
+import { verifies, ConTraceables } from '../src/clew/traceables/clew';
 
 const cards = loadCards();
+
+/** A minimal, schema-valid active card, ready to mutate into a violation. */
+function validActiveCard(overrides: Partial<CardDef> = {}): CardDef {
+  return {
+    slug: 'test-card',
+    name: 'Test Card',
+    rarity: 'common',
+    type: 'active',
+    school: 'physical',
+    shape: 'cone',
+    basePower: 10,
+    cooldownSeconds: 1,
+    mpCost: 5,
+    minLevel: 1,
+    flavor: 'A test card.',
+    ...overrides,
+  };
+}
+
+/** A minimal, schema-valid ward passive card, ready to mutate into a violation. */
+function validWardCard(overrides: Partial<CardDef> = {}): CardDef {
+  return {
+    slug: 'test-ward',
+    name: 'Test Ward',
+    rarity: 'common',
+    type: 'passive',
+    passiveKind: 'ward',
+    school: 'physical',
+    shape: 'cone',
+    basePower: 10,
+    cooldownSeconds: 0,
+    mpCost: 0,
+    minLevel: 1,
+    flavor: 'A test ward.',
+    ...overrides,
+  };
+}
 
 describe('card definitions — schema', () => {
   it('all cards pass Zod schema validation', () => {
@@ -90,3 +128,59 @@ describe('card definitions — lore rules', () => {
     }
   });
 });
+
+// Rejection-path coverage: the balance-rule tests above only prove the
+// *shipped* content complies; these prove the validator actually REJECTS a
+// synthetic violation of each rule, not just that no violation happens to exist yet.
+
+verifies(
+  ConTraceables.CON_014_LEGENDARY_CARDS_NEED_MINLEVEL_THIRTY_FIVE_EPIC_CARDS_NEED_TWENTY,
+  () => {
+    describe('CON-014 rejection path', () => {
+      it('rejects a legendary card with minLevel just under 35', () => {
+        const { valid, errors } = validateCards([
+          validActiveCard({ rarity: 'legendary', minLevel: 34 }),
+        ]);
+        expect(valid).toBe(false);
+        expect(errors.join('\n')).toMatch(
+          /legendary card must have minLevel >= 35/,
+        );
+      });
+
+      it('accepts a legendary card at exactly minLevel 35', () => {
+        const { valid } = validateCards([
+          validActiveCard({ rarity: 'legendary', minLevel: 35 }),
+        ]);
+        expect(valid).toBe(true);
+      });
+
+      it('rejects an epic card with minLevel just under 20', () => {
+        const { valid, errors } = validateCards([
+          validActiveCard({ rarity: 'epic', minLevel: 19 }),
+        ]);
+        expect(valid).toBe(false);
+        expect(errors.join('\n')).toMatch(/epic card must have minLevel >= 20/);
+      });
+    });
+  },
+);
+
+verifies(
+  ConTraceables.CON_015_A_WARD_PASSIVE_CARD_MUST_HAVE_ZERO_MP_COST,
+  () => {
+    describe('CON-015 rejection path', () => {
+      it('rejects a ward passive with a nonzero mpCost', () => {
+        const { valid, errors } = validateCards([validWardCard({ mpCost: 1 })]);
+        expect(valid).toBe(false);
+        expect(errors.join('\n')).toMatch(
+          /ward passive must have mpCost === 0/,
+        );
+      });
+
+      it('accepts a ward passive with mpCost === 0', () => {
+        const { valid } = validateCards([validWardCard({ mpCost: 0 })]);
+        expect(valid).toBe(true);
+      });
+    });
+  },
+);

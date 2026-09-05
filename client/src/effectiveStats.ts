@@ -3,6 +3,7 @@ import {
   ArchTraceables,
   SwTraceables,
   concerns,
+  realizes,
 } from '../../src/clew/traceables/clew';
 
 /**
@@ -45,21 +46,22 @@ export const RACE_BASE: StatBlock = {
 
 /**
  * Mirrors rules/stats.ts#computeEffectiveStats — race base + additive gear.
- * The server-side function is the canonical `realizes` for SW-004; this is a
- * display-only duplicate, hence `concerns` rather than `realizes` here.
+ * The server-side function is the canonical implementation; this is a
+ * display-only duplicate, cross-checked against the server in
+ * effectiveStats.test.ts.
  */
-export const computeEffectiveStats = concerns(
-  [
-    ArchTraceables.ARCH_002_CLIENT_EFFECTIVE_STATS_IS_A_HAND_SYNCED_DUPLICATE,
+export const computeEffectiveStats = realizes(
+  ArchTraceables.ARCH_002_CLIENT_EFFECTIVE_STATS_IS_A_HAND_SYNCED_DUPLICATE,
+  concerns(
     SwTraceables.SW_004_EFFECTIVE_STATS_STACK_RACE_BASE_WITH_GEAR_ADDITIVELY,
-  ],
-  function computeEffectiveStats(equippedDefs: ItemDefinition[]): StatBlock {
-    const total = { ...RACE_BASE };
-    for (const def of equippedDefs) {
-      for (const key of Object.keys(total) as (keyof StatBlock)[]) {
-        (total as any)[key] += def.statModifiers[key];
+    function computeEffectiveStats(equippedDefs: ItemDefinition[]): StatBlock {
+      const total = { ...RACE_BASE };
+      for (const def of equippedDefs) {
+        for (const key of Object.keys(total) as (keyof StatBlock)[]) {
+          (total as any)[key] += def.statModifiers[key];
+        }
       }
-    }
-    return total;
-  },
+      return total;
+    },
+  ),
 );

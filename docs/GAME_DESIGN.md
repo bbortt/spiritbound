@@ -12,20 +12,26 @@ A PvE-focused MMO RPG blending:
 - **Souls-likes** — permadeath tension, preparation, meaningful loss
 - **Realm of the Mad God** — existence proof: permadeath MMO, 2D, items define power, PvE co-op
 
-**Core fantasy:** Your equipped cards ARE your build. Your spirit is your soul's insurance policy. Your body (gear) is always lost on death.
+**Core fantasy:** Your equipped cards ARE your build.
+Your spirit is your soul's insurance policy.
+Your body (gear) is always lost on death.
 
 ## Design Pillars
 
 1. **Cards are your soul, gear is your body.** Cards can survive death (via spirits); physical equipment never does.
-2. **Preparation over reaction.** You commit to a hand before venturing out (souls-like loop). Spirits are the "bonfires."
-3. **PvE-first.** No open PvP nuking. If PvP ever exists, it is strictly level-and-zone gated.
-4. **Every drop has value.** Duplicate cards are merge fuel or spirit sacrifices. Gear loss keeps the crafting economy alive forever.
+2. **Preparation over reaction.** You commit to a hand before venturing out (souls-like loop).
+   Spirits are the "bonfires."
+3. **PvE-first.** No open PvP nuking.
+   If PvP ever exists, it is strictly level-and-zone gated.
+4. **Every drop has value.** Duplicate cards are merge fuel or spirit sacrifices.
+   Gear loss keeps the crafting economy alive forever.
 
 ## Character Systems
 
 ### Race (base stats)
 
-Classic race system providing base stat distribution. No classes — your equipped cards define your role.
+Classic race system providing base stat distribution.
+No classes — your equipped cards define your role.
 
 ### Gear (additive stats)
 
@@ -38,38 +44,46 @@ quietly steers them away from swords — soft incentive, never a hard lock).
 necklace, 2× ring, 2× earring.
 
 - **Main-hand** is the most mechanically important item — the weapon carries a
-  stat type AND a **geometry modifier** (skinny vs wide area). See Combat & Mechanics.
+  stat type AND a **geometry modifier** (skinny vs wide area).
+  See Combat & Mechanics.
 - **Off-hand** (shield / focus) is a natural home for ward-style defensive stats.
 
 **Armor weight classes** (cloth / chain / plate) telegraph an armor piece's
 defensive bias — plate leans physical def, cloth leans magic def, chain in between.
 This is a _readability_ aid (you can see a tank at a glance) and **not** a wear
 restriction: anyone can wear anything, so a full-plate mage is a legal, intentionally
-fun oddity. Consistent with no-classes design.
+fun oddity.
+Consistent with no-classes design.
 
 **Set effects:** gear pieces can belong to a set; wearing N pieces grants tiered
-bonuses (2-piece, 4-piece, …). Because gear is lost on death, sets **re-form each
+bonuses (2-piece, 4-piece, …).
+Because gear is lost on death, sets **re-form each
 life**, which keeps players re-chasing pieces (good economy churn) — so sets must be
-_repeatably_ attainable, never one-time grinds. Set bonus stats feed card scaling
+_repeatably_ attainable, never one-time grinds.
+Set bonus stats feed card scaling
 (item-balancer seam).
 
 ### Cards (abilities)
 
 - Cards grant **active abilities** and **passive abilities**.
 - **Anyone can learn, carry, and trade any card** — there are no class or weapon
-  restrictions on which cards you can equip. Identity is _emergent_, not assigned
+  restrictions on which cards you can equip.
+  Identity is _emergent_, not assigned
   (see Combat & Mechanics → emergent classes).
 - Each card declares a **scaling tag**: which stat its power reads from (e.g.
-  attack damage, magic damage). The same card performs differently depending on
+  attack damage, magic damage).
+  The same card performs differently depending on
   the weapon/gear feeding that stat — "the mighty swing" hits hard with a sword
   (high attack damage) and soft-but-wide with a staff.
-- The equipped set is your **Hand**, capped at **10 active + 5 passive**. You
+- The equipped set is your **Hand**, capped at **10 active + 5 passive**.
+  You
   **start at 2 active / 1 passive** (the tutorial hands you a pre-filled 1/1 so you
   learn the basics).
   - **Slots are granted by your personal spirit's level — not character level.**
     Leveling your character is the _means_ (easier farming → find & level spirits
     faster); the spirit is the _gate_.
-- Some cards carry a **minimum character-level requirement** to equip. Permadeath
+- Some cards carry a **minimum character-level requirement** to equip.
+  Permadeath
   wrinkle: your spirit may preserve a high-level card through death, but you must
   re-earn the level before you can wield it again.
 - **Passives** come in two kinds: **wards** (protective — mitigation, shields,
@@ -80,19 +94,23 @@ _repeatably_ attainable, never one-time grinds. Set bonus stats feed card scalin
 - **Card merging** (e.g. 3-to-1 ladder): merge level adds _effects_ (extra projectile, longer duration, passive riders) rather than raw numbers — horizontal power, avoids double-dip power creep with character level.
 - **Combo chains:** a card can be a _chain link_ off another — casting the opener
   opens a brief window where the follow-up gains a bonus (Aion-style chain skills).
-  One opener can branch into different follow-ups. This makes the 10-active hand a
+  One opener can branch into different follow-ups.
+  This makes the 10-active hand a
   _sequencing_ skill, not ten independent buttons.
 - **Evolution branches:** merging is a _tree_, not just a ladder — a card can evolve
-  down different branches (e.g. fire vs frost) depending on catalyst/choice. Combined
+  down different branches (e.g. fire vs frost) depending on catalyst/choice.
+  Combined
   with combos, this gives skill-tree-like depth **without a point-buy tree**, so the
   loot-defines-build pillar stays intact (the "tree" emerges from collecting +
   merging, not spending points).
 
 ## Stats & Attributes
 
-Adapted from Aion, reconciled with cursor-aimed combat. Sources stack **additively**:
+Adapted from Aion, reconciled with cursor-aimed combat.
+Sources stack **additively**:
 race seeds primary attributes, gear adds combat stats directly, passive (ward) cards
-can add stats, level scales resources. There are no class locks — your stat spread
+can add stats, level scales resources.
+There are no class locks — your stat spread
 is the soft, emergent class.
 
 ### Primary attributes (race-seeded; the only innate lean)
@@ -109,14 +127,16 @@ is the soft, emergent class.
 
 - **HP** (current/max) + regen — at 0 you die (permadeath).
 - **MP** (current/max) + regen — active cards cost MP; if you can't pay, the card
-  won't fire (Aion rule). Optional: some cards cost HP (blood-magic flavor).
+  won't fire (Aion rule).
+  Optional: some cards cost HP (blood-magic flavor).
 - **Move speed** (multiplier, 1.0 = base).
 
 ### Offensive (gear + primaries; what cards/weapons read)
 
 - **Weapon damage** — weapon-only, base for basic attacks; school routed by the weapon.
 - **Physical attack / Magic attack** — boost physical- / magic-school card damage
-  (these are the card scaling tags). Healing reads magic attack × healing boost.
+  (these are the card scaling tags).
+  Healing reads magic attack × healing boost.
 - **Physical crit / Magic crit** (+ optional crit-damage multiplier).
 - **Accuracy / Magic accuracy** — counter the defender's evasion-parry / magic
   resist, and gate whether secondary status effects land.
@@ -126,7 +146,8 @@ is the soft, emergent class.
 
 ### Defensive (gear + primaries)
 
-- **Physical def / Magic def** — flat mitigation per school. Optional Aion-style
+- **Physical def / Magic def** — flat mitigation per school.
+  Optional Aion-style
   weight classes: plate biases physical def, cloth biases magic def — a per-slot tradeoff.
 - **Parry** — reduce a connected physical hit (capped), countered by accuracy.
 - **Evasion** — avoid a connected hit (capped low), countered by accuracy.
@@ -139,24 +160,29 @@ is the soft, emergent class.
 Because combat is cursor-aimed, **hitting is skill, mitigation is stats**:
 
 1. **Connect** — your aim + weapon geometry vs the target's position decides if you
-   geometrically land it. No "accuracy to land" RNG on your own shots.
+   geometrically land it.
+   No "accuracy to land" RNG on your own shots.
 2. **Resolve** — once connected, defense applies: def mitigates, then
    evasion/parry/resist may roll; the attacker's accuracy lowers the defender's
    effective avoidance.
 
 **Decided (permadeath feel):** evasion is a **glancing blow** (partial damage
-reduction), **not** a full negation, with **low caps**. Full-negation dodges
+reduction), **not** a full negation, with **low caps**.
+Full-negation dodges
 produce feel-bad deaths in both directions under permadeath, so they're out.
 
 ## Combat & Mechanics
 
 ### Control scheme — cursor-aimed (Path of Exile style)
 
-- **Click to move**; abilities fire **toward the cursor**. Aim matters — you can
-  miss. This is a deliberate skill-based choice that reinforces the souls-like feel.
+- **Click to move**; abilities fire **toward the cursor**.
+  Aim matters — you can
+  miss.
+  This is a deliberate skill-based choice that reinforces the souls-like feel.
 - **Fixed camera**, Diablo-style (top-down / isometric).
 - Hotbar plan: left/right mouse for move + basic attack, the 10 active abilities on
-  keys (1–0) cast toward the cursor. A radial or two-row hotbar is on the table —
+  keys (1–0) cast toward the cursor.
+  A radial or two-row hotbar is on the table —
   10 actives is a lot of inputs and needs a conscious UI plan.
 
 ### Weapons are attack geometry + stat carriers
@@ -185,7 +211,8 @@ Identity is not assigned — it emerges from the intersection of:
 - which **weapon** you wield (stat type + geometry), and
 - the **stat types** your accumulated gear provides.
 
-Anyone can wield anything and learn any card; scaling simply rewards synergy. This
+Anyone can wield anything and learn any card; scaling simply rewards synergy.
+This
 keeps builds open, makes hybrid/off-meta builds genuinely discoverable, and gives
 **every card trade value** — junk for one build is a keystone for another.
 
@@ -199,9 +226,12 @@ on the same card** — that would break the tradeoff. (Enforced by the
 ### Inventory vs deck
 
 - **Inventory** holds _physical_ items: gear, potions, quest items, crafting
-  materials, and any cards not currently equipped. Standard MMO inventory.
-- **Deck** holds your equipped Hand (10 active + 5 passive). It is **separate from
-  inventory** and is only changed at spirits (see Spirit System). Cards are soul;
+  materials, and any cards not currently equipped.
+  Standard MMO inventory.
+- **Deck** holds your equipped Hand (10 active + 5 passive).
+  It is **separate from
+  inventory** and is only changed at spirits (see Spirit System).
+  Cards are soul;
   everything in inventory is body.
 
 ## Spirit System
@@ -226,28 +256,35 @@ so spirit progression is the spine of character power.
 
 ### Spirit Leveling — Card Sacrifice
 
-- Feed cards to a spirit to level it up. A sacrifice that **adds up over time**.
+- Feed cards to a spirit to level it up.
+  A sacrifice that **adds up over time**.
 - Burning a rare/legendary card for permanent spirit progression is a deliberate, weighty decision.
 
 ## Social & Group Play
 
-- **Groups:** 2–6 players, cooperative (PvE). Shared XP/loot rules TBD.
+- **Groups:** 2–6 players, cooperative (PvE).
+  Shared XP/loot rules TBD.
 - **Alliances:** up to 6 groups federated (≤ 36 players) for large content (world
   bosses, raids).
 - Grouping is over **active characters**; a member who dies (permadeath) drops from
   the group and rejoins with their next character.
 - **Permadeath × grouping (open):** does a group get any revive, or is death final
-  even in a party? A rez softens the core stakes; no rez makes group content brutal.
-  Possible middle: revive only at a spirit, or at a steep cost. To be decided.
+  even in a party?
+  A rez softens the core stakes; no rez makes group content brutal.
+  Possible middle: revive only at a spirit, or at a steep cost.
+  To be decided.
 - **Persistent social identity** (guild names, rosters that survive death) should
   live at the **account** level, separate from the transient character-level group/
-  alliance. Whether alliances are transient coalitions or persistent guilds: open.
+  alliance.
+  Whether alliances are transient coalitions or persistent guilds: open.
 
 ## Death Rules (souls-like, softened)
 
-- **Gear:** always lost. No exceptions. (This is the permanent economy sink.)
+- **Gear:** always lost.
+  No exceptions. (This is the permanent economy sink.)
 - **Cards:** preserved via your personal spirit's **attunement slots** — attuned
-  cards are _guaranteed_ to survive death; everything un-attuned is lost. This
+  cards are _guaranteed_ to survive death; everything un-attuned is lost.
+  This
   replaces rage-inducing RNG with a souls-style loadout decision made _before_ you
   venture out.
 - **Attunement slots are rarity-tiered.** Your spirit grants slots bucketed by
@@ -260,9 +297,12 @@ so spirit progression is the spine of character power.
 
 ## Opening / Tutorial
 
-No amnesia trope. Instead:
+No amnesia trope.
+Instead:
 
-> You had a falling-out with your previous spirit. Furious, it **purged all your cards and threw you off a cliff**. You wake at the bottom with nothing.
+> You had a falling-out with your previous spirit.
+> Furious, it **purged all your cards and threw you off a cliff**.
+> You wake at the bottom with nothing.
 
 - Explains the empty start AND teaches the spirit system in the first 30 seconds.
 - The angry spirit is a recurring character: rival, questline, possible late-game reconciliation (win back your original purged cards).
@@ -273,15 +313,18 @@ No amnesia trope. Instead:
 - Gear destruction on death → permanent demand for crafting and gear drops.
 - Card merging + spirit sacrifice → card sinks; duplicates always have value.
 - **Trading:** cards are freely tradeable (every card has value to _some_ build —
-  see emergent classes). Gear trading rules TBD. No card _drops_ on death (loss
-  only, mitigated by spirit retention).
+  see emergent classes).
+  Gear trading rules TBD.
+  No card _drops_ on death (loss only, mitigated by spirit retention).
 
 ## Leveling & Progression
 
 ### Philosophy
 
-Permadeath is only fun if _getting back_ is fast. The frustration equation is:
-**time lost on death = hours to re-reach prior level**. The spirit system
+Permadeath is only fun if _getting back_ is fast.
+The frustration equation is:
+**time lost on death = hours to re-reach prior level**.
+The spirit system
 covers what you _keep_ (cards); the leveling design covers how fast you _recover_.
 Both must work together to make death feel tense rather than catastrophic.
 
@@ -289,7 +332,7 @@ Both must work together to make death feel tense rather than catastrophic.
 
 Three arcs, each with a distinct feel:
 
-**Levels 1–10: The Foundation (tutorial arc)**
+#### Levels 1–10: The Foundation (tutorial arc)
 
 - Estimated time first playthrough: ~3–5 hours.
 - Introduces combat, the spirit system, card equipping, and the first zone.
@@ -300,7 +343,7 @@ Three arcs, each with a distinct feel:
 - Unlocks: 4 active / 2 passive hand slots, spirit bonding, first open zone.
 - Level 10 is a **soft account milestone**: the game remembers you did this.
 
-**Levels 10–30: The Awakening (open-world arc)**
+#### Levels 10–30: The Awakening (open-world arc)
 
 - Estimated time: ~15–20 hours from level 10.
 - New zones open roughly every 5 levels (mix of soft recommendation and hard
@@ -309,7 +352,7 @@ Three arcs, each with a distinct feel:
 - Hand slots grow toward 8 active / 4 passive via spirit leveling.
 - This is the heart of the game — most deaths happen here; most re-runs start here.
 
-**Levels 30–50: The Deep Game (endgame arc)**
+#### Levels 30–50: The Deep Game (endgame arc)
 
 - Estimated time: ~25–35 hours from level 30.
 - Dungeons become the primary driver (see Dungeons below).
@@ -319,8 +362,10 @@ Three arcs, each with a distinct feel:
 
 ### XP Curve Design Goals
 
-- Levels 1–10: fast and forgiving. Each level feels like a few quests.
-- Levels 10–30: medium pace. A level per solid play session.
+- Levels 1–10: fast and forgiving.
+  Each level feels like a few quests.
+- Levels 10–30: medium pace.
+  A level per solid play session.
 - Levels 30–50: slower, but dungeon rewards make it feel earned not ground.
 - **After death, re-reaching your prior level should take ~40–50% of the
   original time** — you know what you're doing, the tutorial is skipped,
@@ -337,14 +382,18 @@ Instanced group (or solo) content separate from the open world.
 3. **Abyss** (recommended level 40+) — epic/legendary drops, brutal.
 4. **Hollow** (level 50 only) — endgame loop; legendary gear, best spirits.
    Multiple Hollow tiers (Hollow I → Hollow V, etc.) give infinite scaling
-   goals post-cap. Higher tiers require a "Hollow Key" (rare drop) to enter.
+   goals post-cap.
+   Higher tiers require a "Hollow Key" (rare drop) to enter.
 
-**Permadeath in dungeons:** death is still permanent. However, two softeners
+**Permadeath in dungeons:** death is still permanent.
+However, two softeners
 apply _inside dungeons only_ (see Revival Systems below).
 
-**Why dungeons solve the endgame:** gear is always lost on death. A level-50
+**Why dungeons solve the endgame:** gear is always lost on death.
+A level-50
 player running Hollow V for legendary gear drops has the same gear-churn
-incentive as a level-20 player. The economy never stagnates.
+incentive as a level-20 player.
+The economy never stagnates.
 
 ### Revival Systems
 
@@ -374,15 +423,19 @@ Permanent progress that survives every death — _access and cosmetics, never po
 
 - **Tutorial skip** — unlocked at level 10 (first life only).
 - **Race unlocks** — additional races become available as you hit account XP
-  thresholds (total XP across all lives). Starting race is always available.
+  thresholds (total XP across all lives).
+  Starting race is always available.
 - **Cosmetics** — titles, spirit appearances, character skins earned by
-  account milestones. Pure vanity; never affect power.
+  account milestones.
+  Pure vanity; never affect power.
 - These exist so a long-term player feels that _nothing is ever fully wasted_.
 
 > **Note — no legacy vault:** the personal spirit is the sole cross-death retention
-> mechanism. The spirit's `bond_xp` accumulates across every life and never resets,
+> mechanism.
+> The spirit's `bond_xp` accumulates across every life and never resets,
 > so a veteran player's spirit is meaningfully stronger than a fresh account's —
-> this _is_ the meta-progression. A separate vault would duplicate that function.
+> this _is_ the meta-progression.
+> A separate vault would duplicate that function.
 
 ## Open Questions
 
@@ -400,7 +453,8 @@ Permanent progress that survives every death — _access and cosmetics, never po
   - gear, computed in rules/stats.ts and wired into resolveHit for both
     damageEnemy and enemy casts; item drops on enemy death (ITEM_DROP_CHANCE,
     rarity-weighted + min_level-gated by killer's level), independent of the
-    card roll; gear destroyed on death). Not yet
+    card roll; gear destroyed on death).
+    Not yet
     implemented: a real Race table (computeRaceBase is a single hard-coded
     stub), ward-passive card stats feeding effective_stats, set bonuses,
     difficulty-based item rarity scaling, and armor weight classes as a wear
@@ -411,7 +465,8 @@ Permanent progress that survives every death — _access and cosmetics, never po
     equipment diagram + grouped stat totals with race-base-vs-gear-bonus
     breakdown). item_instance/equipped_item are now public tables (no
     row-level security yet — see ARCHITECTURE.md) so the client can
-    subscribe to them. Blocks: gear economy at scale, itemized build
+    subscribe to them.
+    Blocks: gear economy at scale, itemized build
     identity.
 
 **Resolved:** control scheme (cursor-aimed, PoE-style) · weapon = geometry (range
@@ -468,15 +523,18 @@ Permanent progress that survives every death — _access and cosmetics, never po
 
 ## Tech Stack (decided)
 
-- **Client:** TypeScript + **Phaser** (2D / 2.5D isometric). Browser-based.
+- **Client:** TypeScript + **Phaser** (2D / 2.5D isometric).
+  Browser-based.
   Fixed camera, cursor-aimed controls.
 - **Game backend:** **SpacetimeDB with TypeScript server modules** (added in v1.6, currently beta).
   - Pros: one language end-to-end; networking, real-time sync, subscriptions, persistence built in; proven at MMO scale (BitCraft Online runs on a single module); hot-swappable modules; auto-generated typed client bindings.
   - Risks: TS modules are beta (performance caveats); architecture lock-in to the reducer/transaction model; metered cloud compute (self-hosting as escape hatch).
   - **Hedge:** keep reducers thin; put game-rules logic in plain TS functions so modules could be ported to Rust/C# if needed.
 - **Login / auth server:** a separate, conventional service — owns accounts,
-  sessions, token issuance. The game module trusts a verified identity, not raw
-  credentials. Kept separate for security surface, independent scaling, swappable
+  sessions, token issuance.
+  The game module trusts a verified identity, not raw
+  credentials.
+  Kept separate for security surface, independent scaling, swappable
   auth, and to keep credential handling out of the beta runtime. (See the
   `architect` skill for the seam.)
 - Previously considered and dropped: jMonkeyEngine client (3D too heavy for solo dev), Java backend with virtual threads (SpacetimeDB removes the concurrent-I/O problem virtual threads would have solved).

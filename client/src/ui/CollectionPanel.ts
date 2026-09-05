@@ -1,4 +1,6 @@
 import type { CardDefinition, CardInstance, EquippedCard } from '../db';
+import { computeHandSlots, computeAttunementSlots } from '../handSlots';
+import { ArchTraceables, concerns } from '../../../src/clew/traceables/clew';
 
 const RARITY_COLOR: Record<string, string> = {
   Common: '#aaaaaa',
@@ -7,20 +9,6 @@ const RARITY_COLOR: Record<string, string> = {
   Epic: '#cc44ff',
   Legendary: '#ffcc00',
 };
-
-function computeAttunementSlots(spiritLevel: number): number {
-  return 2 + Math.floor(spiritLevel / 3);
-}
-
-function computeHandSlots(spiritLevel: number): {
-  active: number;
-  passive: number;
-} {
-  return {
-    active: Math.min(10, 3 + Math.floor(spiritLevel / 2)),
-    passive: Math.min(5, 1 + Math.floor(spiritLevel / 4)),
-  };
-}
 
 function rarityTag(tag: string): string {
   return tag.replace(/^["']?(\w+).*/, '$1');
@@ -221,19 +209,39 @@ export class CollectionPanel {
 
   // ── Rendering ──────────────────────────────────────────────────────────────
 
+  /**
+   * Whether the Hand may be changed right now. This client-side `_nearSpirit`
+   * flag is currently the ONLY enforcement of "you can only change your Hand
+   * at a spirit" — the server's equipCard/unequipCard reducers accept the
+   * call unconditionally from anywhere. Anchored here rather than left as an
+   * unremarked read of `_nearSpirit`.
+   */
+  private _spiritGate = concerns(
+    ArchTraceables.ARCH_007_HAND_CHANGES_ONLY_AT_A_SPIRIT_IS_ENFORCED_CLIENT_SIDE_ONLY,
+    function (this: CollectionPanel): boolean {
+      return this._nearSpirit;
+    },
+  );
+
   private _render() {
     const { active: maxActive, passive: maxPassive } = computeHandSlots(
       this._spiritLevel,
     );
-    const maxAttune = computeAttunementSlots(this._spiritLevel);
+    const attunementSlots = computeAttunementSlots(this._spiritLevel);
+    const maxAttune =
+      attunementSlots.common +
+      attunementSlots.uncommon +
+      attunementSlots.rare +
+      attunementSlots.epic +
+      attunementSlots.legendary;
 
-    // Rarity budget for attunement
+    // Rarity budget for attunement — real per-rarity slots from the spirit's level.
     const rarityBudget: Record<string, { cap: number; used: number }> = {
-      Common: { cap: 3, used: 0 },
-      Uncommon: { cap: 2, used: 0 },
-      Rare: { cap: 1, used: 0 },
-      Epic: { cap: 1, used: 0 },
-      Legendary: { cap: 1, used: 0 },
+      Common: { cap: attunementSlots.common, used: 0 },
+      Uncommon: { cap: attunementSlots.uncommon, used: 0 },
+      Rare: { cap: attunementSlots.rare, used: 0 },
+      Epic: { cap: attunementSlots.epic, used: 0 },
+      Legendary: { cap: attunementSlots.legendary, used: 0 },
     };
     let attunedCount = 0;
     for (const inst of this._instances.values()) {
@@ -306,7 +314,7 @@ export class CollectionPanel {
         <div class="sb-grid">${this._renderCollection()}</div>
       </div>
 
-      ${sel && selDef ? this._renderActions(sel, selDef, selEquip, maxActive, maxPassive, attunedCount, maxAttune) : ''}
+      ${sel && selDef ? this._renderActions(sel, selDef, selEquip, maxActive, maxPassive, rarityBudget) : ''}
       ${sel && selDef ? this._renderTooltip(sel, selDef) : ''}
     `;
 
@@ -383,8 +391,7 @@ export class CollectionPanel {
     equip: EquippedCard | null,
     maxActive: number,
     maxPassive: number,
-    attunedCount: number,
-    maxAttune: number,
+    rarityBudget: Record<string, { cap: number; used: number }>,
   ) {
     const type = cardTypeOf(def);
     const isActive = type === 'Active';
@@ -395,11 +402,16 @@ export class CollectionPanel {
       (e) => (e.slotType as any).tag === 'Passive',
     ).length;
     const canEquip =
-      this._nearSpirit &&
+      this._spiritGate() &&
       !equip &&
       (isActive ? usedActive < maxActive : usedPassive < maxPassive);
-    const canUnequip = this._nearSpirit && equip != null;
-    const canAttune = !inst.attuned && attunedCount < maxAttune;
+    const canUnequip = this._spiritGate() && equip != null;
+    // Attunement is gated per-rarity (mirrors the server's toggleAttune),
+    // not a single combined pool — a full "common" budget must not block attuning
+    // a legendary that still has slots free.
+    const rarity = rarityOf(def);
+    const budget = rarityBudget[rarity];
+    const canAttune = !inst.attuned && !!budget && budget.used < budget.cap;
     const canUnattune = inst.attuned && !equip; // can't unattune while equipped
 
     return `<div class="sb-actions">

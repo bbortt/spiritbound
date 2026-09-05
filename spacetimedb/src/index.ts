@@ -39,34 +39,37 @@ import {
 import { resolveHit, resolveHeal } from './rules/combat';
 import { EMPTY_STAT_BLOCK, type StatBlock } from './types';
 import { computeEffectiveStats, computeRaceBase } from './rules/stats';
+import {
+  CARD_DROP_CHANCE,
+  ITEM_DROP_CHANCE,
+  pickWeightedRarity,
+  pickLevelAndRarityGated,
+} from './rules/drops';
+import {
+  distSq,
+  findClosestInRange,
+  decideChasing,
+  hasCastElapsed,
+  decideCooldown,
+  decideResetting,
+  type AggroCandidate,
+} from './rules/enemyAi';
+import {
+  realizes,
+  concerns,
+  SwTraceables,
+  ConTraceables,
+  ArchTraceables,
+  SysTraceables,
+} from '../../src/clew/traceables/clew';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // TUNABLE CONSTANTS  (owned by item-balancer/ability-balancer, see BALANCE.md)
 // ═══════════════════════════════════════════════════════════════════════════════
-
-/** Chance of a ground card drop per enemy death. */
-const CARD_DROP_CHANCE = 0.25;
-/** Chance of a ground item drop per enemy death — independent of the card roll. */
-const ITEM_DROP_CHANCE = 0.2;
-
-/**
- * Rarity weights for both card and item drop rolls. Legendary is 0 — trash
- * mobs never drop legendaries, reserved for bosses/dungeon tiers (BALANCE.md).
- */
-const RARITY_DROP_WEIGHTS: Record<string, number> = {
-  common: 0.6,
-  uncommon: 0.25,
-  rare: 0.12,
-  epic: 0.03,
-  legendary: 0,
-};
-const RARITY_DROP_ORDER = [
-  'common',
-  'uncommon',
-  'rare',
-  'epic',
-  'legendary',
-] as const;
+//
+// CARD_DROP_CHANCE/ITEM_DROP_CHANCE and the rarity-weighting/level-gating pure
+// logic now live in ./rules/drops.ts (see ARCH note in that file's header) —
+// this reducer module only calls into it and writes the result to tables.
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CUSTOM SPACETIMEDB TYPES
@@ -332,45 +335,51 @@ const equippedCard = table(
 );
 
 /** Physical item owned by a CHARACTER (not account) — destroyed on death, the body. */
-const itemInstance = table(
-  {
-    name: 'item_instance',
-    public: true,
-    indexes: [
-      {
-        accessor: 'by_character',
-        algorithm: 'btree',
-        columns: ['ownerCharacterId'],
-      },
-    ],
-  },
-  {
-    itemInstanceId: t.u64().primaryKey().autoInc(),
-    ownerCharacterId: t.u64(),
-    itemDefId: t.u64(),
-    quantity: t.u32(), // 1 for equipment, stackable for consumables
-  },
+const itemInstance = realizes(
+  ArchTraceables.ARCH_001_ITEM_TABLES_PUBLIC_WITH_CLIENT_SIDE_OWNERSHIP_FILTER,
+  table(
+    {
+      name: 'item_instance',
+      public: true,
+      indexes: [
+        {
+          accessor: 'by_character',
+          algorithm: 'btree',
+          columns: ['ownerCharacterId'],
+        },
+      ],
+    },
+    {
+      itemInstanceId: t.u64().primaryKey().autoInc(),
+      ownerCharacterId: t.u64(),
+      itemDefId: t.u64(),
+      quantity: t.u32(), // 1 for equipment, stackable for consumables
+    },
+  ),
 );
 
-const equippedItem = table(
-  {
-    name: 'equipped_item',
-    public: true,
-    indexes: [
-      {
-        accessor: 'by_character',
-        algorithm: 'btree',
-        columns: ['characterId'],
-      },
-    ],
-  },
-  {
-    equippedItemId: t.u64().primaryKey().autoInc(),
-    characterId: t.u64(),
-    itemInstanceId: t.u64(),
-    slot: TEquipSlot,
-    slotOrdinal: t.u32(), // 0/1 for the two rings & two earrings
-  },
+const equippedItem = realizes(
+  ArchTraceables.ARCH_001_ITEM_TABLES_PUBLIC_WITH_CLIENT_SIDE_OWNERSHIP_FILTER,
+  table(
+    {
+      name: 'equipped_item',
+      public: true,
+      indexes: [
+        {
+          accessor: 'by_character',
+          algorithm: 'btree',
+          columns: ['characterId'],
+        },
+      ],
+    },
+    {
+      equippedItemId: t.u64().primaryKey().autoInc(),
+      characterId: t.u64(),
+      itemInstanceId: t.u64(),
+      slot: TEquipSlot,
+      slotOrdinal: t.u32(), // 0/1 for the two rings & two earrings
+    },
+  ),
 );
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -590,44 +599,47 @@ export const init = db.init((ctx) => {
 // REDUCERS — card seeding
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function _doSeedCards(ctx: any): void {
-  let inserted = 0;
-  let updated = 0;
+const _doSeedCards = realizes(
+  SwTraceables.SW_030_SEEDING_UPSERTS_CONTENT_BY_SLUG_RE_RUNNING_IS_ALWAYS_SAFE,
+  function _doSeedCards(ctx: any): void {
+    let inserted = 0;
+    let updated = 0;
 
-  for (let i = 0; i < CARD_DEFS.length; i++) {
-    const card = CARD_DEFS[i];
-    const cardDefId = i + 1; // stable 1-based ID; slug is the idempotency key
+    for (let i = 0; i < CARD_DEFS.length; i++) {
+      const card = CARD_DEFS[i];
+      const cardDefId = i + 1; // stable 1-based ID; slug is the idempotency key
 
-    const rowData = {
-      slug: card.slug,
-      name: card.name,
-      rarity: { tag: card.rarity },
-      cardType: { tag: card.type },
-      passiveKind: { tag: card.passiveKind ?? 'none' },
-      scalingSchool: { tag: card.school },
-      baseShape: { tag: card.shape },
-      basePower: card.basePower,
-      baseCooldown: card.cooldownSeconds,
-      mpCost: card.mpCost,
-      minCharacterLevel: card.minLevel,
-      flavor: card.flavor,
-    };
+      const rowData = {
+        slug: card.slug,
+        name: card.name,
+        rarity: { tag: card.rarity },
+        cardType: { tag: card.type },
+        passiveKind: { tag: card.passiveKind ?? 'none' },
+        scalingSchool: { tag: card.school },
+        baseShape: { tag: card.shape },
+        basePower: card.basePower,
+        baseCooldown: card.cooldownSeconds,
+        mpCost: card.mpCost,
+        minCharacterLevel: card.minLevel,
+        flavor: card.flavor,
+      };
 
-    const existing = ctx.db.cardDefinition.slug.find(card.slug);
-    if (existing) {
-      ctx.db.cardDefinition.cardDefId.update({
-        cardDefId: existing.cardDefId,
-        ...rowData,
-      });
-      updated++;
-    } else {
-      ctx.db.cardDefinition.insert({ cardDefId, ...rowData });
-      inserted++;
+      const existing = ctx.db.cardDefinition.slug.find(card.slug);
+      if (existing) {
+        ctx.db.cardDefinition.cardDefId.update({
+          cardDefId: existing.cardDefId,
+          ...rowData,
+        });
+        updated++;
+      } else {
+        ctx.db.cardDefinition.insert({ cardDefId, ...rowData });
+        inserted++;
+      }
     }
-  }
 
-  console.log(`[seedCards] ${inserted} inserted, ${updated} updated`);
-}
+    console.log(`[seedCards] ${inserted} inserted, ${updated} updated`);
+  },
+);
 
 /**
  * seedCards — upserts all cards from content/cards.json into cardDefinition.
@@ -641,44 +653,49 @@ export const seedCards = db.reducer({}, (ctx) => {
 // REDUCERS — item seeding
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function _doSeedItems(ctx: any): void {
-  let inserted = 0;
-  let updated = 0;
+const _doSeedItems = realizes(
+  SwTraceables.SW_030_SEEDING_UPSERTS_CONTENT_BY_SLUG_RE_RUNNING_IS_ALWAYS_SAFE,
+  function _doSeedItems(ctx: any): void {
+    let inserted = 0;
+    let updated = 0;
 
-  for (const item of ITEM_DEFS) {
-    const rowData = {
-      slug: item.slug,
-      name: item.name,
-      rarity: { tag: item.rarity },
-      minLevel: item.minLevel,
-      category: { tag: item.category },
-      slot: item.slot ? { tag: item.slot } : undefined,
-      armorWeight: item.armorWeight ? { tag: item.armorWeight } : undefined,
-      weaponSchool: item.weaponSchool ? { tag: item.weaponSchool } : undefined,
-      geometryShape: item.geometryShape
-        ? { tag: item.geometryShape }
-        : undefined,
-      geometryWidth: item.geometryWidth ?? undefined,
-      geometryRange: item.geometryRange ?? undefined,
-      statModifiers: { ...ZERO_STAT_MODIFIERS, ...item.stats },
-      flavor: item.flavor,
-    };
+    for (const item of ITEM_DEFS) {
+      const rowData = {
+        slug: item.slug,
+        name: item.name,
+        rarity: { tag: item.rarity },
+        minLevel: item.minLevel,
+        category: { tag: item.category },
+        slot: item.slot ? { tag: item.slot } : undefined,
+        armorWeight: item.armorWeight ? { tag: item.armorWeight } : undefined,
+        weaponSchool: item.weaponSchool
+          ? { tag: item.weaponSchool }
+          : undefined,
+        geometryShape: item.geometryShape
+          ? { tag: item.geometryShape }
+          : undefined,
+        geometryWidth: item.geometryWidth ?? undefined,
+        geometryRange: item.geometryRange ?? undefined,
+        statModifiers: { ...ZERO_STAT_MODIFIERS, ...item.stats },
+        flavor: item.flavor,
+      };
 
-    const existing = ctx.db.itemDefinition.slug.find(item.slug);
-    if (existing) {
-      ctx.db.itemDefinition.itemDefId.update({
-        itemDefId: existing.itemDefId,
-        ...rowData,
-      });
-      updated++;
-    } else {
-      ctx.db.itemDefinition.insert({ itemDefId: 0n, ...rowData });
-      inserted++;
+      const existing = ctx.db.itemDefinition.slug.find(item.slug);
+      if (existing) {
+        ctx.db.itemDefinition.itemDefId.update({
+          itemDefId: existing.itemDefId,
+          ...rowData,
+        });
+        updated++;
+      } else {
+        ctx.db.itemDefinition.insert({ itemDefId: 0n, ...rowData });
+        inserted++;
+      }
     }
-  }
 
-  console.log(`[seedItems] ${inserted} inserted, ${updated} updated`);
-}
+    console.log(`[seedItems] ${inserted} inserted, ${updated} updated`);
+  },
+);
 
 /**
  * seedItems — upserts all items from content/equipment.json into itemDefinition.
@@ -735,34 +752,37 @@ function _findEquippedWeapon(ctx: any, characterId: bigint): any | null {
  * then scale currentHp/currentMp by the same ratio (never just clamp — gaining
  * maxHp should feel like a gain, not a wasted overflow).
  */
-function _withProportionalResourceUpdate(
-  ctx: any,
-  char: any,
-  mutate: () => void,
-): void {
-  const before = buildEffectiveStats(ctx, char);
-  mutate();
-  const after = buildEffectiveStats(ctx, char);
-  const fresh = ctx.db.character.characterId.find(char.characterId);
-  if (!fresh) return;
+const _withProportionalResourceUpdate = realizes(
+  SwTraceables.SW_003_GEAR_CHANGE_RESCALES_CURRENT_HP_MP_PROPORTIONALLY,
+  function _withProportionalResourceUpdate(
+    ctx: any,
+    char: any,
+    mutate: () => void,
+  ): void {
+    const before = buildEffectiveStats(ctx, char);
+    mutate();
+    const after = buildEffectiveStats(ctx, char);
+    const fresh = ctx.db.character.characterId.find(char.characterId);
+    if (!fresh) return;
 
-  const hpRatio = before.maxHp > 0 ? after.maxHp / before.maxHp : 1;
-  const mpRatio = before.maxMp > 0 ? after.maxMp / before.maxMp : 1;
-  const newHp = Math.max(
-    1,
-    Math.min(after.maxHp, Math.round(fresh.currentHp * hpRatio)),
-  );
-  const newMp = Math.max(
-    0,
-    Math.min(after.maxMp, Math.round(fresh.currentMp * mpRatio)),
-  );
+    const hpRatio = before.maxHp > 0 ? after.maxHp / before.maxHp : 1;
+    const mpRatio = before.maxMp > 0 ? after.maxMp / before.maxMp : 1;
+    const newHp = Math.max(
+      1,
+      Math.min(after.maxHp, Math.round(fresh.currentHp * hpRatio)),
+    );
+    const newMp = Math.max(
+      0,
+      Math.min(after.maxMp, Math.round(fresh.currentMp * mpRatio)),
+    );
 
-  ctx.db.character.characterId.update({
-    ...fresh,
-    currentHp: newHp,
-    currentMp: newMp,
-  });
-}
+    ctx.db.character.characterId.update({
+      ...fresh,
+      currentHp: newHp,
+      currentMp: newMp,
+    });
+  },
+);
 
 /**
  * Shared damage path for anything that hits a character: resolves the hit through
@@ -770,42 +790,45 @@ function _withProportionalResourceUpdate(
  * currentHp (or triggers death). cardBaseShape/weapon fields only affect the
  * returned geometry, not the damage number, so safe defaults are fine here.
  */
-function _resolveAndApplyDamage(
-  ctx: any,
-  target: any,
-  params: {
-    cardBasePower: number;
-    cardSchool: 'physical' | 'magical';
-    cardBaseShape: 'cone' | 'line' | 'arc' | 'circle';
-    attackerStats: StatBlock;
-    attackerLevel: number;
-    weaponSchool?: 'physical' | 'magical';
-    weaponWidth?: number;
-    weaponRange?: number;
-  },
-): void {
-  const defenderStats = buildEffectiveStats(ctx, target);
-  const result = resolveHit({
-    cardBasePower: params.cardBasePower,
-    cardMergeLevel: 0,
-    cardSchool: params.cardSchool,
-    cardBaseShape: params.cardBaseShape,
-    characterLevel: params.attackerLevel,
-    weaponSchool: params.weaponSchool ?? params.cardSchool,
-    weaponWidth: params.weaponWidth ?? 0.4,
-    weaponRange: params.weaponRange ?? 150,
-    attackerStats: params.attackerStats,
-    defenderStats,
-    randomRoll: ctx.random(),
-  });
+const _resolveAndApplyDamage = realizes(
+  ArchTraceables.ARCH_003_CLIENT_CONFIRMS_HIT_GEOMETRY_SERVER_RESOLVES_DAMAGE,
+  function _resolveAndApplyDamage(
+    ctx: any,
+    target: any,
+    params: {
+      cardBasePower: number;
+      cardSchool: 'physical' | 'magical';
+      cardBaseShape: 'cone' | 'line' | 'arc' | 'circle';
+      attackerStats: StatBlock;
+      attackerLevel: number;
+      weaponSchool?: 'physical' | 'magical';
+      weaponWidth?: number;
+      weaponRange?: number;
+    },
+  ): void {
+    const defenderStats = buildEffectiveStats(ctx, target);
+    const result = resolveHit({
+      cardBasePower: params.cardBasePower,
+      cardMergeLevel: 0,
+      cardSchool: params.cardSchool,
+      cardBaseShape: params.cardBaseShape,
+      characterLevel: params.attackerLevel,
+      weaponSchool: params.weaponSchool ?? params.cardSchool,
+      weaponWidth: params.weaponWidth ?? 0.4,
+      weaponRange: params.weaponRange ?? 150,
+      attackerStats: params.attackerStats,
+      defenderStats,
+      randomRoll: ctx.random(),
+    });
 
-  const newHp = target.currentHp - result.damage;
-  if (newHp <= 0) {
-    _handleDeath(ctx, target);
-  } else {
-    ctx.db.character.characterId.update({ ...target, currentHp: newHp });
-  }
-}
+    const newHp = target.currentHp - result.damage;
+    if (newHp <= 0) {
+      _handleDeath(ctx, target);
+    } else {
+      ctx.db.character.characterId.update({ ...target, currentHp: newHp });
+    }
+  },
+);
 
 /**
  * Award XP to a character — bumps character.xp/level AND
@@ -813,42 +836,51 @@ function _resolveAndApplyDamage(
  * Shared by the public grantXp reducer and the kill-XP path in damageEnemy,
  * so there is exactly one place this logic lives.
  */
-function _grantXp(ctx: any, char: any, amount: bigint): void {
-  const newXp = char.xp + amount;
-  const newLevel = computeCharacterLevel(newXp);
-  const leveledUp = newLevel > char.level;
+const _grantXp = realizes(
+  ArchTraceables.ARCH_005_HP_MP_REFILL_ON_LEVEL_UP_IS_SERVER_SIDE_NOT_CLIENT,
+  realizes(
+    [
+      SwTraceables.SW_019_GRANT_XP_RAISES_PER_LIFE_XP_AND_LIFETIME_XP_IN_ONE_CALL,
+      SwTraceables.SW_020_A_LEVEL_INCREASE_REFILLS_HP_MP_AND_STAMPS_THE_LEVEL_UP_TIMESTAMP,
+    ] as const,
+    function _grantXp(ctx: any, char: any, amount: bigint): void {
+      const newXp = char.xp + amount;
+      const newLevel = computeCharacterLevel(newXp);
+      const leveledUp = newLevel > char.level;
 
-  // Leveling up refills HP/MP to the new max. This is done here (server-side,
-  // persisted) rather than as a client-side illusion, since currentHp is
-  // permadeath-sensitive and must stay authoritative — the client's level-up
-  // flourish just reacts to lastLevelUpAt/currentHp changing, it doesn't set them.
-  let currentHp = char.currentHp;
-  let currentMp = char.currentMp;
-  if (leveledUp) {
-    const maxes = buildEffectiveStats(ctx, char);
-    currentHp = maxes.maxHp;
-    currentMp = maxes.maxMp;
-  }
+      // Leveling up refills HP/MP to the new max. This is done here (server-side,
+      // persisted) rather than as a client-side illusion, since currentHp is
+      // permadeath-sensitive and must stay authoritative — the client's level-up
+      // flourish just reacts to lastLevelUpAt/currentHp changing, it doesn't set them.
+      let currentHp = char.currentHp;
+      let currentMp = char.currentMp;
+      if (leveledUp) {
+        const maxes = buildEffectiveStats(ctx, char);
+        currentHp = maxes.maxHp;
+        currentMp = maxes.maxMp;
+      }
 
-  ctx.db.character.characterId.update({
-    ...char,
-    xp: newXp,
-    level: newLevel,
-    currentHp,
-    currentMp,
-    lastLevelUpAt: leveledUp ? ctx.timestamp : char.lastLevelUpAt,
-  });
+      ctx.db.character.characterId.update({
+        ...char,
+        xp: newXp,
+        level: newLevel,
+        currentHp,
+        currentMp,
+        lastLevelUpAt: leveledUp ? ctx.timestamp : char.lastLevelUpAt,
+      });
 
-  const progress = ctx.db.accountProgress.accountIdentity.find(
-    char.accountIdentity,
-  );
-  if (progress) {
-    ctx.db.accountProgress.accountIdentity.update({
-      ...progress,
-      totalXpAllLives: progress.totalXpAllLives + amount,
-    });
-  }
-}
+      const progress = ctx.db.accountProgress.accountIdentity.find(
+        char.accountIdentity,
+      );
+      if (progress) {
+        ctx.db.accountProgress.accountIdentity.update({
+          ...progress,
+          totalXpAllLives: progress.totalXpAllLives + amount,
+        });
+      }
+    },
+  ),
+);
 
 function _seedZone1Enemies(ctx: any): void {
   const TILE = 48;
@@ -880,7 +912,10 @@ function _seedZone1Enemies(ctx: any): void {
       castDurationSeconds: 1.8,
       castShape: { tag: 'circle' },
       castDamage: 15,
-      xpReward: 25n,
+      xpReward: concerns(
+        ConTraceables.CON_007_EVERY_ENEMY_CURRENTLY_AWARDS_A_FLAT_XP_REWARD,
+        25n,
+      ),
     });
   }
 }
@@ -997,79 +1032,94 @@ export const applyDamage = db.reducer(
 
 // ─── Internal: permadeath handler ─────────────────────────────────────────────
 
-function _handleDeath(ctx: any, char: any): void {
-  ctx.db.character.characterId.update({
-    ...char,
-    alive: false,
-    currentHp: 0,
-    diedAt: ctx.timestamp,
-  });
+const _handleDeath = concerns(
+  SysTraceables.SYS_006_DEATH_DESTROYS_GEAR_AND_UN_ATTUNED_CARDS_KEEPS_ONLY_WHAT_WAS_ATTUNED,
+  realizes(
+    [
+      SwTraceables.SW_026_DEATH_ALWAYS_DESTROYS_GEAR_AND_A_SPIRITLESS_ACCOUNT_LOSES_EVERY_CARD,
+      ConTraceables.CON_008_FIRST_REACHING_LEVEL_TEN_STAMPS_TUTORIAL_COMPLETED_EXACTLY_ONCE,
+    ] as const,
+    function _handleDeath(ctx: any, char: any): void {
+      ctx.db.character.characterId.update({
+        ...char,
+        alive: false,
+        currentHp: 0,
+        diedAt: ctx.timestamp,
+      });
 
-  const hand = [...ctx.db.equippedCard.by_character.filter(char.characterId)];
-  for (const slot of hand) {
-    ctx.db.equippedCard.equippedCardId.delete(slot.equippedCardId);
-  }
+      const hand = [
+        ...ctx.db.equippedCard.by_character.filter(char.characterId),
+      ];
+      for (const slot of hand) {
+        ctx.db.equippedCard.equippedCardId.delete(slot.equippedCardId);
+      }
 
-  // "Gear is your body" — no exceptions. Equipped items and the underlying
-  // ItemInstances (character-owned, unlike account-owned CardInstances) are
-  // destroyed outright, not retained like attuned cards.
-  const gear = [...ctx.db.equippedItem.by_character.filter(char.characterId)];
-  for (const g of gear) {
-    ctx.db.equippedItem.equippedItemId.delete(g.equippedItemId);
-  }
-  const items = [...ctx.db.itemInstance.by_character.filter(char.characterId)];
-  for (const it of items) {
-    ctx.db.itemInstance.itemInstanceId.delete(it.itemInstanceId);
-  }
+      // "Gear is your body" — no exceptions. Equipped items and the underlying
+      // ItemInstances (character-owned, unlike account-owned CardInstances) are
+      // destroyed outright, not retained like attuned cards.
+      const gear = [
+        ...ctx.db.equippedItem.by_character.filter(char.characterId),
+      ];
+      for (const g of gear) {
+        ctx.db.equippedItem.equippedItemId.delete(g.equippedItemId);
+      }
+      const items = [
+        ...ctx.db.itemInstance.by_character.filter(char.characterId),
+      ];
+      for (const it of items) {
+        ctx.db.itemInstance.itemInstanceId.delete(it.itemInstanceId);
+      }
 
-  const spirit = ctx.db.personalSpirit.accountIdentity.find(
-    char.accountIdentity,
-  );
-  if (!spirit) {
-    const allCards = [
-      ...ctx.db.cardInstance.by_owner.filter(char.accountIdentity),
-    ];
-    for (const ci of allCards) {
-      ctx.db.cardInstance.cardInstanceId.delete(ci.cardInstanceId);
-    }
-    return;
-  }
+      const spirit = ctx.db.personalSpirit.accountIdentity.find(
+        char.accountIdentity,
+      );
+      if (!spirit) {
+        const allCards = [
+          ...ctx.db.cardInstance.by_owner.filter(char.accountIdentity),
+        ];
+        for (const ci of allCards) {
+          ctx.db.cardInstance.cardInstanceId.delete(ci.cardInstanceId);
+        }
+        return;
+      }
 
-  const slots = computeAttunementSlots(spirit.level);
-  const cards: CardForRetention[] = [
-    ...ctx.db.cardInstance.by_owner.filter(char.accountIdentity),
-  ].map((ci: any) => {
-    const def = ctx.db.cardDefinition.cardDefId.find(ci.cardDefId);
-    return {
-      cardInstanceId: ci.cardInstanceId,
-      rarity: (def?.rarity.tag ?? 'common') as any,
-      attuned: ci.attuned,
-    };
-  });
+      const slots = computeAttunementSlots(spirit.level);
+      const cards: CardForRetention[] = [
+        ...ctx.db.cardInstance.by_owner.filter(char.accountIdentity),
+      ].map((ci: any) => {
+        const def = ctx.db.cardDefinition.cardDefId.find(ci.cardDefId);
+        return {
+          cardInstanceId: ci.cardInstanceId,
+          rarity: (def?.rarity.tag ?? 'common') as any,
+          attuned: ci.attuned,
+        };
+      });
 
-  const { lost } = computeRetention(cards, slots);
-  for (const id of lost) {
-    ctx.db.cardInstance.cardInstanceId.delete(id);
-  }
+      const { lost } = computeRetention(cards, slots);
+      for (const id of lost) {
+        ctx.db.cardInstance.cardInstanceId.delete(id);
+      }
 
-  const progress = ctx.db.accountProgress.accountIdentity.find(
-    char.accountIdentity,
-  );
-  if (progress && char.level >= 10 && !progress.tutorialCompleted) {
-    ctx.db.accountProgress.accountIdentity.update({
-      ...progress,
-      tutorialCompleted: true,
-    });
-  }
-}
+      const progress = ctx.db.accountProgress.accountIdentity.find(
+        char.accountIdentity,
+      );
+      if (progress && char.level >= 10 && !progress.tutorialCompleted) {
+        ctx.db.accountProgress.accountIdentity.update({
+          ...progress,
+          tutorialCompleted: true,
+        });
+      }
+    },
+  ),
+);
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // REDUCERS — spirit
 // ═══════════════════════════════════════════════════════════════════════════════
 
-export const sacrificeCard = db.reducer(
-  { cardInstanceId: t.u64() },
-  (ctx, { cardInstanceId }) => {
+export const sacrificeCard = realizes(
+  SwTraceables.SW_029_SACRIFICING_A_CARD_PERMANENTLY_REMOVES_IT_FROM_THE_COLLECTION,
+  db.reducer({ cardInstanceId: t.u64() }, (ctx, { cardInstanceId }) => {
     const card = ctx.db.cardInstance.cardInstanceId.find(cardInstanceId);
     if (!card || !card.ownerIdentity.equals(ctx.sender))
       throw new SenderError('Card not found or not owned');
@@ -1091,12 +1141,12 @@ export const sacrificeCard = db.reducer(
       bondXp: newBondXp,
       level: newLevel,
     });
-  },
+  }),
 );
 
-export const toggleAttune = db.reducer(
-  { cardInstanceId: t.u64() },
-  (ctx, { cardInstanceId }) => {
+export const toggleAttune = realizes(
+  SwTraceables.SW_025_ATTUNING_PAST_A_RARITY_SLOT_BUDGET_IS_REJECTED_UN_ATTUNING_NEVER_IS,
+  db.reducer({ cardInstanceId: t.u64() }, (ctx, { cardInstanceId }) => {
     const card = ctx.db.cardInstance.cardInstanceId.find(cardInstanceId);
     if (!card || !card.ownerIdentity.equals(ctx.sender))
       throw new SenderError('Card not found or not owned');
@@ -1128,60 +1178,70 @@ export const toggleAttune = db.reducer(
       ...card,
       attuned: !card.attuned,
     });
-  },
+  }),
 );
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // REDUCERS — hand management
 // ═══════════════════════════════════════════════════════════════════════════════
 
-export const equipCard = db.reducer(
-  { cardInstanceId: t.u64(), slotType: TCardType, slotIndex: t.u32() },
-  (ctx, { cardInstanceId, slotType, slotIndex }) => {
-    const char = activeCharacter(ctx);
-    if (!char) throw new SenderError('No active character');
+export const equipCard = concerns(
+  SysTraceables.SYS_007_THE_HAND_IS_A_SPIRIT_LEVEL_GATED_CARD_LOADOUT,
+  realizes(
+    SwTraceables.SW_028_EQUIP_CARD_ENFORCES_LEVEL_GATE_AND_HAND_SLOT_CAP_REPLACING_ONLY_THE_EXACT_SLOT,
+    db.reducer(
+      { cardInstanceId: t.u64(), slotType: TCardType, slotIndex: t.u32() },
+      (ctx, { cardInstanceId, slotType, slotIndex }) => {
+        const char = activeCharacter(ctx);
+        if (!char) throw new SenderError('No active character');
 
-    const card = ctx.db.cardInstance.cardInstanceId.find(cardInstanceId);
-    if (!card || !card.ownerIdentity.equals(ctx.sender))
-      throw new SenderError('Card not found or not owned');
+        const card = ctx.db.cardInstance.cardInstanceId.find(cardInstanceId);
+        if (!card || !card.ownerIdentity.equals(ctx.sender))
+          throw new SenderError('Card not found or not owned');
 
-    const def = ctx.db.cardDefinition.cardDefId.find(card.cardDefId);
-    if (!def) throw new SenderError('Card definition missing');
+        const def = ctx.db.cardDefinition.cardDefId.find(card.cardDefId);
+        if (!def) throw new SenderError('Card definition missing');
 
-    if (def.minCharacterLevel > char.level)
-      throw new SenderError(
-        `Requires character level ${def.minCharacterLevel} (you are ${char.level})`,
-      );
+        if (def.minCharacterLevel > char.level)
+          throw new SenderError(
+            `Requires character level ${def.minCharacterLevel} (you are ${char.level})`,
+          );
 
-    const spirit = ctx.db.personalSpirit.accountIdentity.find(ctx.sender);
-    if (!spirit) throw new SenderError('No spirit bonded');
+        const spirit = ctx.db.personalSpirit.accountIdentity.find(ctx.sender);
+        if (!spirit) throw new SenderError('No spirit bonded');
 
-    const handSlots = computeHandSlots(spirit.level);
-    const hand = [...ctx.db.equippedCard.by_character.filter(char.characterId)];
-    const tag = slotType.tag as 'active' | 'passive';
-    const count = hand.filter((e: any) => e.slotType.tag === tag).length;
-    const cap = tag === 'active' ? handSlots.active : handSlots.passive;
+        const handSlots = computeHandSlots(spirit.level);
+        const hand = [
+          ...ctx.db.equippedCard.by_character.filter(char.characterId),
+        ];
+        const tag = slotType.tag as 'active' | 'passive';
+        const count = hand.filter((e: any) => e.slotType.tag === tag).length;
+        const cap = tag === 'active' ? handSlots.active : handSlots.passive;
 
-    const existingInSlot = hand.find(
-      (e: any) => e.slotType.tag === tag && e.slotIndex === slotIndex,
-    );
-    if (!existingInSlot && count >= cap)
-      throw new SenderError(
-        `${tag} hand is full (${count}/${cap} — spirit level ${spirit.level})`,
-      );
+        const existingInSlot = hand.find(
+          (e: any) => e.slotType.tag === tag && e.slotIndex === slotIndex,
+        );
+        if (!existingInSlot && count >= cap)
+          throw new SenderError(
+            `${tag} hand is full (${count}/${cap} — spirit level ${spirit.level})`,
+          );
 
-    if (existingInSlot) {
-      ctx.db.equippedCard.equippedCardId.delete(existingInSlot.equippedCardId);
-    }
+        if (existingInSlot) {
+          ctx.db.equippedCard.equippedCardId.delete(
+            existingInSlot.equippedCardId,
+          );
+        }
 
-    ctx.db.equippedCard.insert({
-      equippedCardId: 0n,
-      characterId: char.characterId,
-      cardInstanceId,
-      slotType,
-      slotIndex,
-    });
-  },
+        ctx.db.equippedCard.insert({
+          equippedCardId: 0n,
+          characterId: char.characterId,
+          cardInstanceId,
+          slotType,
+          slotIndex,
+        });
+      },
+    ),
+  ),
 );
 
 export const unequipCard = db.reducer(
@@ -1202,40 +1262,52 @@ export const unequipCard = db.reducer(
 // REDUCERS — equipment
 // ═══════════════════════════════════════════════════════════════════════════════
 
-export const equipItem = db.reducer(
-  { itemInstanceId: t.u64(), slot: TEquipSlot, slotOrdinal: t.u32() },
-  (ctx, { itemInstanceId, slot, slotOrdinal }) => {
-    const char = activeCharacter(ctx);
-    if (!char) throw new SenderError('No active character');
+export const equipItem = concerns(
+  SysTraceables.SYS_001_EQUIP_GEAR_TO_CHANGE_COMBAT_STATS,
+  realizes(
+    [
+      SwTraceables.SW_001_EQUIP_REQUIRES_OWNERSHIP_AND_MATCHING_SLOT,
+      SwTraceables.SW_002_EQUIP_AUTO_REPLACES_SAME_SLOT_ORDINAL_OCCUPANT,
+    ] as const,
+    db.reducer(
+      { itemInstanceId: t.u64(), slot: TEquipSlot, slotOrdinal: t.u32() },
+      (ctx, { itemInstanceId, slot, slotOrdinal }) => {
+        const char = activeCharacter(ctx);
+        if (!char) throw new SenderError('No active character');
 
-    const inst = ctx.db.itemInstance.itemInstanceId.find(itemInstanceId);
-    if (!inst || inst.ownerCharacterId !== char.characterId)
-      throw new SenderError('Item not found or not owned');
+        const inst = ctx.db.itemInstance.itemInstanceId.find(itemInstanceId);
+        if (!inst || inst.ownerCharacterId !== char.characterId)
+          throw new SenderError('Item not found or not owned');
 
-    const def = ctx.db.itemDefinition.itemDefId.find(inst.itemDefId);
-    if (!def || !def.slot) throw new SenderError('Item is not equippable');
-    if (def.slot.tag !== slot.tag)
-      throw new SenderError(`Item belongs in ${def.slot.tag}, not ${slot.tag}`);
+        const def = ctx.db.itemDefinition.itemDefId.find(inst.itemDefId);
+        if (!def || !def.slot) throw new SenderError('Item is not equippable');
+        if (def.slot.tag !== slot.tag)
+          throw new SenderError(
+            `Item belongs in ${def.slot.tag}, not ${slot.tag}`,
+          );
 
-    _withProportionalResourceUpdate(ctx, char, () => {
-      const existing = [
-        ...ctx.db.equippedItem.by_character.filter(char.characterId),
-      ].find(
-        (s: any) => s.slot.tag === slot.tag && s.slotOrdinal === slotOrdinal,
-      );
-      if (existing) {
-        ctx.db.equippedItem.equippedItemId.delete(existing.equippedItemId);
-      }
+        _withProportionalResourceUpdate(ctx, char, () => {
+          const existing = [
+            ...ctx.db.equippedItem.by_character.filter(char.characterId),
+          ].find(
+            (s: any) =>
+              s.slot.tag === slot.tag && s.slotOrdinal === slotOrdinal,
+          );
+          if (existing) {
+            ctx.db.equippedItem.equippedItemId.delete(existing.equippedItemId);
+          }
 
-      ctx.db.equippedItem.insert({
-        equippedItemId: 0n,
-        characterId: char.characterId,
-        itemInstanceId,
-        slot,
-        slotOrdinal,
-      });
-    });
-  },
+          ctx.db.equippedItem.insert({
+            equippedItemId: 0n,
+            characterId: char.characterId,
+            itemInstanceId,
+            slot,
+            slotOrdinal,
+          });
+        });
+      },
+    ),
+  ),
 );
 
 export const unequipItem = db.reducer(
@@ -1286,7 +1358,10 @@ export const spawnEnemy = db.reducer(
       castDurationSeconds: 1.8,
       castShape: { tag: 'circle' },
       castDamage: 15,
-      xpReward: 25n,
+      xpReward: concerns(
+        ConTraceables.CON_007_EVERY_ENEMY_CURRENTLY_AWARDS_A_FLAT_XP_REWARD,
+        25n,
+      ),
     });
   },
 );
@@ -1298,173 +1373,169 @@ export const spawnEnemy = db.reducer(
  * the sole authority on how much damage that becomes — cardDefId 0 means a bare
  * weapon swing (no card), matching cardDefinition's 1-based ids.
  */
-export const damageEnemy = db.reducer(
-  { enemyId: t.u64(), cardDefId: t.u32() },
-  (ctx, { enemyId, cardDefId }) => {
-    const char = activeCharacter(ctx);
-    if (!char) throw new SenderError('No active character');
+export const damageEnemy = realizes(
+  ArchTraceables.ARCH_003_CLIENT_CONFIRMS_HIT_GEOMETRY_SERVER_RESOLVES_DAMAGE,
+  realizes(
+    SwTraceables.SW_008_BARE_WEAPON_SWING_SUBSTITUTES_WEAPON_STATS_FOR_A_CARD,
+    db.reducer(
+      { enemyId: t.u64(), cardDefId: t.u32() },
+      (ctx, { enemyId, cardDefId }) => {
+        const char = activeCharacter(ctx);
+        if (!char) throw new SenderError('No active character');
 
-    const e = ctx.db.enemy.enemyId.find(enemyId);
-    if (!e || !e.alive) return;
-    if (e.zoneId !== char.zoneId)
-      throw new SenderError('Enemy not in same zone');
+        const e = ctx.db.enemy.enemyId.find(enemyId);
+        if (!e || !e.alive) return;
+        if (e.zoneId !== char.zoneId)
+          throw new SenderError('Enemy not in same zone');
 
-    const weapon = _findEquippedWeapon(ctx, char.characterId);
-    const weaponSchool = (weapon?.weaponSchool?.tag ?? 'physical') as
-      'physical' | 'magical';
-    const weaponWidth = weapon?.geometryWidth ?? 0.4;
-    const weaponRange = weapon?.geometryRange ?? 150;
-    const attackerStats = buildEffectiveStats(ctx, char);
+        const weapon = _findEquippedWeapon(ctx, char.characterId);
+        const weaponSchool = (weapon?.weaponSchool?.tag ?? 'physical') as
+          'physical' | 'magical';
+        const weaponWidth = weapon?.geometryWidth ?? 0.4;
+        const weaponRange = weapon?.geometryRange ?? 150;
+        const attackerStats = buildEffectiveStats(ctx, char);
 
-    let cardBasePower: number;
-    let cardSchool: 'physical' | 'magical';
-    let cardBaseShape: 'cone' | 'line' | 'arc' | 'circle';
+        let cardBasePower: number;
+        let cardSchool: 'physical' | 'magical';
+        let cardBaseShape: 'cone' | 'line' | 'arc' | 'circle';
 
-    if (cardDefId !== 0) {
-      const def = ctx.db.cardDefinition.cardDefId.find(cardDefId);
-      if (!def) throw new SenderError('Card definition not found');
-      cardBasePower = def.basePower;
-      cardSchool = def.scalingSchool.tag as 'physical' | 'magical';
-      cardBaseShape = def.baseShape.tag as 'cone' | 'line' | 'arc' | 'circle';
-    } else {
-      // Bare weapon swing — no card. Feeds the weapon's own weaponDamage stat
-      // through the same scaling/mitigation pipeline as a card cast.
-      cardBasePower = attackerStats.weaponDamage;
-      cardSchool = weaponSchool;
-      cardBaseShape = (weapon?.geometryShape?.tag ?? 'cone') as
-        'cone' | 'line' | 'arc' | 'circle';
-    }
+        if (cardDefId !== 0) {
+          const def = ctx.db.cardDefinition.cardDefId.find(cardDefId);
+          if (!def) throw new SenderError('Card definition not found');
+          cardBasePower = def.basePower;
+          cardSchool = def.scalingSchool.tag as 'physical' | 'magical';
+          cardBaseShape = def.baseShape.tag as
+            'cone' | 'line' | 'arc' | 'circle';
+        } else {
+          // Bare weapon swing — no card. Feeds the weapon's own weaponDamage stat
+          // through the same scaling/mitigation pipeline as a card cast.
+          cardBasePower = attackerStats.weaponDamage;
+          cardSchool = weaponSchool;
+          cardBaseShape = (weapon?.geometryShape?.tag ?? 'cone') as
+            'cone' | 'line' | 'arc' | 'circle';
+        }
 
-    const result = resolveHit({
-      cardBasePower,
-      cardMergeLevel: 0,
-      cardSchool,
-      cardBaseShape,
-      characterLevel: char.level,
-      weaponSchool,
-      weaponWidth,
-      weaponRange,
-      attackerStats,
-      defenderStats: EMPTY_STAT_BLOCK, // enemies have no gear/stats yet
-      randomRoll: ctx.random(),
-    });
+        const result = resolveHit({
+          cardBasePower,
+          cardMergeLevel: 0,
+          cardSchool,
+          cardBaseShape,
+          characterLevel: char.level,
+          weaponSchool,
+          weaponWidth,
+          weaponRange,
+          attackerStats,
+          defenderStats: EMPTY_STAT_BLOCK, // enemies have no gear/stats yet
+          randomRoll: ctx.random(),
+        });
 
-    const newHp = e.currentHp - result.damage;
-    if (newHp <= 0) {
-      ctx.db.enemy.enemyId.update({ ...e, currentHp: 0, alive: false });
-      // Schedule respawn 15 s from now
-      ctx.db.enemyRespawnSchedule.insert({
-        scheduledId: 0n,
-        scheduledAt: ScheduleAt.time(
-          ctx.timestamp.microsSinceUnixEpoch + 15_000_000n,
-        ),
-        enemyId: e.enemyId,
-      });
-      _grantXp(ctx, char, e.xpReward);
-      // Independent drop rolls, level-gated + rarity-weighted (see BALANCE.md).
-      _dropCardFromEnemy(ctx, e, char);
-      _dropItemFromEnemy(ctx, e, char);
-    } else {
-      ctx.db.enemy.enemyId.update({ ...e, currentHp: newHp });
-    }
-  },
+        const newHp = e.currentHp - result.damage;
+        if (newHp <= 0) {
+          ctx.db.enemy.enemyId.update({ ...e, currentHp: 0, alive: false });
+          // Schedule respawn 15 s from now
+          ctx.db.enemyRespawnSchedule.insert({
+            scheduledId: 0n,
+            scheduledAt: ScheduleAt.time(
+              ctx.timestamp.microsSinceUnixEpoch + 15_000_000n,
+            ),
+            enemyId: e.enemyId,
+          });
+          _grantXp(ctx, char, e.xpReward);
+          // Independent drop rolls, level-gated + rarity-weighted (see BALANCE.md).
+          _dropCardFromEnemy(ctx, e, char);
+          _dropItemFromEnemy(ctx, e, char);
+        } else {
+          ctx.db.enemy.enemyId.update({ ...e, currentHp: newHp });
+        }
+      },
+    ),
+  ),
 );
 
-/**
- * Roll a rarity tier weighted by RARITY_DROP_WEIGHTS (common-heavy, legendary
- * never rolls since its weight is 0 — trash mobs don't drop legendaries).
- */
-function _pickWeightedRarity(ctx: any): string {
-  const roll = ctx.random();
-  let cumulative = 0;
-  for (const rarity of RARITY_DROP_ORDER) {
-    cumulative += RARITY_DROP_WEIGHTS[rarity];
-    if (roll < cumulative) return rarity;
-  }
-  return 'common'; // fallback for float rounding at the top of the range
-}
-
-/**
- * Pick one def from `eligible` (already level-filtered), preferring a def that
- * matches the rolled rarity tier; falls back to any eligible def if that tier
- * is empty at this level (e.g. no epics unlocked yet), and to nothing at all
- * if `eligible` itself is empty — never errors, just drops nothing.
- */
-function _pickLevelAndRarityGated(ctx: any, eligible: any[]): any | null {
-  if (eligible.length === 0) return null;
-  const rarity = _pickWeightedRarity(ctx);
-  const pool = eligible.filter((def: any) => def.rarity.tag === rarity);
-  const finalPool = pool.length > 0 ? pool : eligible;
-  return finalPool[ctx.random.integerInRange(0, finalPool.length - 1)];
-}
-
 /** Roll a ground card drop when an enemy dies. Level-gated, rarity-weighted. */
-function _dropCardFromEnemy(ctx: any, e: any, char: any): void {
-  if (ctx.random() >= CARD_DROP_CHANCE) return;
-  const allDefs = [...ctx.db.cardDefinition];
-  const eligible = allDefs.filter(
-    (def: any) => def.minCharacterLevel <= char.level,
-  );
-  const def = _pickLevelAndRarityGated(ctx, eligible);
-  if (!def) return;
-  ctx.db.cardDrop.insert({
-    dropId: 0n,
-    cardDefId: def.cardDefId,
-    zoneId: e.zoneId,
-    posX: e.posX,
-    posY: e.posY,
-    createdAt: ctx.timestamp,
-  });
-}
+const _dropCardFromEnemy = realizes(
+  SwTraceables.SW_015_CARD_AND_ITEM_DROPS_ARE_INDEPENDENT_PER_DEATH_ROLLS,
+  concerns(
+    ConTraceables.CON_006_DUPLICATE_DROPS_ARE_INTENTIONAL_NEVER_DEDUPLICATED,
+    function _dropCardFromEnemy(ctx: any, e: any, char: any): void {
+      if (ctx.random() >= CARD_DROP_CHANCE) return;
+      const allDefs = [...ctx.db.cardDefinition];
+      const eligible = allDefs
+        .filter((def: any) => def.minCharacterLevel <= char.level)
+        .map((def: any) => ({ ...def, rarity: def.rarity.tag }));
+      const def = pickLevelAndRarityGated(eligible, ctx.random(), ctx.random());
+      if (!def) return;
+      ctx.db.cardDrop.insert({
+        dropId: 0n,
+        cardDefId: def.cardDefId,
+        zoneId: e.zoneId,
+        posX: e.posX,
+        posY: e.posY,
+        createdAt: ctx.timestamp,
+      });
+    },
+  ),
+);
 
 /**
  * Roll a ground item drop when an enemy dies. Level-gated, rarity-weighted,
  * independent of the card drop roll.
  */
-function _dropItemFromEnemy(ctx: any, e: any, char: any): void {
-  if (ctx.random() >= ITEM_DROP_CHANCE) return;
-  const allDefs = [...ctx.db.itemDefinition];
-  const eligible = allDefs.filter((def: any) => def.minLevel <= char.level);
-  const def = _pickLevelAndRarityGated(ctx, eligible);
-  if (!def) return;
-  ctx.db.itemDrop.insert({
-    itemDropId: 0n,
-    itemDefId: def.itemDefId,
-    zoneId: e.zoneId,
-    posX: e.posX,
-    posY: e.posY,
-    createdAt: ctx.timestamp,
-  });
-}
+const _dropItemFromEnemy = realizes(
+  SwTraceables.SW_016_DROP_ELIGIBILITY_FILTERS_TO_THE_KILLERS_LEVEL,
+  concerns(
+    ConTraceables.CON_006_DUPLICATE_DROPS_ARE_INTENTIONAL_NEVER_DEDUPLICATED,
+    function _dropItemFromEnemy(ctx: any, e: any, char: any): void {
+      if (ctx.random() >= ITEM_DROP_CHANCE) return;
+      const allDefs = [...ctx.db.itemDefinition];
+      const eligible = allDefs
+        .filter((def: any) => def.minLevel <= char.level)
+        .map((def: any) => ({ ...def, rarity: def.rarity.tag }));
+      const def = pickLevelAndRarityGated(eligible, ctx.random(), ctx.random());
+      if (!def) return;
+      ctx.db.itemDrop.insert({
+        itemDropId: 0n,
+        itemDefId: def.itemDefId,
+        zoneId: e.zoneId,
+        posX: e.posX,
+        posY: e.posY,
+        createdAt: ctx.timestamp,
+      });
+    },
+  ),
+);
 
 /** pickupCard — player picks up a ground drop within 80 px. */
-export const pickupCard = db.reducer({ dropId: t.u64() }, (ctx, { dropId }) => {
-  const char = activeCharacter(ctx);
-  if (!char) throw new SenderError('No active character');
+export const pickupCard = realizes(
+  SwTraceables.SW_018_GROUND_DROPS_DESPAWN_IN_60S_AND_NEED_80PX_TO_PICK_UP,
+  db.reducer({ dropId: t.u64() }, (ctx, { dropId }) => {
+    const char = activeCharacter(ctx);
+    if (!char) throw new SenderError('No active character');
 
-  const drop = ctx.db.cardDrop.dropId.find(dropId);
-  if (!drop) throw new SenderError('Drop not found');
-  if (drop.zoneId !== char.zoneId)
-    throw new SenderError('Drop not in same zone');
+    const drop = ctx.db.cardDrop.dropId.find(dropId);
+    if (!drop) throw new SenderError('Drop not found');
+    if (drop.zoneId !== char.zoneId)
+      throw new SenderError('Drop not in same zone');
 
-  const dx = char.posX - drop.posX;
-  const dy = char.posY - drop.posY;
-  if (dx * dx + dy * dy > 80 * 80) throw new SenderError('Too far from drop');
+    const dx = char.posX - drop.posX;
+    const dy = char.posY - drop.posY;
+    if (dx * dx + dy * dy > 80 * 80) throw new SenderError('Too far from drop');
 
-  ctx.db.cardInstance.insert({
-    cardInstanceId: 0n,
-    ownerIdentity: ctx.sender,
-    cardDefId: drop.cardDefId,
-    mergeLevel: 0,
-    attuned: false,
-  });
-  ctx.db.cardDrop.dropId.delete(dropId);
+    ctx.db.cardInstance.insert({
+      cardInstanceId: 0n,
+      ownerIdentity: ctx.sender,
+      cardDefId: drop.cardDefId,
+      mergeLevel: 0,
+      attuned: false,
+    });
+    ctx.db.cardDrop.dropId.delete(dropId);
 
-  const def = ctx.db.cardDefinition.cardDefId.find(drop.cardDefId);
-  console.log(
-    `[pickup] ${def?.name ?? '?'} → ${ctx.sender.toHexString().slice(0, 8)}...`,
-  );
-});
+    const def = ctx.db.cardDefinition.cardDefId.find(drop.cardDefId);
+    console.log(
+      `[pickup] ${def?.name ?? '?'} → ${ctx.sender.toHexString().slice(0, 8)}...`,
+    );
+  }),
+);
 
 /**
  * pickupItem — player picks up a ground item drop within 80 px.
@@ -1472,37 +1543,40 @@ export const pickupCard = db.reducer({ dropId: t.u64() }, (ctx, { dropId }) => {
  * it dies with the character on permadeath, so ownerCharacterId is always the FK
  * that matters here, not the account identity.
  */
-export const pickupItem = db.reducer({ dropId: t.u64() }, (ctx, { dropId }) => {
-  const char = activeCharacter(ctx);
-  if (!char) throw new SenderError('No active character');
+export const pickupItem = realizes(
+  SwTraceables.SW_018_GROUND_DROPS_DESPAWN_IN_60S_AND_NEED_80PX_TO_PICK_UP,
+  db.reducer({ dropId: t.u64() }, (ctx, { dropId }) => {
+    const char = activeCharacter(ctx);
+    if (!char) throw new SenderError('No active character');
 
-  const drop = ctx.db.itemDrop.itemDropId.find(dropId);
-  if (!drop) throw new SenderError('Drop not found');
-  if (drop.zoneId !== char.zoneId)
-    throw new SenderError('Drop not in same zone');
+    const drop = ctx.db.itemDrop.itemDropId.find(dropId);
+    if (!drop) throw new SenderError('Drop not found');
+    if (drop.zoneId !== char.zoneId)
+      throw new SenderError('Drop not in same zone');
 
-  const dx = char.posX - drop.posX;
-  const dy = char.posY - drop.posY;
-  if (dx * dx + dy * dy > 80 * 80) throw new SenderError('Too far from drop');
+    const dx = char.posX - drop.posX;
+    const dy = char.posY - drop.posY;
+    if (dx * dx + dy * dy > 80 * 80) throw new SenderError('Too far from drop');
 
-  ctx.db.itemInstance.insert({
-    itemInstanceId: 0n,
-    ownerCharacterId: char.characterId,
-    itemDefId: drop.itemDefId,
-    quantity: 1,
-  });
-  ctx.db.itemDrop.itemDropId.delete(dropId);
+    ctx.db.itemInstance.insert({
+      itemInstanceId: 0n,
+      ownerCharacterId: char.characterId,
+      itemDefId: drop.itemDefId,
+      quantity: 1,
+    });
+    ctx.db.itemDrop.itemDropId.delete(dropId);
 
-  const def = ctx.db.itemDefinition.itemDefId.find(drop.itemDefId);
-  console.log(
-    `[pickup] ${def?.name ?? '?'} → ${ctx.sender.toHexString().slice(0, 8)}...`,
-  );
-});
+    const def = ctx.db.itemDefinition.itemDefId.find(drop.itemDefId);
+    console.log(
+      `[pickup] ${def?.name ?? '?'} → ${ctx.sender.toHexString().slice(0, 8)}...`,
+    );
+  }),
+);
 
 /** cardDropCleanup — runs every 10 s, deletes card AND item drops older than 60 s. */
-export const cardDropCleanup = db.reducer(
-  { scheduleRow: cardDropCleanupRow },
-  (ctx, _args: any) => {
+export const cardDropCleanup = realizes(
+  SwTraceables.SW_018_GROUND_DROPS_DESPAWN_IN_60S_AND_NEED_80PX_TO_PICK_UP,
+  db.reducer({ scheduleRow: cardDropCleanupRow }, (ctx, _args: any) => {
     const maxAgeUs = 60_000_000n;
     for (const drop of ctx.db.cardDrop) {
       if (
@@ -1522,79 +1596,49 @@ export const cardDropCleanup = db.reducer(
         ctx.db.itemDrop.itemDropId.delete(drop.itemDropId);
       }
     }
-  },
+  }),
 );
 
-// ─── Chase AI tuning constants ────────────────────────────────────────────────
-const AGGRO_RANGE = 300; // px — enemy notices a player and starts chasing
-const ATTACK_RANGE = 180; // px — enemy stops and starts casting
-const DEAGGRO_RANGE = 500; // px — player has escaped, enemy resets
-const CHASE_SPEED = 110; // px/s — always slower than the player's 180 px/s
-const RESET_SPEED = 80; // px/s — walking back to spawn
-const RESET_HP_PER_TICK = 10; // HP restored per tick while resetting
-const TICK_SECONDS = 0.5; // enemyTick fires every 500 ms
+// ─── Chase AI ─────────────────────────────────────────────────────────────────
+// Tuning constants and the aggro/chase/telegraph/reset decision logic now live
+// in ./rules/enemyAi.ts as pure functions — this reducer module only gathers
+// the candidates/target from ctx.db, calls into rules/, and writes the result.
 
-function _distSq(ax: number, ay: number, bx: number, by: number): number {
-  const dx = ax - bx;
-  const dy = ay - by;
-  return dx * dx + dy * dy;
-}
-
-/** Step at most `maxStep` px from (fromX,fromY) toward (toX,toY); snaps if closer than that. */
-function _moveToward(
-  fromX: number,
-  fromY: number,
-  toX: number,
-  toY: number,
-  maxStep: number,
-) {
-  const dx = toX - fromX;
-  const dy = toY - fromY;
-  const dist = Math.sqrt(dx * dx + dy * dy);
-  if (dist <= maxStep) return { x: toX, y: toY };
-  return { x: fromX + (dx / dist) * maxStep, y: fromY + (dy / dist) * maxStep };
-}
-
-/** Closest alive character in the enemy's zone within AGGRO_RANGE, or null. */
-function _findAggroTarget(
-  ctx: any,
-  zoneId: number,
-  posX: number,
-  posY: number,
-): any | null {
-  let closest: any = null;
-  let closestD2 = AGGRO_RANGE * AGGRO_RANGE;
-  for (const c of [...ctx.db.character.by_zone.filter(zoneId)]) {
-    if (!(c as any).alive) continue;
-    const d2 = _distSq(posX, posY, (c as any).posX, (c as any).posY);
-    if (d2 <= closestD2) {
-      closest = c;
-      closestD2 = d2;
-    }
-  }
-  return closest;
+/** Every alive character in a zone, shaped as pure aggro candidates. */
+function _aggroCandidates(ctx: any, zoneId: number): AggroCandidate[] {
+  return [...ctx.db.character.by_zone.filter(zoneId)]
+    .filter((c: any) => c.alive)
+    .map((c: any) => ({
+      characterId: c.characterId,
+      posX: c.posX,
+      posY: c.posY,
+      alive: c.alive,
+    }));
 }
 
 /** Fire the telegraphed AoE: damage every alive character still within attackRangePx. */
-function _fireCast(ctx: any, e: any): void {
-  for (const c of [...ctx.db.character.by_zone.filter(e.zoneId)]) {
-    if (!(c as any).alive) continue;
-    if (
-      _distSq((c as any).posX, (c as any).posY, e.posX, e.posY) >
-      e.attackRangePx * e.attackRangePx
-    )
-      continue;
-    // Enemies have no gear/stats yet (flat castDamage), so attackerLevel 0 skips
-    // level scaling — the defender's real effectiveStats still mitigate the hit.
-    _resolveAndApplyDamage(ctx, c, {
-      cardBasePower: e.castDamage,
-      cardSchool: 'physical',
-      cardBaseShape: e.castShape.tag,
-      attackerStats: EMPTY_STAT_BLOCK,
-      attackerLevel: 0,
-    });
-  }
-}
+const _fireCast = realizes(
+  SwTraceables.SW_012_TELEGRAPHED_CAST_FIRES_ONCE_AFTER_ITS_DURATION_HITTING_EVERYONE_IN_RANGE,
+  function _fireCast(ctx: any, e: any): void {
+    for (const c of [...ctx.db.character.by_zone.filter(e.zoneId)]) {
+      if (!(c as any).alive) continue;
+      if (
+        distSq((c as any).posX, (c as any).posY, e.posX, e.posY) >
+        e.attackRangePx * e.attackRangePx
+      )
+        continue;
+      // Enemies have no gear/stats yet (flat castDamage), so attackerLevel 0 skips
+      // level scaling — the defender's real effectiveStats still mitigate the hit.
+      _resolveAndApplyDamage(ctx, c, {
+        cardBasePower: e.castDamage,
+        cardSchool: 'physical',
+        cardBaseShape: e.castShape.tag,
+        attackerStats: EMPTY_STAT_BLOCK,
+        attackerLevel: 0,
+      });
+    }
+  },
+);
 
 /**
  * enemyTick — runs every 500 ms (Interval schedule, row never deleted).
@@ -1602,155 +1646,156 @@ function _fireCast(ctx: any, e: any): void {
  *   idle → chasing → casting → cooldown → (chasing | casting) or resetting → idle
  * Damage fires only after castDurationSeconds, hitting every character in the AoE.
  */
-export const enemyTick = db.reducer(
-  { scheduleRow: enemyTickRow },
-  (ctx, _args: any) => {
-    for (const e of ctx.db.enemy) {
-      if (!e.alive) continue;
+export const enemyTick = realizes(
+  ArchTraceables.ARCH_004_ENEMY_TICK_IS_ONE_SCHEDULED_REDUCER_DRIVING_A_FIVE_STATE_MACHINE,
+  concerns(
+    SysTraceables.SYS_003_ENEMIES_AGGRO_CHASE_AND_ATTACK_UNDER_SERVER_AUTHORITY,
+    db.reducer({ scheduleRow: enemyTickRow }, (ctx, _args: any) => {
+      for (const e of ctx.db.enemy) {
+        if (!e.alive) continue;
 
-      const state = e.aggroState.tag as
-        'idle' | 'chasing' | 'casting' | 'cooldown' | 'resetting';
+        const state = e.aggroState.tag as
+          'idle' | 'chasing' | 'casting' | 'cooldown' | 'resetting';
 
-      if (state === 'idle') {
-        const target = _findAggroTarget(ctx, e.zoneId, e.posX, e.posY);
-        if (target) {
-          ctx.db.enemy.enemyId.update({
-            ...e,
-            aggroState: { tag: 'chasing' },
-            targetCharacterId: (target as any).characterId,
-          });
-        }
-      } else if (state === 'chasing') {
-        const target =
-          e.targetCharacterId !== undefined
-            ? ctx.db.character.characterId.find(e.targetCharacterId)
-            : null;
-
-        if (!target || !target.alive) {
-          ctx.db.enemy.enemyId.update({
-            ...e,
-            aggroState: { tag: 'resetting' },
-            targetCharacterId: undefined,
-          });
-          continue;
-        }
-
-        const d2 = _distSq(e.posX, e.posY, target.posX, target.posY);
-        if (d2 > DEAGGRO_RANGE * DEAGGRO_RANGE) {
-          ctx.db.enemy.enemyId.update({
-            ...e,
-            aggroState: { tag: 'resetting' },
-            lastSeenTargetAt: ctx.timestamp,
-          });
-        } else if (d2 <= ATTACK_RANGE * ATTACK_RANGE) {
-          ctx.db.enemy.enemyId.update({
-            ...e,
-            aggroState: { tag: 'casting' },
-            castStartedAt: ctx.timestamp,
-          });
-        } else {
-          const step = CHASE_SPEED * TICK_SECONDS;
-          const { x, y } = _moveToward(
+        if (state === 'idle') {
+          const target = findClosestInRange(
+            _aggroCandidates(ctx, e.zoneId),
             e.posX,
             e.posY,
-            target.posX,
-            target.posY,
-            step,
           );
-          ctx.db.enemy.enemyId.update({ ...e, posX: x, posY: y });
-        }
-      } else if (state === 'casting') {
-        // Check whether the cast duration has elapsed
-        if (e.castStartedAt === undefined) continue;
-        const elapsedUs =
-          ctx.timestamp.microsSinceUnixEpoch -
-          e.castStartedAt.microsSinceUnixEpoch;
-        const durationUs = BigInt(
-          Math.round(e.castDurationSeconds * 1_000_000),
-        );
-        if (elapsedUs >= durationUs) {
-          _fireCast(ctx, e);
-          ctx.db.enemy.enemyId.update({
-            ...e,
-            aggroState: { tag: 'cooldown' },
-            castStartedAt: undefined,
-            lastAttackAt: ctx.timestamp,
-          });
-        }
-      } else if (state === 'cooldown') {
-        const target =
-          e.targetCharacterId !== undefined
-            ? ctx.db.character.characterId.find(e.targetCharacterId)
-            : null;
+          if (target) {
+            ctx.db.enemy.enemyId.update({
+              ...e,
+              aggroState: { tag: 'chasing' },
+              targetCharacterId: target.characterId,
+            });
+          }
+        } else if (state === 'chasing') {
+          const target =
+            e.targetCharacterId !== undefined
+              ? ctx.db.character.characterId.find(e.targetCharacterId)
+              : null;
 
-        if (!target || !target.alive) {
-          ctx.db.enemy.enemyId.update({
-            ...e,
-            aggroState: { tag: 'resetting' },
-            targetCharacterId: undefined,
-          });
-          continue;
-        }
+          const decision = decideChasing(e.posX, e.posY, target ?? null);
+          if (decision.kind === 'targetLost') {
+            ctx.db.enemy.enemyId.update({
+              ...e,
+              aggroState: { tag: 'resetting' },
+              targetCharacterId: undefined,
+            });
+          } else if (decision.kind === 'deaggro') {
+            ctx.db.enemy.enemyId.update({
+              ...e,
+              aggroState: { tag: 'resetting' },
+              lastSeenTargetAt: ctx.timestamp,
+            });
+          } else if (decision.kind === 'inAttackRange') {
+            ctx.db.enemy.enemyId.update({
+              ...e,
+              aggroState: { tag: 'casting' },
+              castStartedAt: ctx.timestamp,
+            });
+          } else {
+            ctx.db.enemy.enemyId.update({
+              ...e,
+              posX: decision.posX,
+              posY: decision.posY,
+            });
+          }
+        } else if (state === 'casting') {
+          // Check whether the cast duration has elapsed
+          if (e.castStartedAt === undefined) continue;
+          if (
+            hasCastElapsed(
+              ctx.timestamp.microsSinceUnixEpoch,
+              e.castStartedAt.microsSinceUnixEpoch,
+              e.castDurationSeconds,
+            )
+          ) {
+            _fireCast(ctx, e);
+            ctx.db.enemy.enemyId.update({
+              ...e,
+              aggroState: { tag: 'cooldown' },
+              castStartedAt: undefined,
+              lastAttackAt: ctx.timestamp,
+            });
+          }
+        } else if (state === 'cooldown') {
+          const target =
+            e.targetCharacterId !== undefined
+              ? ctx.db.character.characterId.find(e.targetCharacterId)
+              : null;
 
-        if (
-          _distSq(e.posX, e.posY, target.posX, target.posY) >
-          ATTACK_RANGE * ATTACK_RANGE
-        ) {
-          // Target moved out of attack range mid-cooldown — re-engage by chasing.
-          ctx.db.enemy.enemyId.update({ ...e, aggroState: { tag: 'chasing' } });
-          continue;
-        }
-
-        // Still in range: return to idle-cooldown-wait, then recast once the timer elapses.
-        if (e.lastAttackAt === undefined) continue;
-        const elapsedUs =
-          ctx.timestamp.microsSinceUnixEpoch -
-          e.lastAttackAt.microsSinceUnixEpoch;
-        const cooldownUs = BigInt(
-          Math.round(e.attackCooldownSeconds * 1_000_000),
-        );
-        if (elapsedUs >= cooldownUs) {
-          ctx.db.enemy.enemyId.update({
-            ...e,
-            aggroState: { tag: 'casting' },
-            castStartedAt: ctx.timestamp,
-          });
-        }
-      } else if (state === 'resetting') {
-        const step = RESET_SPEED * TICK_SECONDS;
-        const { x, y } = _moveToward(e.posX, e.posY, e.spawnX, e.spawnY, step);
-        const newHp = Math.min(e.maxHp, e.currentHp + RESET_HP_PER_TICK);
-
-        const reAggro = _findAggroTarget(ctx, e.zoneId, x, y);
-        if (reAggro) {
-          ctx.db.enemy.enemyId.update({
-            ...e,
-            posX: x,
-            posY: y,
-            currentHp: newHp,
-            aggroState: { tag: 'chasing' },
-            targetCharacterId: (reAggro as any).characterId,
-          });
-        } else if (x === e.spawnX && y === e.spawnY) {
-          ctx.db.enemy.enemyId.update({
-            ...e,
-            posX: x,
-            posY: y,
-            currentHp: e.maxHp,
-            aggroState: { tag: 'idle' },
-            targetCharacterId: undefined,
-          });
-        } else {
-          ctx.db.enemy.enemyId.update({
-            ...e,
-            posX: x,
-            posY: y,
-            currentHp: newHp,
-          });
+          const decision = decideCooldown(
+            e.posX,
+            e.posY,
+            target ?? null,
+            ctx.timestamp.microsSinceUnixEpoch,
+            e.lastAttackAt !== undefined
+              ? e.lastAttackAt.microsSinceUnixEpoch
+              : null,
+            e.attackCooldownSeconds,
+          );
+          if (decision.kind === 'targetLost') {
+            ctx.db.enemy.enemyId.update({
+              ...e,
+              aggroState: { tag: 'resetting' },
+              targetCharacterId: undefined,
+            });
+          } else if (decision.kind === 'reengage') {
+            // Target moved out of attack range mid-cooldown — re-engage by chasing.
+            ctx.db.enemy.enemyId.update({
+              ...e,
+              aggroState: { tag: 'chasing' },
+            });
+          } else if (decision.kind === 'recast') {
+            ctx.db.enemy.enemyId.update({
+              ...e,
+              aggroState: { tag: 'casting' },
+              castStartedAt: ctx.timestamp,
+            });
+          }
+          // 'wait' — still in range, cooldown not elapsed yet: no change this tick.
+        } else if (state === 'resetting') {
+          const decision = decideResetting(
+            e.posX,
+            e.posY,
+            e.spawnX,
+            e.spawnY,
+            e.currentHp,
+            e.maxHp,
+            _aggroCandidates(ctx, e.zoneId),
+          );
+          if (decision.kind === 'reaggro') {
+            ctx.db.enemy.enemyId.update({
+              ...e,
+              posX: decision.posX,
+              posY: decision.posY,
+              currentHp: decision.currentHp,
+              aggroState: { tag: 'chasing' },
+              targetCharacterId: decision.target.characterId,
+            });
+          } else if (decision.kind === 'arrived') {
+            ctx.db.enemy.enemyId.update({
+              ...e,
+              posX: decision.posX,
+              posY: decision.posY,
+              currentHp: decision.currentHp,
+              aggroState: { tag: 'idle' },
+              targetCharacterId: undefined,
+            });
+          } else {
+            ctx.db.enemy.enemyId.update({
+              ...e,
+              posX: decision.posX,
+              posY: decision.posY,
+              currentHp: decision.currentHp,
+            });
+          }
         }
       }
-    }
-  },
+    }),
+  ),
 );
 
 /**

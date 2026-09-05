@@ -1,0 +1,21 @@
+# Document schema for stories (the `story` document type).
+# clew merges this with the pinned core (id form, `**Status**` grammar, relation
+# links) it always enforces. The `Status` value set is clew's; it is listed here so
+# the schema is complete, and a restated enum must match clew's set exactly.
+# Fields are listed in the order a story must present them.
+onError: fail
+fields:
+  Title:
+    required: true
+  Status:
+    enum: [planned, active, done, dropped]
+  Business Value:
+    required: true
+  Problem / Context:
+    required: true
+  Solution Approach:
+    required: true
+  Acceptance Criteria:
+    required: true
+  Out of scope:
+    required: true

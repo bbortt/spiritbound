@@ -17,7 +17,8 @@ Everything you need is one hand on the mouse, one on the keyboard.
 A few notes on feel:
 
 - **Holding a card key** shows you exactly where it'll land — cone, line,
-  arc, or circle — before you commit. Release to fire; let go of the aim
+  arc, or circle — before you commit.
+  Release to fire; let go of the aim
   before you're ready, and nothing happens.
 - **Escape** cancels whatever you're mid-cast on, no penalty, no cooldown
   wasted.

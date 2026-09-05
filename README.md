@@ -1,3 +1,5 @@
+# SpacetimeDB TypeScript Quickstart
+
 Get a SpacetimeDB TypeScript app running in under 5 minutes.
 
 ## Prerequisites
@@ -23,9 +25,10 @@ spacetime dev --template basic-ts
 
 Your project contains both server and client code.
 
-Edit `spacetimedb/src/index.ts` to add tables and reducers. Use the generated bindings in `src/module_bindings/` to build your client.
+Edit `spacetimedb/src/index.ts` to add tables and reducers.
+Use the generated bindings in `src/module_bindings/` to build your client.
 
-```
+```text
 my-spacetime-app/
 ├── spacetimedb/             # Your SpacetimeDB module
 │   └── src/
@@ -38,9 +41,11 @@ my-spacetime-app/
 
 ## Understand tables and reducers
 
-Open `spacetimedb/src/index.ts` to see the module code. The template includes a `person` table and two reducers: `add` to insert a person, and `sayHello` to greet everyone.
+Open `spacetimedb/src/index.ts` to see the module code.
+The template includes a `person` table and two reducers: `add` to insert a person, and `sayHello` to greet everyone.
 
-Tables store your data. Reducers are functions that modify data — they're the only way to write to the database.
+Tables store your data.
+Reducers are functions that modify data — they're the only way to write to the database.
 
 ```typescript
 import { schema, table, t } from 'spacetimedb/server';
@@ -72,7 +77,8 @@ export const sayHello = spacetimedb.reducer((ctx) => {
 
 ## Test with the CLI
 
-Open a new terminal and navigate to your project directory. Then use the SpacetimeDB CLI to call reducers and query your data directly.
+Open a new terminal and navigate to your project directory.
+Then use the SpacetimeDB CLI to call reducers and query your data directly.
 
 ```bash
 cd my-spacetime-app

@@ -15,8 +15,13 @@
 
     /* Linting */
     "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "erasableSyntaxOnly": true,
+    // erasableSyntaxOnly and noUnusedParameters removed: clew's generated
+    // TypeScript traceables (src/clew/traceables/clew/*.ts) use real `enum`
+    // declarations (erasableSyntaxOnly forbids that — but a removed spec id
+    // failing to compile IS the point of clew's anchoring) and an
+    // intentionally-unused `ids` parameter on `verifies()` (it exists only
+    // for compile-time id-checking, never read at runtime). See
+    // 004-technology-contract.md.
     "noFallthroughCasesInSwitch": true
   },
   "include": ["src"]

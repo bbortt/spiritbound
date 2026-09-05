@@ -1,15 +1,20 @@
 # SpacetimeDB Core Concepts
 
-SpacetimeDB is a relational database that is also a server. It lets you upload application logic directly into the database via WebAssembly modules, eliminating the traditional web/game server layer entirely.
+SpacetimeDB is a relational database that is also a server.
+It lets you upload application logic directly into the database via WebAssembly modules, eliminating the traditional web/game server layer entirely.
 
 ---
 
 ## Critical Rules
 
-1. **Reducers are transactional.** They do not return data to callers. Use subscriptions to read data.
-2. **Reducers must be deterministic.** No filesystem, network, timers, or random. All state must come from tables.
-3. **Read data via tables/subscriptions**, not reducer return values. Clients get data through subscribed queries.
-4. **Auto-increment IDs are not sequential.** Gaps are normal, do not use for ordering. Use timestamps or explicit sequence columns.
+1. **Reducers are transactional.** They do not return data to callers.
+   Use subscriptions to read data.
+2. **Reducers must be deterministic.** No filesystem, network, timers, or random.
+   All state must come from tables.
+3. **Read data via tables/subscriptions**, not reducer return values.
+   Clients get data through subscribed queries.
+4. **Auto-increment IDs are not sequential.** Gaps are normal, do not use for ordering.
+   Use timestamps or explicit sequence columns.
 5. **`ctx.sender` is the authenticated principal.** Never trust identity passed as arguments.
 
 ---
@@ -37,11 +42,12 @@ SpacetimeDB is a relational database that is also a server. It lets you upload a
 ## Tables
 
 - **Private tables** (default): Only accessible by reducers and the database owner.
-- **Public tables**: Exposed for client read access through subscriptions. Writes still require reducers.
+- **Public tables**: Exposed for client read access through subscriptions.
+  Writes still require reducers.
 
 Organize data by access pattern, not by entity:
 
-```
+```text
 Player          PlayerState         PlayerStats
 id         <--  player_id           player_id
 name            position_x          total_kills
@@ -51,11 +57,14 @@ name            position_x          total_kills
 
 ## Reducers
 
-Reducers are transactional functions that modify database state. They run atomically, cannot interact with the outside world, and do not return data to callers. See the language-specific server skills for syntax.
+Reducers are transactional functions that modify database state.
+They run atomically, cannot interact with the outside world, and do not return data to callers.
+See the language-specific server skills for syntax.
 
 ## Event Tables
 
-Event tables broadcast reducer-specific data to clients. Rows are never stored in the client cache (`count()` returns 0, `iter()` yields nothing); only `onInsert` callbacks fire.
+Event tables broadcast reducer-specific data to clients.
+Rows are never stored in the client cache (`count()` returns 0, `iter()` yields nothing); only `onInsert` callbacks fire.
 
 ## Subscriptions
 
@@ -95,13 +104,13 @@ Lifecycle: Write → Compile → Publish (`spacetime publish`) → Hot-swap (rep
 
 SpacetimeDB works with many OIDC providers, including SpacetimeAuth (built-in), Auth0, Clerk, Keycloak, Google, and GitHub.
 
-# SpacetimeDB CLI
+## SpacetimeDB CLI
 
 Use this skill when the user needs help with the `spacetime` CLI tool - initializing projects, building modules, publishing databases, querying data, managing servers, or troubleshooting CLI issues.
 
-## Quick Reference
+### Quick Reference
 
-### Project Initialization & Development
+#### Project Initialization & Development
 
 ```bash
 # Initialize new project
@@ -120,7 +129,7 @@ spacetime dev --client-lang typescript --module-bindings-path ./client/src/modul
 spacetime generate --lang typescript|csharp|rust|unrealcpp --out-dir ./bindings --module-path ./server
 ```
 
-### Publishing & Deployment
+#### Publishing & Deployment
 
 ```bash
 # Publish to Maincloud (default)
@@ -133,7 +142,7 @@ spacetime publish my-database --server local --yes
 spacetime publish my-database --delete-data always --yes
 ```
 
-### Database Interaction
+#### Database Interaction
 
 ```bash
 # SQL queries
@@ -156,7 +165,7 @@ spacetime describe my-database table users --json
 spacetime describe my-database reducer my_reducer --json
 ```
 
-### Database Management
+#### Database Management
 
 ```bash
 # List databases
@@ -169,7 +178,7 @@ spacetime delete my-database
 spacetime rename <database-identity> --to new-name
 ```
 
-### Server Management
+#### Server Management
 
 ```bash
 # List configured servers
@@ -192,7 +201,7 @@ spacetime start
 spacetime server clear
 ```
 
-### Authentication
+#### Authentication
 
 ```bash
 # Login (opens browser)
@@ -208,14 +217,14 @@ spacetime login show
 spacetime logout
 ```
 
-## Default Servers
+### Default Servers
 
 | Name        | URL                                 | Description                |
 | ----------- | ----------------------------------- | -------------------------- |
 | `maincloud` | `https://maincloud.spacetimedb.com` | Production cloud (default) |
 | `local`     | `http://127.0.0.1:3000`             | Local development server   |
 
-## Common Flags
+### Common Flags
 
 | Flag            | Short | Description                                |
 | --------------- | ----- | ------------------------------------------ |
@@ -224,30 +233,30 @@ spacetime logout
 | `--anonymous`   |       | Use anonymous identity                     |
 | `--module-path` | `-p`  | Path to module project                     |
 
-## Troubleshooting
+### Troubleshooting
 
-### "Not logged in"
+#### "Not logged in"
 
 ```bash
 spacetime login
 # Or use --anonymous for public operations
 ```
 
-### "Server not responding"
+#### "Server not responding"
 
 ```bash
 spacetime server ping <server>
 # For local: ensure spacetime start is running
 ```
 
-### "Schema conflict"
+#### "Schema conflict"
 
 ```bash
 # Clear data and republish
 spacetime publish my-db --delete-data always --yes
 ```
 
-### "Build failed"
+#### "Build failed"
 
 ```bash
 # Check Rust/C# toolchain
@@ -256,15 +265,15 @@ rustup show
 rustup target add wasm32-unknown-unknown
 ```
 
-## Module Languages
+### Module Languages
 
 **Server-side (modules):** Rust, C#, TypeScript, C++
 **Client SDKs:** TypeScript, C#, Rust, Unreal Engine
 **CLI `generate` targets:** TypeScript, C#, Rust, Unreal C++
 
-# SpacetimeDB TypeScript SDK Reference
+## SpacetimeDB TypeScript SDK Reference
 
-## Imports
+### Imports
 
 ```typescript
 import { schema, table, t } from 'spacetimedb/server';
@@ -272,9 +281,10 @@ import { SenderError } from 'spacetimedb/server';
 import { ScheduleAt } from 'spacetimedb'; // for scheduled tables only
 ```
 
-## Tables
+### Tables (SDK API)
 
-`table(OPTIONS, COLUMNS)` takes two arguments. The `name` field MUST be snake_case:
+`table(OPTIONS, COLUMNS)` takes two arguments.
+The `name` field MUST be snake_case:
 
 ```typescript
 const entity = table(
@@ -291,7 +301,7 @@ Options: `name` (snake_case, recommended), `public: true`, `event: true`, `sched
 
 `ctx.db` accessors are the camelCase form of the table's `name` field.
 
-## Column Types
+### Column Types
 
 | Builder               | JS type      | Notes             |
 | --------------------- | ------------ | ----------------- |
@@ -311,9 +321,10 @@ Modifiers: `.primaryKey()`, `.autoInc()`, `.unique()`, `.index('btree')`
 
 Optional columns: `nickname: t.option(t.string())`
 
-## Indexes
+### Indexes
 
-Prefer inline `.index('btree')` for single-column. Use named indexes only for multi-column:
+Prefer inline `.index('btree')` for single-column.
+Use named indexes only for multi-column:
 
 ```typescript
 // Inline (preferred for single-column):
@@ -325,16 +336,18 @@ indexes: [{ accessor: 'by_group_user', algorithm: 'btree', columns: ['groupId', 
 // Access: ctx.db.membership.by_group_user.filter([groupId, userId]);
 ```
 
-When you frequently look up rows by multiple columns, prefer a multi-column index over filtering by one column and looping over the results. Multi-column filter takes an array matching the index column order. You can omit trailing columns to do a prefix scan.
+When you frequently look up rows by multiple columns, prefer a multi-column index over filtering by one column and looping over the results.
+Multi-column filter takes an array matching the index column order.
+You can omit trailing columns to do a prefix scan.
 
-## Schema Export
+### Schema Export
 
 ```typescript
 const spacetimedb = schema({ entity, record }); // ONE object, not spread args
 export default spacetimedb;
 ```
 
-## Reducers
+### Reducers (SDK API)
 
 Export name becomes the reducer name:
 
@@ -350,7 +363,7 @@ export const createEntity = spacetimedb.reducer(
 export const doReset = spacetimedb.reducer((ctx) => { ... });
 ```
 
-## DB Operations
+### DB Operations
 
 ```typescript
 ctx.db.entity.insert({ id: 0n, name: 'Sample' }); // Insert (0n for autoInc)
@@ -362,11 +375,13 @@ ctx.db.entity.id.update({ ...existing, name: newName }); // Update (spread + ove
 ctx.db.entity.id.delete(entityId); // Delete by PK
 ```
 
-Note: `iter()` and `filter()` return iterators. Spread to Array for `.sort()`, `.filter()`, `.map()`.
+Note: `iter()` and `filter()` return iterators.
+Spread to Array for `.sort()`, `.filter()`, `.map()`.
 
-## Lifecycle Hooks
+### Lifecycle Hooks
 
-MUST be `export const`. Bare calls are silently ignored:
+MUST be `export const`.
+Bare calls are silently ignored:
 
 ```typescript
 export const init = spacetimedb.init((ctx) => { ... });
@@ -374,9 +389,11 @@ export const onConnect = spacetimedb.clientConnected((ctx) => { ... });
 export const onDisconnect = spacetimedb.clientDisconnected((ctx) => { ... });
 ```
 
-## Reducer Context API
+### Reducer Context API
 
-`ReducerContext` is the single source of sender identity, deterministic time, and deterministic randomness inside a reducer. Always go through `ctx` for these. Standard library clocks and random sources are not available in modules.
+`ReducerContext` is the single source of sender identity, deterministic time, and deterministic randomness inside a reducer.
+Always go through `ctx` for these.
+Standard library clocks and random sources are not available in modules.
 
 ```typescript
 // Auth: ctx.sender is the caller's Identity
@@ -394,7 +411,7 @@ const bytes: Uint8Array = ctx.random.fill(new Uint8Array(16));
 new Date(Number(row.createdAt.microsSinceUnixEpoch / 1000n));
 ```
 
-## Scheduled Tables
+### Scheduled Tables
 
 ```typescript
 const tickTimer = table(
@@ -419,7 +436,7 @@ export const tick = spacetimedb.reducer(
 // Repeating: ScheduleAt.interval(60_000_000n)
 ```
 
-## Custom Types
+### Custom Types
 
 ```typescript
 // Product type (struct):
@@ -440,7 +457,7 @@ const Shape = t.enum('Shape', {
 // Values: { tag: 'circle', value: 10 }
 ```
 
-## Views
+### Views
 
 ```typescript
 // Anonymous view (same for all clients):
@@ -458,7 +475,7 @@ export const myProfile = spacetimedb.view(
 );
 ```
 
-## Complete Example
+### Complete Example
 
 ```typescript
 import { schema, table, t } from 'spacetimedb/server';
@@ -516,9 +533,9 @@ export const addRecord = spacetimedb.reducer(
 );
 ```
 
-# SpacetimeDB TypeScript Client
+## SpacetimeDB TypeScript Client
 
-## React: main.tsx
+### React: main.tsx
 
 ```typescript
 import React, { useEffect, useMemo } from 'react';
@@ -546,7 +563,7 @@ function Root() {
 ReactDOM.createRoot(document.getElementById('root')!).render(<Root />);
 ```
 
-## React: App.tsx
+### React: App.tsx
 
 ```typescript
 import { useTable, useSpacetimeDB } from 'spacetimedb/react';
@@ -599,7 +616,7 @@ function App() {
 }
 ```
 
-## Vanilla (non-React)
+### Vanilla (non-React)
 
 ```typescript
 import { DbConnection, tables } from './module_bindings';

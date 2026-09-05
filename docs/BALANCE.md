@@ -1,8 +1,10 @@
 # Spiritbound — Balance Reference
 
-Shared numeric reference for `ability-balancer` and `item-balancer`. This is
+Shared numeric reference for `ability-balancer` and `item-balancer`.
+This is
 where hard-coded constants get a name and a home so they stop drifting
-silently between `rules/`, `spacetimedb/src/index.ts`, and this doc. Every
+silently between `rules/`, `spacetimedb/src/index.ts`, and this doc.
+Every
 number below is a **stub pending real playtest data** unless marked
 otherwise — treat them as "currently shipped," not "correct forever."
 
@@ -10,11 +12,12 @@ otherwise — treat them as "currently shipped," not "correct forever."
 
 Implemented in `spacetimedb/src/rules/death.ts#computeCharacterLevel`:
 
-```
+```text
 level = clamp(1, 50, floor((xp / 80) ^ 0.55))
 ```
 
-Placeholder power curve. Design goal (per `GAME_DESIGN.md`): 1–10 fast,
+Placeholder power curve.
+Design goal (per `GAME_DESIGN.md`): 1–10 fast,
 10–30 medium, 30–50 slower, with post-death re-leveling taking ~40–50% of
 the original time. **Not yet validated against that goal — pending
 playtest.**
@@ -23,12 +26,13 @@ playtest.**
 
 Implemented in `spacetimedb/src/rules/death.ts#computeSpiritLevel`:
 
-```
+```text
 level = clamp(1, 50, floor(log10(bondXp + 1) * 17))
 ```
 
 Rough anchors: ~100 XP ≈ level 1, ~10,000 XP ≈ level 10, ~1,000,000 XP ≈
-level 50. Log-shaped so early levels feel fast. **Pending playtest.**
+level 50.
+Log-shaped so early levels feel fast. **Pending playtest.**
 
 ### Sacrifice XP (feeding a card to a spirit)
 
@@ -47,7 +51,7 @@ rarity for spirit bond XP:
 
 `rules/death.ts#computeHandSlots`:
 
-```
+```text
 active  = min(10, 2 + floor(spiritLevel * 0.2))   // 2 at level 1 → 10 at level 40
 passive = min(5,  1 + floor(spiritLevel * 0.1))   // 1 at level 1 → 5  at level 40
 ```
@@ -57,7 +61,7 @@ passive = min(5,  1 + floor(spiritLevel * 0.1))   // 1 at level 1 → 5  at leve
 `rules/death.ts#computeAttunementSlots` — how many cards of each rarity
 survive death if attuned:
 
-```
+```text
 common:    min(8, floor(level * 0.6) + 1)
 uncommon:  min(6, floor(level * 0.4))
 rare:      min(4, floor(level * 0.2))
@@ -70,9 +74,11 @@ cannot hoard 10 legendaries."
 
 ## Stat conversion anchors
 
-Placeholder — pending playtest. No numeric conversion rates (e.g. how much
+Placeholder — pending playtest.
+No numeric conversion rates (e.g. how much
 `accuracy` is needed to fully counter a given `evasion`) have been decided
-yet beyond the formula shape in `rules/combat.ts` (see below). Needs real
+yet beyond the formula shape in `rules/combat.ts` (see below).
+Needs real
 numbers once combat is played at scale.
 
 ## Card balance constants
@@ -124,7 +130,7 @@ real player stats yet.
 
 `spacetimedb/src/index.ts` — top-of-file named constants:
 
-```
+```text
 CARD_DROP_CHANCE = 0.25   // was 0.70
 ITEM_DROP_CHANCE = 0.20   // was 0.40
 ```
@@ -143,7 +149,8 @@ sampling within that tier:
 | legendary |     0% |
 
 **Legendary cards never drop from trash mobs** — the weight is 0 by design;
-they're reserved for bosses and dungeon tiers (not yet implemented). If the
+they're reserved for bosses and dungeon tiers (not yet implemented).
+If the
 picked tier has no eligible cards at the killer's level, selection falls
 back to the full eligible pool; if that's empty too, the enemy drops
 nothing rather than erroring.
@@ -153,16 +160,19 @@ then `itemDefinition` rows filtered by `minLevel <= killer's level`, same
 rarity-weighted tier pick and same nothing-rather-than-error fallback.
 
 Ground drops despawn 60s after `createdAt` (swept by `cardDropCleanup`,
-every 10s). Pickup requires being within 80px (`pickupCard` / `pickupItem`).
+every 10s).
+Pickup requires being within 80px (`pickupCard` / `pickupItem`).
 
 **Duplicates are intentional, not a bug.** A second copy of a card you
 already own is merge fuel (future merge system) and spirit-sacrifice fodder
-(`SACRIFICE_XP` above, live today). They currently feel like dead weight
+(`SACRIFICE_XP` above, live today).
+They currently feel like dead weight
 only because the merge UI doesn't exist yet — that's a missing feature, not
 a reason to suppress duplicate drops.
 
 **Placeholder** — owned by `item-balancer` long-term; not yet tuned against
-an economy model. The percentages above are a first rebalance pass (down
+an economy model.
+The percentages above are a first rebalance pass (down
 from 70%/40%) to make drops feel earned rather than guaranteed; still
 pending real playtest data.
 
@@ -182,13 +192,15 @@ public `grantXp` reducer). `_grantXp`:
   watches that field to trigger the level-up flash/text.
 
 flat `25` XP per kill is a placeholder — no scaling by enemy difficulty
-yet, since only one enemy tier exists. See `docs/ARCHITECTURE.md` for the
+yet, since only one enemy tier exists.
+See `docs/ARCHITECTURE.md` for the
 client/server level-curve duplication this feature depends on.
 
 ## Race base stats (vertical slice)
 
 `spacetimedb/src/rules/stats.ts#computeRaceBase` — one hard-coded human
-placeholder, ignores its `raceId` argument. This is the character's stat
+placeholder, ignores its `raceId` argument.
+This is the character's stat
 floor before any gear:
 
 | Field                                                 | Value | Field           | Value |
@@ -203,18 +215,22 @@ floor before any gear:
 That placeholder is gone — a fresh character now always starts at exactly
 `computeRaceBase(0)`'s maxHp/maxMp (100/60) regardless of level, matching
 `GAME_DESIGN.md`'s stat model (Health/Will are race-seeded primaries, not
-level-seeded). Character level now only scales card damage
-(`LEVEL_SCALING_PER_LEVEL` above) — HP/MP growth is gear's job. Flagging
+level-seeded).
+Character level now only scales card damage
+(`LEVEL_SCALING_PER_LEVEL` above) — HP/MP growth is gear's job.
+Flagging
 this since it's a real gameplay-feel change, not just plumbing.
 
 ## Bare weapon swing (no card)
 
 `spacetimedb/src/index.ts#damageEnemy` — `cardDefId: 0` means a bare weapon
-swing (right-click basic attack, no card cast). It's fed through the same
+swing (right-click basic attack, no card cast).
+It's fed through the same
 `resolveHit` pipeline as a card cast, with `cardBasePower` set to the
 attacker's `weaponDamage` stat (0 unarmed) instead of a card's `basePower`,
 and `cardSchool`/`cardBaseShape` taken from the equipped main_hand weapon
-(defaults: physical, cone, width 0.4, range 150 if bare-handed). This is a
+(defaults: physical, cone, width 0.4, range 150 if bare-handed).
+This is a
 judgment call — `resolveHit` itself doesn't consume `weaponDamage` anywhere
 else (card casts still scale off `physicalAttack`/`magicAttack` only, per
 `GAME_DESIGN.md`'s stat table), so `weaponDamage` would otherwise be a
@@ -224,7 +240,8 @@ dead stat on every weapon in `equipment.json`.
 
 `content/equipment.json` — 6 common/uncommon items seeded via `seedItems`.
 No stat budget table exists yet (no gear drops or equip flow live), so these
-are first-pass numbers, not budget-derived. Validated only against the
+are first-pass numbers, not budget-derived.
+Validated only against the
 structural rules in `content/validateEquipment.ts` (main_hand needs full
 geometry, armorWeight null on weapons/off_hand, evasion < 0.20, moveSpeed <
 0.5, epic/legendary stat floors, and the power-vs-area rule below).
@@ -239,9 +256,11 @@ geometry, armorWeight null on weapons/off_hand, evasion < 0.20, moveSpeed <
 | Spirit Focus      | off_hand  | uncommon | —                            | magicDef 10, magicResist 0.05, maxMp 25            |
 
 **Power-vs-area rule (main_hand only):** if `geometryWidth > 1.0`, then
-`weaponDamage + physicalAttack + magicAttack` must not exceed 20. Apprentice
+`weaponDamage + physicalAttack + magicAttack` must not exceed 20.
+Apprentice
 Staff sits exactly at the boundary (6 + 14 = 20, width 1.8) — the validator
 enforces `<= 20` (not a strict `<`) specifically so this starter item stays
-legal; tightening this to a strict `<` would retroactively break it. Flagged
+legal; tightening this to a strict `<` would retroactively break it.
+Flagged
 here rather than silently choosing one reading, since it's a real judgment
 call `item-balancer` may want to revisit once a real stat budget exists.

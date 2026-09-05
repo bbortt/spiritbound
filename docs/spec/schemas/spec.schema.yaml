@@ -1,0 +1,20 @@
+# Document schema for specs (SW, CON, ARCH, NF, STK, SYS, ...).
+# clew merges this with the pinned core (id form, `**Status**` grammar, relation
+# links) it always enforces. The `Status` value set is clew's; it is listed here so
+# the schema is complete, and a restated enum must match clew's set exactly. Lens
+# carries only the allowed values.
+onError: fail
+fields:
+  Title:
+    required: true
+  Lens:
+    required: true
+    enum: [STK, SYS, SW, ARCH, NF, CON]
+  Status:
+    enum: [planned, active, deprecated]
+  Description:
+    required: true
+  Rationale:
+    required: true
+  Verification Description:
+    required: true

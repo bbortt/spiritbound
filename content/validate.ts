@@ -1,4 +1,10 @@
 import { z } from 'zod';
+import {
+  realizes,
+  concerns,
+  ConTraceables,
+  SysTraceables,
+} from '../src/clew/traceables/clew';
 
 export { loadCards } from './loader';
 
@@ -44,66 +50,75 @@ export const CardSchema = z
 
 export type CardDef = z.infer<typeof CardSchema>;
 
-function crossCheck(cards: CardDef[]): string[] {
-  const errors: string[] = [];
+const crossCheck = realizes(
+  [
+    ConTraceables.CON_014_LEGENDARY_CARDS_NEED_MINLEVEL_THIRTY_FIVE_EPIC_CARDS_NEED_TWENTY,
+    ConTraceables.CON_015_A_WARD_PASSIVE_CARD_MUST_HAVE_ZERO_MP_COST,
+  ] as const,
+  function crossCheck(cards: CardDef[]): string[] {
+    const errors: string[] = [];
 
-  const slugs = cards.map((c) => c.slug);
-  const dupes = slugs.filter((s, i) => slugs.indexOf(s) !== i);
-  if (dupes.length > 0) {
-    errors.push(`Duplicate slugs: ${[...new Set(dupes)].join(', ')}`);
-  }
-
-  for (const card of cards) {
-    if (card.rarity === 'legendary' && card.minLevel < 35) {
-      errors.push(
-        `${card.slug}: legendary card must have minLevel >= 35 (got ${card.minLevel})`,
-      );
+    const slugs = cards.map((c) => c.slug);
+    const dupes = slugs.filter((s, i) => slugs.indexOf(s) !== i);
+    if (dupes.length > 0) {
+      errors.push(`Duplicate slugs: ${[...new Set(dupes)].join(', ')}`);
     }
-    if (card.rarity === 'epic' && card.minLevel < 20) {
-      errors.push(
-        `${card.slug}: epic card must have minLevel >= 20 (got ${card.minLevel})`,
-      );
-    }
-    if (
-      card.type === 'passive' &&
-      card.passiveKind === 'ward' &&
-      card.mpCost !== 0
-    ) {
-      errors.push(
-        `${card.slug}: ward passive must have mpCost === 0 (got ${card.mpCost})`,
-      );
-    }
-  }
 
-  return errors;
-}
-
-export function validateCards(cards: unknown[]): {
-  valid: boolean;
-  errors: string[];
-} {
-  const errors: string[] = [];
-  const valid: CardDef[] = [];
-
-  for (const item of cards) {
-    const result = CardSchema.safeParse(item);
-    if (!result.success) {
-      const slug =
-        typeof (item as Record<string, unknown>)?.slug === 'string'
-          ? ((item as Record<string, unknown>).slug as string)
-          : '(unknown)';
-      for (const issue of result.error.issues) {
-        const path = issue.path.join('.') || 'root';
-        errors.push(`${slug}: ${path}: ${issue.message}`);
+    for (const card of cards) {
+      if (card.rarity === 'legendary' && card.minLevel < 35) {
+        errors.push(
+          `${card.slug}: legendary card must have minLevel >= 35 (got ${card.minLevel})`,
+        );
       }
-    } else {
-      valid.push(result.data);
+      if (card.rarity === 'epic' && card.minLevel < 20) {
+        errors.push(
+          `${card.slug}: epic card must have minLevel >= 20 (got ${card.minLevel})`,
+        );
+      }
+      if (
+        card.type === 'passive' &&
+        card.passiveKind === 'ward' &&
+        card.mpCost !== 0
+      ) {
+        errors.push(
+          `${card.slug}: ward passive must have mpCost === 0 (got ${card.mpCost})`,
+        );
+      }
     }
-  }
 
-  errors.push(...crossCheck(valid));
-  return { valid: errors.length === 0, errors };
-}
+    return errors;
+  },
+);
+
+export const validateCards = concerns(
+  SysTraceables.SYS_008_CONTENT_IS_AUTHORED_AS_JSON_VALIDATED_THEN_IDEMPOTENTLY_SEEDED,
+  function validateCards(cards: unknown[]): {
+    valid: boolean;
+    errors: string[];
+  } {
+    const errors: string[] = [];
+    const valid: CardDef[] = [];
+
+    for (const item of cards) {
+      const result = CardSchema.safeParse(item);
+      if (!result.success) {
+        const slug =
+          typeof (item as Record<string, unknown>)?.slug === 'string'
+            ? ((item as Record<string, unknown>).slug as string)
+            : '(unknown)';
+        for (const issue of result.error.issues) {
+          const path = issue.path.join('.') || 'root';
+          errors.push(`${slug}: ${path}: ${issue.message}`);
+        }
+      } else {
+        valid.push(result.data);
+      }
+    }
+
+    errors.push(...crossCheck(valid));
+    return { valid: errors.length === 0, errors };
+  },
+);
 
 export function parseCards(raw: unknown[]): CardDef[] {
   const { valid, errors } = validateCards(raw);

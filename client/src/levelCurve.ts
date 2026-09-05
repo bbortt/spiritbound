@@ -11,7 +11,7 @@ import {
  * and the architecture rule is that derived values are never stored on a row.
  * Keep this in sync by hand if rules/death.ts changes; see the matching note
  * in that file and in ARCHITECTURE.md. The server-side function is the
- * canonical `realizes` for SW-021; this is a display-only duplicate.
+ * canonical implementation; this is a display-only duplicate.
  */
 export const computeCharacterLevel = concerns(
   [
