@@ -355,3 +355,103 @@ Fixed as part of the same change that made it testable
 (`client/src/handSlots.test.ts` cross-checks the corrected client copy
 against `rules/death.ts`'s real output), consistent with the existing
 `effectiveStats.ts`/`levelCurve.ts` duplication pattern.
+
+## `content/config.json` splits operator configuration from authored content — 2026
+
+**Context:** Every balance dial lived in code: `CARD_DROP_CHANCE`/
+`ITEM_DROP_CHANCE`/`RARITY_DROP_WEIGHTS` in `rules/drops.ts`, the aggro/attack/
+deaggro ranges and chase/reset speeds in `rules/enemyAi.ts`, and the 60s
+despawn / 80px pickup / 15s respawn literals inline in `index.ts`.
+Retuning a
+server therefore meant editing TypeScript and republishing — which makes a
+"custom server" not meaningfully custom.
+`content/` already held authored
+content (`cards.json`, `equipment.json`) with a validator/loader pipeline, so
+the question was whether operator dials belong in the same place.
+
+**Decision:** They do, but as a distinct _kind_ of file with a different owner.
+`content/` now holds two kinds:
+
+- **content** — `cards.json`, `equipment.json`.
+  Authored by designers, seeded
+  into tables, changed by a content pull request.
+- **operator configuration** — `config.json`.
+  Balance dials a server operator
+  is expected to edit on their own deployment.
+  Never seeded; read straight
+  into the module's runtime constants.
+
+Both go through the same discipline: a Zod schema in a pure validator
+(`validateConfig.ts`), a `node:fs` loader split out per the existing
+tree-shaking decision (`configLoader.ts`), validation at module load, and a
+throw that stops the module rather than a warning that lets it run.
+
+The pure rule modules do **not** import the config.
+`rules/drops.ts` takes a
+`RarityWeights` argument; `rules/enemyAi.ts` takes an `EnemyAiTuning`
+argument; `rules/leveling.ts` takes a `LevelDiffTuning` argument.
+`index.ts` —
+the one place that already owns runtime wiring — loads the config once at
+module init and passes the values in.
+
+**Consequences:** A server operator can retune the economy without forking the
+code, and `BALANCE.md` finally has a single file to point at instead of three
+modules.
+Keeping the rules parameterised rather than letting them read a config
+singleton preserves what the testing contract depends on: a rule function's
+output is a function of its arguments, so a test fixes the tuning instead of
+the process's environment.
+
+The cost, recorded rather than resolved: **two constraints that used to be
+guaranteed by code are now numbers in a file an operator may edit, and the
+schema does not enforce either.** `CON-003` (chase speed always under the
+player's move speed) and `CON-004` (zero legendary drop weight) were both
+code-level invariants; they are now `config.json` values.
+The shipped config
+honours both, and `enemyAi.test.ts` and `config.test.ts` assert that it does —
+so this repository's own values stay correct.
+What is gone is the guarantee
+for a _modified_ deployment.
+Adding schema-level guards for both would close
+it, and is a deliberate follow-up decision rather than an oversight (see
+`STR-009`'s Out of scope).
+
+## The client duplicates `computeXpReward` to render the floating XP number — 2026
+
+**Context:** The floating "+N XP" text read `enemy.xpReward` straight off the
+row.
+Once the reward scales by the player-to-enemy level gap, that column no
+longer holds the number that was granted — the reward depends on _who_ killed
+the enemy — so it was removed from the table entirely, leaving the client with
+no source for the value.
+Rows carry state; they do not carry the outcome of a
+reducer call.
+
+**Decision:** Duplicate it.
+`client/src/xpReward.ts` carries a byte-for-byte
+copy of `rules/leveling.ts#computeXpReward` plus a copy of the `xp` block of
+`config.json`, and the client computes the number from the enemy row's `level`
+and the local character's level.
+
+The alternatives were worse.
+Writing the granted amount back to the enemy row
+would store a derived, per-killer value on a shared row — exactly what
+`index.ts`'s own header forbids.
+Shipping the operator's balance file to every
+browser for one number is disproportionate.
+Duplication is the pattern this
+codebase has already chosen twice at the same boundary
+(`client/src/levelCurve.ts`, `client/src/handSlots.ts`), and it is the one with
+a precedent for keeping the copies honest.
+
+**Consequences:** A fourth hand-synced duplicate, with the usual drift risk —
+mitigated the same way as the others: `client/src/xpReward.test.ts` sweeps
+every level pair from 1–50 and asserts the client's output equals the server
+function's, and `content/config.test.ts` asserts the client's copied `xp`
+block still matches the shipped `config.json`.
+That second check is the one
+that actually bites: a retuned config nobody mirrored into the client would
+otherwise make the floating number silently disagree with the XP granted.
+It
+lives on the content side because the client's `tsconfig` cannot see the
+`node:fs` loader.

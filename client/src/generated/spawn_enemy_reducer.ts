@@ -14,4 +14,5 @@ export default {
   zoneId: __t.u32(),
   x: __t.f32(),
   y: __t.f32(),
+  level: __t.u32(),
 };

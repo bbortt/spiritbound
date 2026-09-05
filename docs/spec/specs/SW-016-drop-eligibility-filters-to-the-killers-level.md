@@ -3,7 +3,7 @@ Drop eligibility filters definitions to the killer's character level
 
 **Lens**: SW
 
-**Status**: active
+**Status**: deprecated
 
 **Description**
 A successful roll's eligible pool is every `cardDefinition`/
@@ -28,3 +28,14 @@ value exactly equal to the killer's level.
 **Realizes**
 
 - [SYS-004](SYS-004-enemy-deaths-roll-level-gated-rarity-weighted-ground-drops.md)
+
+## Changes
+
+- **2026-09-05** — Deprecated by STR-009, superseded by `SW-037`.
+  Filtering the drop pool by the _killer's_ level made a high-level player
+  a loot multiplier over low-level enemies — the same wolf dropped level-20
+  gear for a veteran and level-1 gear for a newcomer.
+  Eligibility is now
+  keyed to the enemy's own level plus two, so the drop describes what died.
+  The per-definition `minLevel`/`minCharacterLevel` gate itself is
+  unchanged; only the level it is compared against moved.

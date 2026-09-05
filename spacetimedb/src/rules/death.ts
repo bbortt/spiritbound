@@ -5,10 +5,12 @@
  */
 
 import type { Rarity, AttunementSlots, HandSlots } from '../types';
+import { RARITY_ORDER } from '../types';
 import {
   concerns,
   realizes,
   ArchTraceables,
+  ConTraceables,
   SwTraceables,
   SysTraceables,
 } from '../../../src/clew/traceables/clew';
@@ -63,6 +65,70 @@ export const computeAttunementSlots = realizes(
       epic: Math.min(2, Math.floor(l * 0.08)),
       legendary: Math.min(1, l >= 30 ? 1 : 0), // unlocks at spirit level 30
     };
+  },
+);
+
+// ─── Rarity ceiling (what the spirit can hold at all) ─────────────────────────
+
+/**
+ * The highest card rarity this spirit can equip/swap.
+ * Separate from attunement (what survives death) — this is
+ * about what the spirit can HANDLE at all.
+ *
+ * The thresholds sit deliberately below the attunement thresholds for the same
+ * tiers (rare at 12 here vs a first rare slot around 10 and a legendary slot at
+ * 30 there): a player gets to wield a tier for a stretch of levels before they
+ * can protect it, so an above-tier card is a risk before it is an asset.
+ */
+export const computeRarityCeiling = concerns(
+  SysTraceables.SYS_010_SPIRIT_LEVEL_CAPS_THE_CARD_RARITY_A_PLAYER_CAN_HOLD_AT_ALL,
+  realizes(
+    SwTraceables.SW_033_THE_RARITY_CEILING_STEPS_AT_SPIRIT_LEVELS_FIVE_TWELVE_TWENTY_FIVE_AND_FORTY,
+    function computeRarityCeiling(spiritLevel: number): Rarity {
+      if (spiritLevel >= 40) return 'legendary';
+      if (spiritLevel >= 25) return 'epic';
+      if (spiritLevel >= 12) return 'rare';
+      if (spiritLevel >= 5) return 'uncommon';
+      return 'common';
+    },
+  ),
+);
+
+/**
+ * Can a spirit of this level hold a card of this rarity at all?
+ *
+ * This is the EQUIP gate. It never consults the attunement budget and the
+ * attunement budget never consults it — two separate spirit gates.
+ */
+export const canSpiritHandle = concerns(
+  ConTraceables.CON_017_THE_RARITY_CEILING_AND_THE_ATTUNEMENT_SLOTS_ARE_TWO_SEPARATE_GATES,
+  realizes(
+    SwTraceables.SW_033_THE_RARITY_CEILING_STEPS_AT_SPIRIT_LEVELS_FIVE_TWELVE_TWENTY_FIVE_AND_FORTY,
+    function canSpiritHandle(spiritLevel: number, cardRarity: Rarity): boolean {
+      const ceiling = computeRarityCeiling(spiritLevel);
+      return RARITY_ORDER.indexOf(cardRarity) <= RARITY_ORDER.indexOf(ceiling);
+    },
+  ),
+);
+
+/** Human-readable rarity, for the ceiling messages shown to players. */
+export function rarityLabel(rarity: Rarity): string {
+  return rarity.charAt(0).toUpperCase() + rarity.slice(1);
+}
+
+/**
+ * The rejection message shared by equipCard and toggleAttune, so the two paths
+ * cannot drift into telling the player two different things.
+ */
+export const rarityCeilingError = realizes(
+  SwTraceables.SW_034_EQUIPPING_OR_ATTUNING_ABOVE_THE_CEILING_IS_REJECTED_NAMING_THE_CEILING,
+  function rarityCeilingError(spiritLevel: number, cardRarity: Rarity): string {
+    const ceiling = computeRarityCeiling(spiritLevel);
+    return (
+      `Your spirit (Lv ${spiritLevel}) cannot handle ${cardRarity} cards yet — ` +
+      `it can hold up to ${ceiling}. Level your spirit or find a stronger ` +
+      `location spirit.`
+    );
   },
 );
 

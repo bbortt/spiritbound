@@ -254,6 +254,26 @@ so spirit progression is the spine of character power.
 - Role: **death insurance** (see Death Rules).
 - Survives your death — it is the meta-progression anchor across lives.
 
+### The two spirit gates (don't confuse them)
+
+A spirit imposes **two separate rarity gates**, and passing one never implies
+passing the other:
+
+- **Rarity ceiling** — what the spirit can **EQUIP** (or attune) _at all_.
+  Common below spirit level 5, then uncommon at 5, rare at 12, epic at 25,
+  legendary at 40.
+  Above the ceiling the card is simply unusable: the server
+  rejects both `equipCard` and `toggleAttune`, and the client shows it locked.
+- **Attunement slots** — what survives **DEATH**.
+  A rarity-tiered budget that
+  grows with spirit level (legendary unlocks at 30).
+
+**A spirit can equip a rare card long before it can protect one.** That gap is
+deliberate: for a stretch of spirit levels an above-tier card is a _risk_ — you
+can fight with it, and death still destroys it.
+Levelling the spirit first buys
+access, then buys insurance.
+
 ### Spirit Leveling — Card Sacrifice
 
 - Feed cards to a spirit to level it up.
@@ -517,9 +537,24 @@ Permanent progress that survives every death — _access and cosmetics, never po
   account_progress.total_xp_all_lives both update, the latter surviving
   death; level-up refills HP/MP and stamps `lastLevelUpAt` for the client's
   golden-flash/"LEVEL N" VFX; client XP bar + floating "+N XP" text) ·
-  **level-gated drops** (both card and item drop pools filtered to the
-  killer's level before the rarity-weighted pick, so e.g. a level-5-gated
-  card can't drop for a level-1 character).
+  **level-gated drops** (both card and item drop pools filtered before the
+  rarity-weighted pick, so e.g. a level-5-gated card can't drop from a
+  level-1 enemy) · **server balance config** (`content/config.json` — drop
+  rates and rarity weights, XP tuning, drop despawn/pickup range, enemy AI
+  ranges and speeds are operator-tunable, Zod-validated at module load, and
+  the module refuses to start on an invalid file) · **spirit rarity
+  ceiling** (spirit level caps which card rarities can be equipped or
+  attuned at all — common/uncommon/rare/epic/legendary at spirit levels
+  1/5/12/25/40 — enforced in `equipCard` and `toggleAttune`, and shown as
+  locked cards plus a ceiling line in the collection and spirit panels;
+  separate from the attunement slots, see the two-gates note above) ·
+  **level-scaled XP** (enemies carry a `level`; the kill reward is computed
+  from the level gap — full XP within 2 levels, linear falloff to zero at 8
+  levels above, a bonus capped at ×1.5 for killing above your level so
+  over-pulling never pays under permadeath — and drop eligibility is keyed
+  to the enemy's level + 2 rather than the killer's, so farming trivial mobs
+  yields neither XP nor high-level loot; the client shows the enemy's level
+  colour-coded by relative difficulty and reads a zero reward as "No XP").
 
 ## Tech Stack (decided)
 

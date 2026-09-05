@@ -3,7 +3,7 @@ Every enemy currently awards a flat XP reward regardless of difficulty
 
 **Lens**: CON
 
-**Status**: active
+**Status**: deprecated
 
 **Description**
 Every zone-1 enemy's `xpReward` is currently the same flat value (25)
@@ -28,3 +28,16 @@ rewards.
 **Realizes**
 
 - [SYS-005](SYS-005-killing-enemies-grants-xp-that-levels-up-the-character.md)
+
+## Changes
+
+- **2026-09-05** — Deprecated by STR-009.
+  This spec recorded the flat 25-XP-per-kill value as a temporary
+  simplification and named enemy tiers as the trigger that would retire it.
+  STR-009 retires it from the other side: the reward is now computed from
+  the configured base XP and the player-to-enemy level difference
+  (`SW-036`), and the enemy row no longer carries an `xpReward` column at
+  all, so there is no flat per-enemy reward left to record.
+  Differentiated
+  per-enemy _difficulty_ (HP, damage) remains unbuilt and stays out of
+  scope.

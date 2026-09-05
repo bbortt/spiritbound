@@ -3,30 +3,23 @@
  * Pure functions: no SpacetimeDB imports, no side effects. Randomness is always
  * taken as a parameter (a 0..1 roll) so callers (reducers) can pass `ctx.random()`
  * and tests can pass a fixed value.
+ *
+ * The drop chances and the rarity weight table are no longer constants here:
+ * they are server-operator dials in content/config.json, passed in by the
+ * reducer module so this file stays independent of the config.
  */
 
 import type { Rarity } from '../types';
 import {
   realizes,
-  concerns,
   ConTraceables,
   SwTraceables,
   SysTraceables,
 } from '../../../src/clew/traceables/clew';
 
-/** Chance of a ground card drop per enemy death. */
-export const CARD_DROP_CHANCE = 0.25;
-/** Chance of a ground item drop per enemy death — independent of the card roll. */
-export const ITEM_DROP_CHANCE = 0.2;
+/** A rarity weight table, as declared per drop category in config.json. */
+export type RarityWeights = Record<Rarity, number>;
 
-/**
- * Rarity weights for both card and item drop rolls. Legendary is 0 — trash
- * mobs never drop legendaries, reserved for bosses/dungeon tiers (BALANCE.md).
- */
-export const RARITY_DROP_WEIGHTS: Record<Rarity, number> = concerns(
-  ConTraceables.CON_004_LEGENDARY_DROP_WEIGHT_IS_ZERO,
-  { common: 0.6, uncommon: 0.25, rare: 0.12, epic: 0.03, legendary: 0 },
-);
 export const RARITY_DROP_ORDER: readonly Rarity[] = [
   'common',
   'uncommon',
@@ -36,18 +29,24 @@ export const RARITY_DROP_ORDER: readonly Rarity[] = [
 ] as const;
 
 /**
- * Roll a rarity tier weighted by RARITY_DROP_WEIGHTS (common-heavy, legendary
- * never rolls since its weight is 0 — trash mobs don't drop legendaries).
+ * Roll a rarity tier weighted by the supplied table (common-heavy in the
+ * shipped config; legendary never rolls there, since its weight is 0 — trash
+ * mobs don't drop legendaries). The table is validated to sum to 1.0 at module
+ * load, so the trailing fallback only catches float rounding at the
+ * very top of the range.
  */
 export const pickWeightedRarity = realizes(
   [
     SysTraceables.SYS_004_ENEMY_DEATHS_ROLL_LEVEL_GATED_RARITY_WEIGHTED_GROUND_DROPS,
     ConTraceables.CON_004_LEGENDARY_DROP_WEIGHT_IS_ZERO,
   ] as const,
-  function pickWeightedRarity(randomRoll: number): Rarity {
+  function pickWeightedRarity(
+    randomRoll: number,
+    weights: RarityWeights,
+  ): Rarity {
     let cumulative = 0;
     for (const rarity of RARITY_DROP_ORDER) {
-      cumulative += RARITY_DROP_WEIGHTS[rarity];
+      cumulative += weights[rarity];
       if (randomRoll < cumulative) return rarity;
     }
     return 'common'; // fallback for float rounding at the top of the range
@@ -69,9 +68,10 @@ export const pickLevelAndRarityGated = realizes(
     eligible: readonly T[],
     randomRarityRoll: number,
     randomIndexRoll: number,
+    weights: RarityWeights,
   ): T | null {
     if (eligible.length === 0) return null;
-    const rarity = pickWeightedRarity(randomRarityRoll);
+    const rarity = pickWeightedRarity(randomRarityRoll, weights);
     const pool = eligible.filter((item) => item.rarity === rarity);
     const finalPool = pool.length > 0 ? pool : eligible;
     const index = Math.min(

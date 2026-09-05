@@ -106,9 +106,27 @@ player-facing Jekyll reference site (`site/`) generated from
    Drops are now level-gated and rarity-weighted (both cards and items),
    and drop rates were rebalanced down (25%/20%, from 70%/40%) — see
    `BALANCE.md`.
-   Still needed: enemy difficulty tiers (flat 25 XP / 100 HP
-   everywhere), a merge UI to make duplicate drops feel useful.
-3. Expand content: more cards/enemies/zones/items now that gear is fully wired.
+   XP now scales with the player-to-enemy level gap
+   (`rules/leveling.ts`, enemies carry a `level`), and drop eligibility is
+   keyed to the enemy's level rather than the killer's.
+   Still needed:
+   enemy difficulty _tiers_ (HP/damage are still flat at 100/8 across every
+   enemy — only the level varies), a merge UI to make duplicate drops feel
+   useful.
+3. **Server balance config** — `content/config.json` holds the
+   operator-tunable dials (drop rates and rarity weights, XP tuning,
+   drop despawn/pickup, enemy AI ranges and speeds), validated by
+   `content/validateConfig.ts` at module load; the module refuses to start
+   on an invalid file.
+   `cards.json`/`equipment.json` remain authored
+   content — see `ARCHITECTURE.md` for the split and the two invariants it
+   moves out of the compiler's reach.
+4. **Spirit rarity ceiling** — spirit level now caps which card rarities
+   can be equipped or attuned at all (`rules/death.ts`), separate from the
+   attunement slots that decide what survives death.
+   See the "two spirit
+   gates" note in `GAME_DESIGN.md`.
+5. Expand content: more cards/enemies/zones/items now that gear is fully wired.
 
 ## Open Questions (for later)
 

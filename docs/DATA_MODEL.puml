@@ -327,6 +327,7 @@ package "Runtime (instances)" <<Frame>> {
   class Enemy {
     enemy_id : u64 {PK}              ' autoInc
     zone_id : u32 {FK}
+    level : u32                      ' set on spawn; zone-1 enemies are level 2
     pos_x : f32
     pos_y : f32
     spawn_x : f32
@@ -345,7 +346,6 @@ package "Runtime (instances)" <<Frame>> {
     cast_duration_seconds : f32
     cast_shape : ShapeType
     cast_damage : i32
-    xp_reward : u64                  ' awarded to the killer via _grantXp; 25 default for zone-1
   }
 }
 
@@ -535,9 +535,15 @@ end note
 
 note as N_Leveling
   **Leveling rules (rules/):**
-  IMPLEMENTED: enemy.xp_reward (25 default, zone-1) is granted to the
-  killer on death via a shared _grantXp(ctx, character, amount) helper
-  (index.ts), used by both damageEnemy and the public grantXp reducer.
+  IMPLEMENTED: the kill reward is COMPUTED, not stored — rules/leveling.ts
+  computeXpReward(config.xp.base_monster_xp, enemy.level, character.level,
+  config.xp.level_diff_penalty) scales it by the player-to-enemy level gap:
+  full XP within 2 levels, a linear falloff to 0 at 8+ levels above, and a
+  capped bonus (x1.5) for killing above your level. The enemy row therefore
+  carries `level` and NO xp_reward column — the reward depends on the killer,
+  so it is not row state. The result is granted via the shared
+  _grantXp(ctx, character, amount) helper (index.ts), used by both
+  damageEnemy and the public grantXp reducer.
   XP gained -> character.xp (per-life); on threshold (computeCharacterLevel)
   -> level up -> currentHp/currentMp refilled to max, last_level_up_at
   stamped (client watches this field to trigger the level-up flash).
@@ -553,15 +559,27 @@ note as N_Leveling
   Revive card (TRIGGERED passive): fires on group member death IN dungeon
   only; once per dungeon instance; cannot target self.
 
-  **Drop gating (IMPLEMENTED, index.ts):** CARD_DROP_CHANCE=0.25 /
-  ITEM_DROP_CHANCE=0.20 (down from 0.70/0.40). On a hit, eligible content is
-  filtered to CardDefinition.min_character_level / ItemDefinition.min_level
-  <= killer's level, then a rarity tier is chosen by weight (common 60%,
-  uncommon 25%, rare 12%, epic 3%, legendary 0% — legendaries never drop
-  from trash mobs, reserved for bosses/dungeons) before sampling within
-  tier. Empty tier -> falls back to the full eligible pool; empty pool ->
-  no drop (never errors). Duplicate drops are intentional (merge fuel +
-  spirit-sacrifice fodder), not a bug — see BALANCE.md.
+  **Drop gating (IMPLEMENTED, index.ts):** the chances and rarity weights are
+  server-operator dials in content/config.json now, not code constants —
+  cards 25% / gear 20%, with per-category weight tables (cards: common 60%,
+  uncommon 25%, rare 12%, epic 3%, legendary 0%; gear: 65/22/10/3/0 —
+  legendaries never drop from trash mobs, reserved for bosses/dungeons).
+  On a kill, eligible content is filtered to
+  CardDefinition.min_character_level / ItemDefinition.min_level
+  <= ENEMY.level + 2 (not the killer's level, so a low-level enemy drops
+  low-level loot however high-level the player farming it is), then a rarity
+  tier is chosen by weight before sampling within tier. Empty tier -> falls
+  back to the full eligible pool; empty pool -> no drop (never errors).
+  Duplicate drops are intentional (merge fuel + spirit-sacrifice fodder),
+  not a bug — see BALANCE.md.
+
+  **Spirit rarity ceiling (IMPLEMENTED, rules/death.ts):** a spirit's level
+  caps the card rarity it can hold at all — common < 5, uncommon >= 5,
+  rare >= 12, epic >= 25, legendary >= 40 (computeRarityCeiling /
+  canSpiritHandle). Enforced in equipCard AND toggleAttune. This is a
+  SEPARATE gate from the attunement slots: the ceiling decides what can be
+  equipped, the slots decide what survives death, and neither implies the
+  other (a spirit can wield a rare long before it can protect one).
 end note
 
 note bottom of Enemy

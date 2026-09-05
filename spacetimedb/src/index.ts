@@ -26,25 +26,28 @@ import { parseCards } from '../../content/validate';
 import equipmentJson from '../../content/equipment.json';
 import { parseEquipment } from '../../content/validateEquipment';
 
+// @ts-ignore — JSON import resolved by esbuild; the node:fs path in configLoader.ts
+// is tree-shaken from this bundle since only parseConfig is used here.
+import configJson from '../../content/config.json';
+import { parseConfig } from '../../content/validateConfig';
+
 import {
   computeSpiritLevel,
   computeAttunementSlots,
   computeHandSlots,
   computeCharacterLevel,
   computeRetention,
+  canSpiritHandle,
+  rarityCeilingError,
   SACRIFICE_XP,
   type CardForRetention,
 } from './rules/death';
+import { computeXpReward } from './rules/leveling';
 
 import { resolveHit, resolveHeal } from './rules/combat';
 import { EMPTY_STAT_BLOCK, type StatBlock } from './types';
 import { computeEffectiveStats, computeRaceBase } from './rules/stats';
-import {
-  CARD_DROP_CHANCE,
-  ITEM_DROP_CHANCE,
-  pickWeightedRarity,
-  pickLevelAndRarityGated,
-} from './rules/drops';
+import { pickWeightedRarity, pickLevelAndRarityGated } from './rules/drops';
 import {
   distSq,
   findClosestInRange,
@@ -64,12 +67,33 @@ import {
 } from '../../src/clew/traceables/clew';
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// TUNABLE CONSTANTS  (owned by item-balancer/ability-balancer, see BALANCE.md)
+// SERVER CONFIG  (owned by the server OPERATOR — content/config.json)
 // ═══════════════════════════════════════════════════════════════════════════════
 //
-// CARD_DROP_CHANCE/ITEM_DROP_CHANCE and the rarity-weighting/level-gating pure
-// logic now live in ./rules/drops.ts (see ARCH note in that file's header) —
-// this reducer module only calls into it and writes the result to tables.
+// Balance dials — drop chances and rarity weights, XP tuning, ground-drop
+// lifetime and pickup range, enemy AI ranges and speeds — are read once, here,
+// at module init. A validation failure throws out of module initialisation and
+// the module does not start: no defaults, no partial application.
+//
+// The pure rule modules in ./rules/ never import this; they take their tuning
+// as parameters, and this file passes it in.
+const CONFIG = concerns(
+  [
+    ArchTraceables.ARCH_010_CONFIG_JSON_IS_OPERATOR_TUNABLE_CARDS_AND_EQUIPMENT_JSON_ARE_CONTENT,
+    ConTraceables.CON_016_AN_INVALID_CONFIG_REFUSES_TO_START_THE_MODULE,
+  ] as const,
+  parseConfig(configJson),
+);
+
+/** Microsecond forms of the configured durations, for the schedule/timestamp maths. */
+const DROP_DESPAWN_US = BigInt(
+  Math.round(CONFIG.drops.despawnSeconds * 1_000_000),
+);
+const ENEMY_RESPAWN_US = BigInt(
+  Math.round(CONFIG.enemies.respawnSeconds * 1_000_000),
+);
+/** Squared pickup range, so the reducers can compare without a square root. */
+const PICKUP_RANGE_SQ = CONFIG.drops.pickupRangePx * CONFIG.drops.pickupRangePx;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CUSTOM SPACETIMEDB TYPES
@@ -439,6 +463,8 @@ const enemy = table(
   {
     enemyId: t.u64().primaryKey().autoInc(),
     zoneId: t.u32(),
+    /** Set on spawn. Drives the XP reward and the drop-pool level gate. */
+    level: t.u32(),
     posX: t.f32(),
     posY: t.f32(),
     spawnX: t.f32(),
@@ -457,7 +483,6 @@ const enemy = table(
     castDurationSeconds: t.f32(),
     castShape: TShape,
     castDamage: t.i32(),
-    xpReward: t.u64(),
   },
 );
 
@@ -882,6 +907,12 @@ const _grantXp = realizes(
   ),
 );
 
+/** Zone-1 enemies are level 2 — see docs/BALANCE.md for the zone/level table. */
+const ZONE_1_ENEMY_LEVEL = concerns(
+  SysTraceables.SYS_011_XP_AND_DROP_ELIGIBILITY_SCALE_WITH_THE_ENEMYS_OWN_LEVEL,
+  2,
+);
+
 function _seedZone1Enemies(ctx: any): void {
   const TILE = 48;
   const half = TILE / 2;
@@ -894,6 +925,7 @@ function _seedZone1Enemies(ctx: any): void {
     ctx.db.enemy.insert({
       enemyId: 0n,
       zoneId: 1,
+      level: ZONE_1_ENEMY_LEVEL,
       posX: pos.x,
       posY: pos.y,
       spawnX: pos.x,
@@ -912,10 +944,6 @@ function _seedZone1Enemies(ctx: any): void {
       castDurationSeconds: 1.8,
       castShape: { tag: 'circle' },
       castDamage: 15,
-      xpReward: concerns(
-        ConTraceables.CON_007_EVERY_ENEMY_CURRENTLY_AWARDS_A_FLAT_XP_REWARD,
-        25n,
-      ),
     });
   }
 }
@@ -1144,41 +1172,55 @@ export const sacrificeCard = realizes(
   }),
 );
 
-export const toggleAttune = realizes(
-  SwTraceables.SW_025_ATTUNING_PAST_A_RARITY_SLOT_BUDGET_IS_REJECTED_UN_ATTUNING_NEVER_IS,
-  db.reducer({ cardInstanceId: t.u64() }, (ctx, { cardInstanceId }) => {
-    const card = ctx.db.cardInstance.cardInstanceId.find(cardInstanceId);
-    if (!card || !card.ownerIdentity.equals(ctx.sender))
-      throw new SenderError('Card not found or not owned');
+export const toggleAttune = concerns(
+  SysTraceables.SYS_010_SPIRIT_LEVEL_CAPS_THE_CARD_RARITY_A_PLAYER_CAN_HOLD_AT_ALL,
+  realizes(
+    [
+      SwTraceables.SW_025_ATTUNING_PAST_A_RARITY_SLOT_BUDGET_IS_REJECTED_UN_ATTUNING_NEVER_IS,
+      SwTraceables.SW_034_EQUIPPING_OR_ATTUNING_ABOVE_THE_CEILING_IS_REJECTED_NAMING_THE_CEILING,
+    ] as const,
+    db.reducer({ cardInstanceId: t.u64() }, (ctx, { cardInstanceId }) => {
+      const card = ctx.db.cardInstance.cardInstanceId.find(cardInstanceId);
+      if (!card || !card.ownerIdentity.equals(ctx.sender))
+        throw new SenderError('Card not found or not owned');
 
-    const def = ctx.db.cardDefinition.cardDefId.find(card.cardDefId);
-    if (!def) throw new SenderError('Card definition missing');
+      const def = ctx.db.cardDefinition.cardDefId.find(card.cardDefId);
+      if (!def) throw new SenderError('Card definition missing');
 
-    const spirit = ctx.db.personalSpirit.accountIdentity.find(ctx.sender);
-    if (!spirit) throw new SenderError('No spirit bonded');
+      const spirit = ctx.db.personalSpirit.accountIdentity.find(ctx.sender);
+      if (!spirit) throw new SenderError('No spirit bonded');
 
-    if (!card.attuned) {
-      const slots = computeAttunementSlots(spirit.level);
-      const rarityTag = def.rarity.tag as keyof typeof slots;
-      const slotMax = slots[rarityTag];
-      const allOwned = [...ctx.db.cardInstance.by_owner.filter(ctx.sender)];
-      const usedSlots = allOwned.filter((ci: any) => {
-        if (!ci.attuned || ci.cardInstanceId === cardInstanceId) return false;
-        const d = ctx.db.cardDefinition.cardDefId.find(ci.cardDefId);
-        return d?.rarity.tag === rarityTag;
-      }).length;
+      if (!card.attuned) {
+        // The ceiling gate comes first: you cannot protect what you cannot hold.
+        // Un-attuning skips it entirely — letting a card go is never blocked.
+        if (!canSpiritHandle(spirit.level, def.rarity.tag)) {
+          throw new SenderError(
+            rarityCeilingError(spirit.level, def.rarity.tag),
+          );
+        }
 
-      if (usedSlots >= slotMax)
-        throw new SenderError(
-          `No ${rarityTag} attunement slots remaining (spirit level ${spirit.level})`,
-        );
-    }
+        const slots = computeAttunementSlots(spirit.level);
+        const rarityTag = def.rarity.tag as keyof typeof slots;
+        const slotMax = slots[rarityTag];
+        const allOwned = [...ctx.db.cardInstance.by_owner.filter(ctx.sender)];
+        const usedSlots = allOwned.filter((ci: any) => {
+          if (!ci.attuned || ci.cardInstanceId === cardInstanceId) return false;
+          const d = ctx.db.cardDefinition.cardDefId.find(ci.cardDefId);
+          return d?.rarity.tag === rarityTag;
+        }).length;
 
-    ctx.db.cardInstance.cardInstanceId.update({
-      ...card,
-      attuned: !card.attuned,
-    });
-  }),
+        if (usedSlots >= slotMax)
+          throw new SenderError(
+            `No ${rarityTag} attunement slots remaining (spirit level ${spirit.level})`,
+          );
+      }
+
+      ctx.db.cardInstance.cardInstanceId.update({
+        ...card,
+        attuned: !card.attuned,
+      });
+    }),
+  ),
 );
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1186,9 +1228,15 @@ export const toggleAttune = realizes(
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export const equipCard = concerns(
-  SysTraceables.SYS_007_THE_HAND_IS_A_SPIRIT_LEVEL_GATED_CARD_LOADOUT,
+  [
+    SysTraceables.SYS_007_THE_HAND_IS_A_SPIRIT_LEVEL_GATED_CARD_LOADOUT,
+    SysTraceables.SYS_010_SPIRIT_LEVEL_CAPS_THE_CARD_RARITY_A_PLAYER_CAN_HOLD_AT_ALL,
+  ] as const,
   realizes(
-    SwTraceables.SW_028_EQUIP_CARD_ENFORCES_LEVEL_GATE_AND_HAND_SLOT_CAP_REPLACING_ONLY_THE_EXACT_SLOT,
+    [
+      SwTraceables.SW_028_EQUIP_CARD_ENFORCES_LEVEL_GATE_AND_HAND_SLOT_CAP_REPLACING_ONLY_THE_EXACT_SLOT,
+      SwTraceables.SW_034_EQUIPPING_OR_ATTUNING_ABOVE_THE_CEILING_IS_REJECTED_NAMING_THE_CEILING,
+    ] as const,
     db.reducer(
       { cardInstanceId: t.u64(), slotType: TCardType, slotIndex: t.u32() },
       (ctx, { cardInstanceId, slotType, slotIndex }) => {
@@ -1209,6 +1257,14 @@ export const equipCard = concerns(
 
         const spirit = ctx.db.personalSpirit.accountIdentity.find(ctx.sender);
         if (!spirit) throw new SenderError('No spirit bonded');
+
+        // What the spirit can HANDLE at all, checked before the slot budget —
+        // a rarity it cannot hold is not a "hand is full" problem.
+        if (!canSpiritHandle(spirit.level, def.rarity.tag)) {
+          throw new SenderError(
+            rarityCeilingError(spirit.level, def.rarity.tag),
+          );
+        }
 
         const handSlots = computeHandSlots(spirit.level);
         const hand = [
@@ -1335,11 +1391,12 @@ export const unequipItem = db.reducer(
  * Useful for testing; seeding is handled by init().
  */
 export const spawnEnemy = db.reducer(
-  { zoneId: t.u32(), x: t.f32(), y: t.f32() },
-  (ctx, { zoneId, x, y }) => {
+  { zoneId: t.u32(), x: t.f32(), y: t.f32(), level: t.u32() },
+  (ctx, { zoneId, x, y, level }) => {
     ctx.db.enemy.insert({
       enemyId: 0n,
       zoneId,
+      level: level > 0 ? level : ZONE_1_ENEMY_LEVEL,
       posX: x,
       posY: y,
       spawnX: x,
@@ -1358,10 +1415,6 @@ export const spawnEnemy = db.reducer(
       castDurationSeconds: 1.8,
       castShape: { tag: 'circle' },
       castDamage: 15,
-      xpReward: concerns(
-        ConTraceables.CON_007_EVERY_ENEMY_CURRENTLY_AWARDS_A_FLAT_XP_REWARD,
-        25n,
-      ),
     });
   },
 );
@@ -1432,15 +1485,23 @@ export const damageEnemy = realizes(
         const newHp = e.currentHp - result.damage;
         if (newHp <= 0) {
           ctx.db.enemy.enemyId.update({ ...e, currentHp: 0, alive: false });
-          // Schedule respawn 15 s from now
+          // Schedule respawn, at the configured delay
           ctx.db.enemyRespawnSchedule.insert({
             scheduledId: 0n,
             scheduledAt: ScheduleAt.time(
-              ctx.timestamp.microsSinceUnixEpoch + 15_000_000n,
+              ctx.timestamp.microsSinceUnixEpoch + ENEMY_RESPAWN_US,
             ),
             enemyId: e.enemyId,
           });
-          _grantXp(ctx, char, e.xpReward);
+          // Reward scales with the gap between the killer and what they killed:
+          // trivial mobs pay nothing, above-level mobs pay a capped bonus.
+          const xp = computeXpReward(
+            CONFIG.xp.baseMonsterXp,
+            e.level,
+            char.level,
+            CONFIG.xp.levelDiffPenalty,
+          );
+          if (xp > 0) _grantXp(ctx, char, BigInt(xp));
           // Independent drop rolls, level-gated + rarity-weighted (see BALANCE.md).
           _dropCardFromEnemy(ctx, e, char);
           _dropItemFromEnemy(ctx, e, char);
@@ -1452,18 +1513,37 @@ export const damageEnemy = realizes(
   ),
 );
 
-/** Roll a ground card drop when an enemy dies. Level-gated, rarity-weighted. */
+/**
+ * How far above the enemy's own level a definition may still be eligible.
+ * Headroom inside the enemy's band — not a reintroduction of the killer's level.
+ */
+const DROP_LEVEL_HEADROOM = 2;
+
+/**
+ * Roll a ground card drop when an enemy dies. Rarity-weighted, and gated by the
+ * ENEMY's level rather than the killer's, so a level-2 wolf drops level-2 loot
+ * no matter who kills it.
+ */
 const _dropCardFromEnemy = realizes(
-  SwTraceables.SW_015_CARD_AND_ITEM_DROPS_ARE_INDEPENDENT_PER_DEATH_ROLLS,
+  [
+    SwTraceables.SW_015_CARD_AND_ITEM_DROPS_ARE_INDEPENDENT_PER_DEATH_ROLLS,
+    SwTraceables.SW_037_DROP_ELIGIBILITY_FILTERS_TO_THE_ENEMYS_LEVEL_PLUS_TWO,
+  ] as const,
   concerns(
     ConTraceables.CON_006_DUPLICATE_DROPS_ARE_INTENTIONAL_NEVER_DEDUPLICATED,
-    function _dropCardFromEnemy(ctx: any, e: any, char: any): void {
-      if (ctx.random() >= CARD_DROP_CHANCE) return;
+    function _dropCardFromEnemy(ctx: any, e: any, _char: any): void {
+      if (ctx.random() >= CONFIG.dropRates.cards.baseChance) return;
+      const maxLevel = e.level + DROP_LEVEL_HEADROOM;
       const allDefs = [...ctx.db.cardDefinition];
       const eligible = allDefs
-        .filter((def: any) => def.minCharacterLevel <= char.level)
+        .filter((def: any) => def.minCharacterLevel <= maxLevel)
         .map((def: any) => ({ ...def, rarity: def.rarity.tag }));
-      const def = pickLevelAndRarityGated(eligible, ctx.random(), ctx.random());
+      const def = pickLevelAndRarityGated(
+        eligible,
+        ctx.random(),
+        ctx.random(),
+        CONFIG.dropRates.cards.rarityWeights,
+      );
       if (!def) return;
       ctx.db.cardDrop.insert({
         dropId: 0n,
@@ -1478,20 +1558,26 @@ const _dropCardFromEnemy = realizes(
 );
 
 /**
- * Roll a ground item drop when an enemy dies. Level-gated, rarity-weighted,
- * independent of the card drop roll.
+ * Roll a ground item drop when an enemy dies. Rarity-weighted, gated by the
+ * enemy's level plus headroom, independent of the card drop roll.
  */
 const _dropItemFromEnemy = realizes(
-  SwTraceables.SW_016_DROP_ELIGIBILITY_FILTERS_TO_THE_KILLERS_LEVEL,
+  SwTraceables.SW_037_DROP_ELIGIBILITY_FILTERS_TO_THE_ENEMYS_LEVEL_PLUS_TWO,
   concerns(
     ConTraceables.CON_006_DUPLICATE_DROPS_ARE_INTENTIONAL_NEVER_DEDUPLICATED,
-    function _dropItemFromEnemy(ctx: any, e: any, char: any): void {
-      if (ctx.random() >= ITEM_DROP_CHANCE) return;
+    function _dropItemFromEnemy(ctx: any, e: any, _char: any): void {
+      if (ctx.random() >= CONFIG.dropRates.gear.baseChance) return;
+      const maxLevel = e.level + DROP_LEVEL_HEADROOM;
       const allDefs = [...ctx.db.itemDefinition];
       const eligible = allDefs
-        .filter((def: any) => def.minLevel <= char.level)
+        .filter((def: any) => def.minLevel <= maxLevel)
         .map((def: any) => ({ ...def, rarity: def.rarity.tag }));
-      const def = pickLevelAndRarityGated(eligible, ctx.random(), ctx.random());
+      const def = pickLevelAndRarityGated(
+        eligible,
+        ctx.random(),
+        ctx.random(),
+        CONFIG.dropRates.gear.rarityWeights,
+      );
       if (!def) return;
       ctx.db.itemDrop.insert({
         itemDropId: 0n,
@@ -1519,7 +1605,8 @@ export const pickupCard = realizes(
 
     const dx = char.posX - drop.posX;
     const dy = char.posY - drop.posY;
-    if (dx * dx + dy * dy > 80 * 80) throw new SenderError('Too far from drop');
+    if (dx * dx + dy * dy > PICKUP_RANGE_SQ)
+      throw new SenderError('Too far from drop');
 
     ctx.db.cardInstance.insert({
       cardInstanceId: 0n,
@@ -1556,7 +1643,8 @@ export const pickupItem = realizes(
 
     const dx = char.posX - drop.posX;
     const dy = char.posY - drop.posY;
-    if (dx * dx + dy * dy > 80 * 80) throw new SenderError('Too far from drop');
+    if (dx * dx + dy * dy > PICKUP_RANGE_SQ)
+      throw new SenderError('Too far from drop');
 
     ctx.db.itemInstance.insert({
       itemInstanceId: 0n,
@@ -1577,7 +1665,7 @@ export const pickupItem = realizes(
 export const cardDropCleanup = realizes(
   SwTraceables.SW_018_GROUND_DROPS_DESPAWN_IN_60S_AND_NEED_80PX_TO_PICK_UP,
   db.reducer({ scheduleRow: cardDropCleanupRow }, (ctx, _args: any) => {
-    const maxAgeUs = 60_000_000n;
+    const maxAgeUs = DROP_DESPAWN_US;
     for (const drop of ctx.db.cardDrop) {
       if (
         ctx.timestamp.microsSinceUnixEpoch -
@@ -1662,6 +1750,7 @@ export const enemyTick = realizes(
             _aggroCandidates(ctx, e.zoneId),
             e.posX,
             e.posY,
+            CONFIG.enemies,
           );
           if (target) {
             ctx.db.enemy.enemyId.update({
@@ -1676,7 +1765,12 @@ export const enemyTick = realizes(
               ? ctx.db.character.characterId.find(e.targetCharacterId)
               : null;
 
-          const decision = decideChasing(e.posX, e.posY, target ?? null);
+          const decision = decideChasing(
+            e.posX,
+            e.posY,
+            target ?? null,
+            CONFIG.enemies,
+          );
           if (decision.kind === 'targetLost') {
             ctx.db.enemy.enemyId.update({
               ...e,
@@ -1735,6 +1829,7 @@ export const enemyTick = realizes(
               ? e.lastAttackAt.microsSinceUnixEpoch
               : null,
             e.attackCooldownSeconds,
+            CONFIG.enemies,
           );
           if (decision.kind === 'targetLost') {
             ctx.db.enemy.enemyId.update({
@@ -1765,6 +1860,7 @@ export const enemyTick = realizes(
             e.currentHp,
             e.maxHp,
             _aggroCandidates(ctx, e.zoneId),
+            CONFIG.enemies,
           );
           if (decision.kind === 'reaggro') {
             ctx.db.enemy.enemyId.update({

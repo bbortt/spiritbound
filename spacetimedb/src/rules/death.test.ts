@@ -5,9 +5,17 @@ import {
   computeHandSlots,
   computeRetention,
   computeCharacterLevel,
+  computeRarityCeiling,
+  canSpiritHandle,
+  rarityCeilingError,
   type CardForRetention,
 } from './death';
-import { verifies, SwTraceables } from '../../../src/clew/traceables/clew';
+import type { Rarity } from '../types';
+import {
+  verifies,
+  ConTraceables,
+  SwTraceables,
+} from '../../../src/clew/traceables/clew';
 
 verifies(
   SwTraceables.SW_024_SPIRIT_LEVEL_IS_A_LOG_SHAPED_CURVE_OVER_BOND_XP,
@@ -158,6 +166,93 @@ verifies(
           expect(level).toBeGreaterThanOrEqual(prev);
           prev = level;
         }
+      });
+    });
+  },
+);
+
+verifies(
+  SwTraceables.SW_033_THE_RARITY_CEILING_STEPS_AT_SPIRIT_LEVELS_FIVE_TWELVE_TWENTY_FIVE_AND_FORTY,
+  () => {
+    describe('computeRarityCeiling', () => {
+      it('is common below spirit level 5', () => {
+        expect(computeRarityCeiling(1)).toBe('common');
+        expect(computeRarityCeiling(4)).toBe('common');
+      });
+
+      it('steps up exactly at 5, 12, 25 and 40', () => {
+        expect(computeRarityCeiling(5)).toBe('uncommon');
+        expect(computeRarityCeiling(11)).toBe('uncommon');
+        expect(computeRarityCeiling(12)).toBe('rare');
+        expect(computeRarityCeiling(24)).toBe('rare');
+        expect(computeRarityCeiling(25)).toBe('epic');
+        expect(computeRarityCeiling(39)).toBe('epic');
+        expect(computeRarityCeiling(40)).toBe('legendary');
+        expect(computeRarityCeiling(50)).toBe('legendary');
+      });
+    });
+
+    describe('canSpiritHandle', () => {
+      it('accepts a card exactly at the ceiling', () => {
+        expect(canSpiritHandle(5, 'uncommon')).toBe(true);
+        expect(canSpiritHandle(12, 'rare')).toBe(true);
+        expect(canSpiritHandle(40, 'legendary')).toBe(true);
+      });
+
+      it('accepts every rarity below the ceiling', () => {
+        expect(canSpiritHandle(25, 'common')).toBe(true);
+        expect(canSpiritHandle(25, 'uncommon')).toBe(true);
+        expect(canSpiritHandle(25, 'rare')).toBe(true);
+      });
+
+      it('rejects the tier immediately above the ceiling', () => {
+        expect(canSpiritHandle(4, 'uncommon')).toBe(false);
+        expect(canSpiritHandle(11, 'rare')).toBe(false);
+        expect(canSpiritHandle(24, 'epic')).toBe(false);
+        expect(canSpiritHandle(39, 'legendary')).toBe(false);
+      });
+
+      it('lets a level-1 spirit hold only commons', () => {
+        const above: Rarity[] = ['uncommon', 'rare', 'epic', 'legendary'];
+        expect(canSpiritHandle(1, 'common')).toBe(true);
+        for (const rarity of above) {
+          expect(canSpiritHandle(1, rarity)).toBe(false);
+        }
+      });
+    });
+  },
+);
+
+verifies(
+  SwTraceables.SW_034_EQUIPPING_OR_ATTUNING_ABOVE_THE_CEILING_IS_REJECTED_NAMING_THE_CEILING,
+  () => {
+    describe('rarityCeilingError', () => {
+      it('names the spirit level, the refused rarity and the ceiling', () => {
+        const message = rarityCeilingError(8, 'rare');
+        expect(message).toContain('Lv 8');
+        expect(message).toContain('rare');
+        expect(message).toContain('up to uncommon');
+      });
+    });
+  },
+);
+
+verifies(
+  ConTraceables.CON_017_THE_RARITY_CEILING_AND_THE_ATTUNEMENT_SLOTS_ARE_TWO_SEPARATE_GATES,
+  () => {
+    describe('CON-017 — the ceiling and the attunement budget are independent', () => {
+      it('can hold a rarity it has no attunement slot for', () => {
+        // Spirit 12 reaches the rare ceiling but has only floor(12*0.08)=0 epic
+        // slots and no legendary slot: wieldable is not the same as protectable.
+        expect(canSpiritHandle(12, 'rare')).toBe(true);
+        expect(computeAttunementSlots(12).epic).toBe(0);
+        expect(computeAttunementSlots(12).legendary).toBe(0);
+      });
+
+      it('has an attunement slot for a rarity below its ceiling too', () => {
+        // The gates move at different rates; neither derives from the other.
+        expect(computeAttunementSlots(30).legendary).toBe(1);
+        expect(canSpiritHandle(30, 'legendary')).toBe(false);
       });
     });
   },

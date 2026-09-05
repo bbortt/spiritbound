@@ -1,6 +1,19 @@
 import type { CardDefinition, CardInstance, EquippedCard } from '../db';
-import { computeHandSlots, computeAttunementSlots } from '../handSlots';
-import { ArchTraceables, concerns } from '../../../src/clew/traceables/clew';
+import {
+  computeHandSlots,
+  computeAttunementSlots,
+  computeRarityCeiling,
+  canSpiritHandle,
+  rarityLabel,
+  spiritCeilingHeadline,
+  type Rarity,
+} from '../handSlots';
+import {
+  ArchTraceables,
+  SwTraceables,
+  concerns,
+  realizes,
+} from '../../../src/clew/traceables/clew';
 
 const RARITY_COLOR: Record<string, string> = {
   Common: '#aaaaaa',
@@ -16,6 +29,14 @@ function rarityTag(tag: string): string {
 
 function rarityOf(def: CardDefinition): string {
   return rarityTag((def.rarity as any).tag ?? String(def.rarity));
+}
+
+/**
+ * The generated bindings capitalise enum tags ("Rarity.Uncommon"); the shared
+ * rule functions speak the lowercase server vocabulary.
+ */
+function rarityKeyOf(def: CardDefinition): Rarity {
+  return rarityOf(def).toLowerCase() as Rarity;
 }
 
 function cardTypeOf(def: CardDefinition): string {
@@ -81,6 +102,12 @@ const CSS = `
 .sb-card:hover { border-color: #777; }
 .sb-card.selected { border-color: #fff; }
 .sb-card.equipped { outline: 2px solid #ffcc00; }
+.sb-card.beyond-ceiling { opacity: 0.35; filter: grayscale(0.6); }
+.sb-ceiling-lock { position: absolute; top: 2px; left: 2px; font-size: 9px; }
+.sb-ceiling-note {
+  margin-top: 6px; padding: 6px; border: 1px solid #664422; border-radius: 4px;
+  background: #1a1208; color: #ff9944; font-size: 11px; line-height: 1.5;
+}
 .sb-card-name { font-size: 9px; line-height: 1.2; font-weight: 600; }
 .sb-card-badges { display: flex; gap: 2px; margin-top: 2px; flex-wrap: wrap; justify-content: center; }
 .sb-badge {
@@ -282,6 +309,8 @@ export class CollectionPanel {
     const headerText = isSpiritMode
       ? `Spirit — ${this._spiritName}, Lv ${this._spiritLevel}`
       : 'Collection';
+    // "Spirit Lv 8 — can handle up to Uncommon cards".
+    const ceilingLine = spiritCeilingHeadline(this._spiritLevel);
 
     this.panel.innerHTML = `
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
@@ -289,7 +318,7 @@ export class CollectionPanel {
         <span style="cursor:pointer;color:#888;font-size:18px" id="sb-close">✕</span>
       </div>
 
-      ${this._renderSpiritInfo(maxAttune, attunedCount, rarityBudget)}
+      ${this._renderSpiritInfo(maxAttune, attunedCount, rarityBudget, ceilingLine)}
 
       ${!isSpiritMode && !this._nearSpirit ? `<div class="sb-near-notice">Visit a spirit to manage your hand</div>` : ''}
 
@@ -321,24 +350,34 @@ export class CollectionPanel {
     this._attachListeners();
   }
 
-  private _renderSpiritInfo(
-    maxAttune: number,
-    attunedCount: number,
-    budget: Record<string, { cap: number; used: number }>,
-  ) {
-    const parts = Object.entries(budget)
-      .filter(([, v]) => v.cap > 0)
-      .map(
-        ([r, v]) =>
-          `<span style="color:${RARITY_COLOR[r]}">${r}: ${v.used}/${v.cap}</span>`,
-      )
-      .join(' · ');
-    return `
+  /**
+   * The two spirit gates, shown as two separate lines because they are two
+   * separate rules: the ceiling is what the spirit can hold at all,
+   * the budget is what survives death.
+   */
+  private _renderSpiritInfo = realizes(
+    SwTraceables.SW_035_CARDS_ABOVE_THE_CEILING_RENDER_LOCKED_AND_THE_HEADER_NAMES_THE_CEILING,
+    function (
+      this: CollectionPanel,
+      maxAttune: number,
+      attunedCount: number,
+      budget: Record<string, { cap: number; used: number }>,
+      ceilingLine: string,
+    ) {
+      const parts = Object.entries(budget)
+        .filter(([, v]) => v.cap > 0)
+        .map(
+          ([r, v]) =>
+            `<span style="color:${RARITY_COLOR[r]}">${r}: ${v.used}/${v.cap}</span>`,
+        )
+        .join(' · ');
+      return `
       <div class="sb-section">
-        <div class="sb-spirit-info">Spirit Lv ${this._spiritLevel}</div>
+        <div class="sb-spirit-info">${ceilingLine}</div>
         <div class="sb-spirit-budget">Attuned ${attunedCount}/${maxAttune} · ${parts}</div>
       </div>`;
-  }
+    },
+  );
 
   private _renderSlot(
     inst: CardInstance | null,
@@ -370,10 +409,20 @@ export class CollectionPanel {
         const school = def ? schoolOf(def) : '';
         const isEquipped = this._equipped.has(inst.cardInstanceId);
         const isSelected = inst.cardInstanceId === this._selected;
+        // Above the spirit's ceiling: dim it and mark it locked rather than
+        // letting the player find out by having the server reject them.
+        const beyondCeiling = def
+          ? !canSpiritHandle(this._spiritLevel, rarityKeyOf(def))
+          : false;
         let cls = 'sb-card';
         if (isEquipped) cls += ' equipped';
         if (isSelected) cls += ' selected';
-        return `<div class="${cls}" data-iid="${inst.cardInstanceId}" style="border-color:${color}55;background:${color}11">
+        if (beyondCeiling) cls += ' beyond-ceiling';
+        const ceilingTitle = beyondCeiling
+          ? ` title="${rarity} needs a stronger spirit — yours can handle up to ${rarityLabel(computeRarityCeiling(this._spiritLevel))}"`
+          : '';
+        return `<div class="${cls}" data-iid="${inst.cardInstanceId}"${ceilingTitle} style="border-color:${color}55;background:${color}11">
+        ${beyondCeiling ? `<div class="sb-ceiling-lock">🔒</div>` : ''}
         ${inst.attuned ? `<div class="sb-lock">🔒</div>` : ''}
         <div class="sb-card-name" style="color:${color}">${def?.name ?? '?'}</div>
         <div class="sb-card-badges">
@@ -401,8 +450,12 @@ export class CollectionPanel {
     const usedPassive = [...this._equipped.values()].filter(
       (e) => (e.slotType as any).tag === 'Passive',
     ).length;
+    // The ceiling gate mirrors the server's equipCard/toggleAttune guard: a
+    // card the spirit cannot handle offers neither action.
+    const withinCeiling = canSpiritHandle(this._spiritLevel, rarityKeyOf(def));
     const canEquip =
       this._spiritGate() &&
+      withinCeiling &&
       !equip &&
       (isActive ? usedActive < maxActive : usedPassive < maxPassive);
     const canUnequip = this._spiritGate() && equip != null;
@@ -411,8 +464,16 @@ export class CollectionPanel {
     // a legendary that still has slots free.
     const rarity = rarityOf(def);
     const budget = rarityBudget[rarity];
-    const canAttune = !inst.attuned && !!budget && budget.used < budget.cap;
+    const canAttune =
+      !inst.attuned && withinCeiling && !!budget && budget.used < budget.cap;
     const canUnattune = inst.attuned && !equip; // can't unattune while equipped
+
+    const ceilingNote = withinCeiling
+      ? ''
+      : `<div class="sb-ceiling-note">🔒 Your spirit (Lv ${this._spiritLevel}) cannot handle
+         ${rarity} cards yet — it can hold up to
+         ${rarityLabel(computeRarityCeiling(this._spiritLevel))}.
+         Level your spirit or find a stronger location spirit.</div>`;
 
     return `<div class="sb-actions">
       <button class="sb-btn" data-action="equip" ${canEquip ? '' : 'disabled'}>Equip</button>
@@ -420,7 +481,7 @@ export class CollectionPanel {
       <button class="sb-btn" data-action="attune" ${canAttune ? '' : 'disabled'}>${inst.attuned ? 'Attuned 🔒' : 'Attune'}</button>
       <button class="sb-btn" data-action="unattune" ${canUnattune ? '' : 'disabled'}>Unattune</button>
       <button class="sb-btn danger" data-action="sacrifice">Sacrifice to Spirit</button>
-    </div>`;
+    </div>${ceilingNote}`;
   }
 
   private _renderTooltip(inst: CardInstance, def: CardDefinition) {
@@ -433,6 +494,13 @@ export class CollectionPanel {
       <div>${rarity} · ${type} · ${school}</div>
       <div>Power: ${def.basePower} · Cooldown: ${def.baseCooldown}s · MP: ${def.mpCost}</div>
       <div>Merge Lv: ${inst.mergeLevel} · Min Lv: ${def.minCharacterLevel}</div>
+      ${
+        canSpiritHandle(this._spiritLevel, rarityKeyOf(def))
+          ? ''
+          : `<div style="color:#ff9944">🔒 ${rarity} is above your spirit's rarity ceiling.
+             A Lv ${this._spiritLevel} spirit can hold up to
+             ${rarityLabel(computeRarityCeiling(this._spiritLevel))} cards.</div>`
+      }
       ${inst.attuned ? '<div>🔒 Attuned — survives death</div>' : ''}
       <div class="sb-tooltip-flavor">${def.flavor}</div>
     </div>`;
@@ -470,6 +538,15 @@ export class CollectionPanel {
     const inst = this._instances.get(iid);
     const def = inst ? this._cardDefs.get(inst.cardDefId) : null;
     if (!inst || !def) return;
+
+    // Belt and braces with the disabled buttons: never fire a call the server
+    // is going to reject on the rarity ceiling.
+    if (
+      (action === 'equip' || action === 'attune') &&
+      !canSpiritHandle(this._spiritLevel, rarityKeyOf(def))
+    ) {
+      return;
+    }
 
     switch (action) {
       case 'equip': {

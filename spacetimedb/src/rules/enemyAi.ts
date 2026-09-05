@@ -15,18 +15,32 @@ import {
   SysTraceables,
 } from '../../../src/clew/traceables/clew';
 
-// ─── Chase AI tuning constants ────────────────────────────────────────────────
+// ─── Chase AI tuning ──────────────────────────────────────────────────────────
+// The ranges and speeds are server-operator dials in content/config.json now,
+// passed in per call rather than read here, so this file stays independent of
+// the config file and a test can fix the numbers.
+//
 // Player move speed lives in rules/stats.ts's computeRaceBase().moveSpeed (1.0,
-// a multiplier) combined with the client's base px/s; CHASE_SPEED here must
-// always stay under whatever that resolves to (currently 180px/s).
-export const AGGRO_RANGE = 300; // px — enemy notices a player and starts chasing
-export const ATTACK_RANGE = 180; // px — enemy stops and starts casting
-export const DEAGGRO_RANGE = 500; // px — player has escaped, enemy resets
-export const CHASE_SPEED = realizes(
+// a multiplier) combined with the client's base px/s; the configured chase
+// speed must always stay under whatever that resolves to (currently 180px/s).
+// The config schema cannot enforce that, so content/config.test.ts and
+// enemyAi.test.ts assert it for the shipped values instead — see
+// docs/ARCHITECTURE.md for why that guarantee is now advisory.
+
+/** The `enemies` block of the server config, as the AI rules consume it. */
+export interface EnemyAiTuning {
+  aggroRangePx: number;
+  attackRangePx: number;
+  deaggroRangePx: number;
+  chaseSpeedPxPerSec: number;
+  resetSpeedPxPerSec: number;
+}
+
+export const ENEMY_AI_CHASE_SPEED_NOTE = concerns(
   ConTraceables.CON_003_CHASE_SPEED_IS_ALWAYS_SLOWER_THAN_PLAYER_MOVE_SPEED,
-  110, // px/s — always slower than the player's 180 px/s move speed
+  true,
 );
-export const RESET_SPEED = 80; // px/s — walking back to spawn
+
 export const RESET_HP_PER_TICK = 10; // HP restored per tick while resetting
 export const TICK_SECONDS = 0.5; // enemyTick fires every 500 ms
 
@@ -58,16 +72,17 @@ export interface AggroCandidate {
   alive: boolean;
 }
 
-/** Closest alive candidate within AGGRO_RANGE, or null. */
+/** Closest alive candidate within the configured aggro range, or null. */
 export const findClosestInRange = realizes(
   SwTraceables.SW_010_IDLE_ENEMY_AGGROES_ONTO_CLOSEST_CHARACTER_IN_RANGE,
   function findClosestInRange(
     candidates: readonly AggroCandidate[],
     posX: number,
     posY: number,
+    tuning: EnemyAiTuning,
   ): AggroCandidate | null {
     let closest: AggroCandidate | null = null;
-    let closestD2 = AGGRO_RANGE * AGGRO_RANGE;
+    let closestD2 = tuning.aggroRangePx * tuning.aggroRangePx;
     for (const c of candidates) {
       if (!c.alive) continue;
       const d2 = distSq(posX, posY, c.posX, c.posY);
@@ -93,14 +108,17 @@ export const decideChasing = realizes(
     enemyX: number,
     enemyY: number,
     target: { posX: number; posY: number; alive: boolean } | null,
+    tuning: EnemyAiTuning,
   ): ChasingDecision {
     if (!target || !target.alive) return { kind: 'targetLost' };
 
     const d2 = distSq(enemyX, enemyY, target.posX, target.posY);
-    if (d2 > DEAGGRO_RANGE * DEAGGRO_RANGE) return { kind: 'deaggro' };
-    if (d2 <= ATTACK_RANGE * ATTACK_RANGE) return { kind: 'inAttackRange' };
+    if (d2 > tuning.deaggroRangePx * tuning.deaggroRangePx)
+      return { kind: 'deaggro' };
+    if (d2 <= tuning.attackRangePx * tuning.attackRangePx)
+      return { kind: 'inAttackRange' };
 
-    const step = CHASE_SPEED * TICK_SECONDS;
+    const step = tuning.chaseSpeedPxPerSec * TICK_SECONDS;
     const { x, y } = moveToward(enemyX, enemyY, target.posX, target.posY, step);
     return { kind: 'moveToward', posX: x, posY: y };
   },
@@ -136,11 +154,12 @@ export const decideCooldown = realizes(
     nowUs: bigint,
     lastAttackAtUs: bigint | null,
     attackCooldownSeconds: number,
+    tuning: EnemyAiTuning,
   ): CooldownDecision {
     if (!target || !target.alive) return { kind: 'targetLost' };
     if (
       distSq(enemyX, enemyY, target.posX, target.posY) >
-      ATTACK_RANGE * ATTACK_RANGE
+      tuning.attackRangePx * tuning.attackRangePx
     ) {
       return { kind: 'reengage' };
     }
@@ -173,12 +192,13 @@ export const decideResetting = realizes(
     currentHp: number,
     maxHp: number,
     candidates: readonly AggroCandidate[],
+    tuning: EnemyAiTuning,
   ): ResettingDecision {
-    const step = RESET_SPEED * TICK_SECONDS;
+    const step = tuning.resetSpeedPxPerSec * TICK_SECONDS;
     const { x, y } = moveToward(enemyX, enemyY, spawnX, spawnY, step);
     const healedHp = Math.min(maxHp, currentHp + RESET_HP_PER_TICK);
 
-    const reAggro = findClosestInRange(candidates, x, y);
+    const reAggro = findClosestInRange(candidates, x, y, tuning);
     if (reAggro)
       return {
         kind: 'reaggro',
