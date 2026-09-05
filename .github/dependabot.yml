@@ -1,0 +1,25 @@
+version: 2
+updates:
+  - package-ecosystem: 'github-actions'
+    directory: '/'
+    schedule:
+      interval: 'daily'
+    cooldown:
+      default-days: 7
+    assignees:
+      - bbortt
+  - package-ecosystem: 'npm'
+    directories:
+      - '/'
+      - '/client'
+      - '/spacetimedb'
+    schedule:
+      interval: 'daily'
+    cooldown:
+      default-days: 7
+    assignees:
+      - bbortt
+    groups:
+      workspace-dependencies:
+        patterns:
+          - '*'

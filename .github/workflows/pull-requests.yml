@@ -1,0 +1,106 @@
+name: Pull-Request Checks
+
+on:
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: mr-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Install pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86
+        with:
+          run_install: false
+      - name: Install Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          cache: 'pnpm'
+          node-version: 24
+      - name: Install Dependencies
+        run: pnpm install
+      - name: Check Source Formatting
+        run: pnpm run prettier:check
+      - name: Check Markdown Formatting
+        run: pnpm lint:markdown
+  ci:
+    name: Build and Test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Install pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86
+        with:
+          run_install: false
+      - name: Install Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          cache: 'pnpm'
+          node-version: 24
+      - name: Install Dependencies
+        run: pnpm install
+      - name: Test client
+        run: pnpm run vitest
+      - name: Fetch References
+        run: git fetch --unshallow origin
+      - name: Cache SonarQube Packages
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        if: '!steps.check.outputs.number'
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: ${{ runner.os }}-sonar
+      - name: Sonar Analysis
+        if: "!steps.check.outputs.number && !contains(github.actor, 'dependabot')"
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          ./mvnw -B sonar:sonar \
+            -Dsonar.host.url=https://sonarcloud.io \
+            -Dsonar.organization=bbortt-github \
+            -Dsonar.projectKey=bbortt_snow-white
+  dependency-review:
+    name: Dependency Review
+    runs-on: ubuntu-latest
+    if: ${{ !startsWith(github.head_ref, 'release-please-') && !startsWith(github.ref, 'refs/heads/release-please-') }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Dependency Review
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294
+  zizmor:
+    name: Zizmor
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Run zizmor 🌈
+        uses: zizmorcore/zizmor-action@3dc1ecc9bcb9e94e9b2c709687979e1298497054
