@@ -91,20 +91,16 @@ jobs:
         run: git fetch --unshallow origin
       - name: Cache SonarQube Packages
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
-        if: '!steps.check.outputs.number'
+        if: "!contains(github.actor, 'dependabot')"
         with:
           path: ~/.sonar/cache
           key: ${{ runner.os }}-sonar
           restore-keys: ${{ runner.os }}-sonar
       - name: Sonar Analysis
-        if: "!steps.check.outputs.number && !contains(github.actor, 'dependabot')"
+        if: "!contains(github.actor, 'dependabot')"
+        uses: SonarSource/sonarqube-scan-action@22918119ff8e1ca75a623e15c8296b6ea4fbe28f
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        run: |
-          ./mvnw -B sonar:sonar \
-            -Dsonar.host.url=https://sonarcloud.io \
-            -Dsonar.organization=bbortt-github \
-            -Dsonar.projectKey=bbortt_snow-white
   specs:
     name: Specifications with @ariadne-systems/clew
     runs-on: ubuntu-latest
