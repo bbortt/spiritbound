@@ -22,7 +22,8 @@
     "spacetime:publish": "pnpm spacetime:bundle && docker run --rm -v \"%cd%:/project\" -v spiritbound-cli-config:/home/spacetime/.config/spacetime clockworklabs/spacetime:latest publish --no-config -j /project/spacetimedb/dist/bundle.js --server maincloud spiritbound",
     "spacetime:publish:local": "pnpm run db:restart && pnpm spacetime:bundle && docker run --rm -v \"%cd%:/project\" clockworklabs/spacetime:latest publish --anonymous --no-config -j /project/spacetimedb/dist/bundle.js --server http://host.docker.internal:3000 spiritbound --yes",
     "ui:start": "pnpm -C client dev",
-    "vitest": "vitest run"
+    "vitest": "vitest run",
+    "vitest:integration": "vitest run -c vitest.integration.config.ts"
   },
   "dependencies": {
     "spacetimedb": "2.9.0",
