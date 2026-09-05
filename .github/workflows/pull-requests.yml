@@ -61,8 +61,32 @@ jobs:
           node-version: 24
       - name: Install Dependencies
         run: pnpm install
-      - name: Test client
+      - name: Unit tests
         run: pnpm run vitest
+      - name: Start SpacetimeDB
+        run: docker run -d --name spiritbound-ci -p 3000:3000 clockworklabs/spacetime:latest start --in-memory
+      - name: Wait for SpacetimeDB
+        run: |
+          for i in $(seq 1 30); do
+            curl -sf -X POST http://localhost:3000/v1/identity > /dev/null && exit 0
+            sleep 1
+          done
+          echo "SpacetimeDB did not become ready in time" >&2
+          exit 1
+      - name: Bundle SpacetimeDB module
+        run: pnpm run spacetime:bundle
+      - name: Publish SpacetimeDB module
+        run: |
+          docker run --rm --network host \
+            -v "${{ github.workspace }}:/project" \
+            clockworklabs/spacetime:latest publish --anonymous --no-config \
+            -j /project/spacetimedb/dist/bundle.js \
+            --server http://localhost:3000 spiritbound --yes
+      - name: Integration tests
+        run: pnpm run vitest:integration
+      - name: Stop SpacetimeDB
+        if: always()
+        run: docker rm -f spiritbound-ci || true
       - name: Fetch References
         run: git fetch --unshallow origin
       - name: Cache SonarQube Packages

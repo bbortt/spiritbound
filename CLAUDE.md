@@ -35,9 +35,13 @@ requirements are recorded and how code proves it satisfies them.
 - **Every new feature or behavior change**: draft the story/specs
   (`clew-draft`), ground them against existing code and specs
   (`clew-context`), get them approved and finalized (`clew-promote`), then
-  implement with the spec set `active` and the code (and its test, where
-  the testing contract requires one) **anchored** to it (`clew-implement` /
-  `clew-anchor`).
+  implement with the spec set `active` and the code **and its test**
+  **anchored** to it (`clew-implement` / `clew-anchor`).
+  Writing that test —
+  unit, integration, or both, per `005-testing-contract.md` §0 — is part of
+  the task by default, not something to wait to be asked for; the same
+  section also says what _not_ to bother testing, so this never becomes
+  padding for its own sake.
   Run `clew-review` on the changed specs before calling the
   work done.
   Never write game-affecting code without a spec it anchors to.

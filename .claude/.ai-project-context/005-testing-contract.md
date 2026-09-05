@@ -2,6 +2,44 @@
 
 Define your project's mandatory testing rules.
 
+## 0. Write the test without being asked — but only the meaningful one
+
+Adding or changing behavior is not done until it has the test that actually
+proves it, at whichever of the two levels below genuinely covers it — this
+is part of the task, not a separate follow-up request.
+Decide the level the
+same way this contract's other sections do:
+
+- New or changed **pure logic** (a rule function, a validator, a client-side
+  duplicate) → a **unit test** in the same pass, per Section 2's coverage
+  rule.
+- New or changed **reducer behavior that only shows up end-to-end** (an
+  ownership/ordering/cross-table effect an HTTP call must exercise, not a
+  pure function) → an **integration test**, per Section 3, when the
+  scenario is concrete enough to write one deterministically (a real
+  black-box sequence of calls, not "mock the database").
+  Prefer adding one
+  `it` to an existing `describe` in the relevant
+  `*.integration.test.ts` file over starting a new file, if one already
+  covers the same feature area.
+
+**Meaningful only — this is a ceiling, not a floor to hit:**
+
+- Do not write a test whose failure would tell a reader nothing they didn't
+  already know from the type system or an obvious code read (a getter, a
+  trivial passthrough, restating a Zod schema's own type).
+- Do not add an integration test for something the unit suite already
+  proves — reach for the integration suite only when the reducer's own
+  wiring (not the pure function it calls into) is what's actually being
+  verified.
+- Do not pad a PR with tests for pre-existing, unrelated code just because
+  the file was already open — same "Change Scope Discipline" this
+  project's `003-developer-guidelines.md` already states for the code
+  itself applies to the tests written alongside it.
+- When a change genuinely has nothing worth testing this way (a comment, a
+  rename, a doc, a pure-refactor with no behavior change), say so rather
+  than inventing a test to look complete.
+
 ## 1. Test Files & Naming
 
 - **Runner:** `vitest`, the only test framework in this repo (see

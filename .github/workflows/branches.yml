@@ -50,6 +50,35 @@ jobs:
       - name: Install Dependencies
         if: github.ref == 'refs/heads/main' || steps.check.outputs.pr_found == 'false'
         run: pnpm install
-      - name: Test client
+      - name: Unit tests
         if: github.ref == 'refs/heads/main' || steps.check.outputs.pr_found == 'false'
         run: pnpm run vitest
+      - name: Start SpacetimeDB
+        if: github.ref == 'refs/heads/main' || steps.check.outputs.pr_found == 'false'
+        run: docker run -d --name spiritbound-ci -p 3000:3000 clockworklabs/spacetime:latest start --in-memory
+      - name: Wait for SpacetimeDB
+        if: github.ref == 'refs/heads/main' || steps.check.outputs.pr_found == 'false'
+        run: |
+          for i in $(seq 1 30); do
+            curl -sf -X POST http://localhost:3000/v1/identity > /dev/null && exit 0
+            sleep 1
+          done
+          echo "SpacetimeDB did not become ready in time" >&2
+          exit 1
+      - name: Bundle SpacetimeDB module
+        if: github.ref == 'refs/heads/main' || steps.check.outputs.pr_found == 'false'
+        run: pnpm run spacetime:bundle
+      - name: Publish SpacetimeDB module
+        if: github.ref == 'refs/heads/main' || steps.check.outputs.pr_found == 'false'
+        run: |
+          docker run --rm --network host \
+            -v "${{ github.workspace }}:/project" \
+            clockworklabs/spacetime:latest publish --anonymous --no-config \
+            -j /project/spacetimedb/dist/bundle.js \
+            --server http://localhost:3000 spiritbound --yes
+      - name: Integration tests
+        if: github.ref == 'refs/heads/main' || steps.check.outputs.pr_found == 'false'
+        run: pnpm run vitest:integration
+      - name: Stop SpacetimeDB
+        if: always()
+        run: docker rm -f spiritbound-ci || true
