@@ -15,10 +15,10 @@ description: >
 
 # Ability-Balancer
 
-You tune the *numbers* of Spiritbound so the game stays fair, readable, and free
+You tune the _numbers_ of Spiritbound so the game stays fair, readable, and free
 of power creep. Read `docs/GAME_DESIGN.md` and `docs/BALANCE.md` (shared with
 `item-balancer`; create if absent) before tuning. This skill encodes the balance
-*philosophy*; `docs/BALANCE.md` holds the concrete target tables.
+_philosophy_; `docs/BALANCE.md` holds the concrete target tables.
 
 ## Shared seam with item-balancer (critical)
 
@@ -34,16 +34,16 @@ whether the real lever is the card or the gear feeding it before nerfing the car
 These come from core design decisions — protect them:
 
 1. **Two scaling axes, kept separate.**
-   - **Character level** scales a card's *raw numbers* (damage, healing). This
+   - **Character level** scales a card's _raw numbers_ (damage, healing). This
      exists so old/common cards never become dead loot as the player levels.
-   - **Merge level** scales a card's *effects* — extra projectile, longer
+   - **Merge level** scales a card's _effects_ — extra projectile, longer
      duration, an added passive rider — **not** raw numbers.
-   - Never let a single card gain big raw-number boosts from *both* axes. That is
+   - Never let a single card gain big raw-number boosts from _both_ axes. That is
      the power-creep double-dip the design explicitly forbids. If a proposed card
      does this, flag it and rebalance.
 
-2. **Horizontal > vertical for rarity.** Higher rarity should mean *more
-   interesting/situational*, not strictly *bigger numbers*. A legendary should
+2. **Horizontal > vertical for rarity.** Higher rarity should mean _more
+   interesting/situational_, not strictly _bigger numbers_. A legendary should
    change how you play, not just out-stat a common. Resist "legendary = common ×3."
 
 3. **PvE-first balance.** Tune against PvE encounters, not player-vs-player. If
@@ -53,7 +53,7 @@ These come from core design decisions — protect them:
 4. **Hand limits are the master lever.** Target ~10 active + 5 passive slots, but
    slots are themselves progression (start smaller, ~4/2, unlock via character
    level / spirit bonds). When something feels overpowered, ask whether the fix is
-   the card's numbers or the *opportunity cost* of a slot — often the slot is the
+   the card's numbers or the _opportunity cost_ of a slot — often the slot is the
    better lever.
 
 ## Death & spirit math
@@ -63,7 +63,7 @@ These come from core design decisions — protect them:
   guaranteed-loadout choice is a better player decision than a rage-inducing roll.
   Optionally a small RNG bonus for un-attuned cards.
 - When tuning spirit progression, the value being granted is **access and safety**
-  (attunement slots, swap-rarity ceiling, swap-while-traveling), *not* combat
+  (attunement slots, swap-rarity ceiling, swap-while-traveling), _not_ combat
   power. Keep spirit power out of the damage equation.
 - Card sacrifice (feeding cards to level a spirit) must stay a real cost — the
   attunement/access gained should feel worth burning a card, but never so cheap
@@ -74,7 +74,7 @@ These come from core design decisions — protect them:
 1. Identify role (active/passive), rarity, and which axis carries its growth.
 2. Assign raw numbers via the **character-level scaling curve** in
    `docs/BALANCE.md` (don't invent ad-hoc numbers — anchor to the curve).
-3. Define merge-level effects as *horizontal* additions only.
+3. Define merge-level effects as _horizontal_ additions only.
 4. Sanity checks:
    - Does it double-dip raw scaling? (reject)
    - Is its power mostly numbers or mostly an interesting effect? (prefer effect)

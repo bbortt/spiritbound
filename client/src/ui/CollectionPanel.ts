@@ -1,14 +1,10 @@
-import type {
-  CardDefinition,
-  CardInstance,
-  EquippedCard,
-} from '../db';
+import type { CardDefinition, CardInstance, EquippedCard } from '../db';
 
 const RARITY_COLOR: Record<string, string> = {
-  Common:    '#aaaaaa',
-  Uncommon:  '#44cc44',
-  Rare:      '#4488ff',
-  Epic:      '#cc44ff',
+  Common: '#aaaaaa',
+  Uncommon: '#44cc44',
+  Rare: '#4488ff',
+  Epic: '#cc44ff',
   Legendary: '#ffcc00',
 };
 
@@ -16,10 +12,13 @@ function computeAttunementSlots(spiritLevel: number): number {
   return 2 + Math.floor(spiritLevel / 3);
 }
 
-function computeHandSlots(spiritLevel: number): { active: number; passive: number } {
+function computeHandSlots(spiritLevel: number): {
+  active: number;
+  passive: number;
+} {
   return {
-    active:  Math.min(10, 3 + Math.floor(spiritLevel / 2)),
-    passive: Math.min(5,  1 + Math.floor(spiritLevel / 4)),
+    active: Math.min(10, 3 + Math.floor(spiritLevel / 2)),
+    passive: Math.min(5, 1 + Math.floor(spiritLevel / 4)),
   };
 }
 
@@ -129,9 +128,9 @@ export class CollectionPanel {
   private _spiritLevel = 1;
   private _spiritName = 'your spirit';
 
-  private _cardDefs    = new Map<number, CardDefinition>();
-  private _instances   = new Map<bigint, CardInstance>();
-  private _equipped    = new Map<bigint, EquippedCard>();   // key = cardInstanceId
+  private _cardDefs = new Map<number, CardDefinition>();
+  private _instances = new Map<bigint, CardInstance>();
+  private _equipped = new Map<bigint, EquippedCard>(); // key = cardInstanceId
   private _selected: bigint | null = null;
 
   constructor(opts: { mode: CollectionPanelMode }) {
@@ -146,7 +145,8 @@ export class CollectionPanel {
     }
 
     this.panel = document.createElement('div');
-    this.panel.id = this._mode === 'spirit' ? 'sb-spirit-panel' : 'sb-collection-panel';
+    this.panel.id =
+      this._mode === 'spirit' ? 'sb-spirit-panel' : 'sb-collection-panel';
     this.panel.className = 'sb-panel';
     document.body.appendChild(this.panel);
 
@@ -167,7 +167,9 @@ export class CollectionPanel {
     this._open ? this.close() : this.open();
   }
 
-  isOpen() { return this._open; }
+  isOpen() {
+    return this._open;
+  }
 
   setNearSpirit(near: boolean) {
     this._nearSpirit = near;
@@ -220,15 +222,17 @@ export class CollectionPanel {
   // ── Rendering ──────────────────────────────────────────────────────────────
 
   private _render() {
-    const { active: maxActive, passive: maxPassive } = computeHandSlots(this._spiritLevel);
+    const { active: maxActive, passive: maxPassive } = computeHandSlots(
+      this._spiritLevel,
+    );
     const maxAttune = computeAttunementSlots(this._spiritLevel);
 
     // Rarity budget for attunement
     const rarityBudget: Record<string, { cap: number; used: number }> = {
-      Common:    { cap: 3, used: 0 },
-      Uncommon:  { cap: 2, used: 0 },
-      Rare:      { cap: 1, used: 0 },
-      Epic:      { cap: 1, used: 0 },
+      Common: { cap: 3, used: 0 },
+      Uncommon: { cap: 2, used: 0 },
+      Rare: { cap: 1, used: 0 },
+      Epic: { cap: 1, used: 0 },
       Legendary: { cap: 1, used: 0 },
     };
     let attunedCount = 0;
@@ -256,9 +260,15 @@ export class CollectionPanel {
       }
     }
 
-    const sel = this._selected != null ? this._instances.get(this._selected) ?? null : null;
-    const selDef = sel ? this._cardDefs.get(sel.cardDefId) ?? null : null;
-    const selEquip = this._selected != null ? this._equipped.get(this._selected) ?? null : null;
+    const sel =
+      this._selected != null
+        ? (this._instances.get(this._selected) ?? null)
+        : null;
+    const selDef = sel ? (this._cardDefs.get(sel.cardDefId) ?? null) : null;
+    const selEquip =
+      this._selected != null
+        ? (this._equipped.get(this._selected) ?? null)
+        : null;
 
     const isSpiritMode = this._mode === 'spirit';
     const headerText = isSpiritMode
@@ -275,7 +285,9 @@ export class CollectionPanel {
 
       ${!isSpiritMode && !this._nearSpirit ? `<div class="sb-near-notice">Visit a spirit to manage your hand</div>` : ''}
 
-      ${isSpiritMode ? `
+      ${
+        isSpiritMode
+          ? `
       <div class="sb-section">
         <div class="sb-section-title">Active Slots (${maxActive}/10)</div>
         <div class="sb-slots">${activeSlots.map((inst, i) => this._renderSlot(inst, i, 'active', maxActive)).join('')}</div>
@@ -285,7 +297,9 @@ export class CollectionPanel {
         <div class="sb-section-title">Passive Slots (${maxPassive}/5)</div>
         <div class="sb-slots">${passiveSlots.map((inst, i) => this._renderSlot(inst, i, 'passive', maxPassive)).join('')}</div>
       </div>
-      ` : ''}
+      `
+          : ''
+      }
 
       <div class="sb-section">
         <div class="sb-section-title">Collection (${this._instances.size})</div>
@@ -306,7 +320,10 @@ export class CollectionPanel {
   ) {
     const parts = Object.entries(budget)
       .filter(([, v]) => v.cap > 0)
-      .map(([r, v]) => `<span style="color:${RARITY_COLOR[r]}">${r}: ${v.used}/${v.cap}</span>`)
+      .map(
+        ([r, v]) =>
+          `<span style="color:${RARITY_COLOR[r]}">${r}: ${v.used}/${v.cap}</span>`,
+      )
       .join(' · ');
     return `
       <div class="sb-section">
@@ -315,7 +332,12 @@ export class CollectionPanel {
       </div>`;
   }
 
-  private _renderSlot(inst: CardInstance | null, index: number, type: 'active' | 'passive', maxUnlocked: number) {
+  private _renderSlot(
+    inst: CardInstance | null,
+    index: number,
+    type: 'active' | 'passive',
+    maxUnlocked: number,
+  ) {
     const locked = index >= maxUnlocked;
     const def = inst ? this._cardDefs.get(inst.cardDefId) : null;
     const isSelected = inst && inst.cardInstanceId === this._selected;
@@ -331,18 +353,19 @@ export class CollectionPanel {
   }
 
   private _renderCollection() {
-    return [...this._instances.values()].map(inst => {
-      const def = this._cardDefs.get(inst.cardDefId);
-      const rarity = def ? rarityOf(def) : 'Common';
-      const color  = RARITY_COLOR[rarity] ?? '#aaa';
-      const type   = def ? cardTypeOf(def) : '';
-      const school = def ? schoolOf(def) : '';
-      const isEquipped = this._equipped.has(inst.cardInstanceId);
-      const isSelected = inst.cardInstanceId === this._selected;
-      let cls = 'sb-card';
-      if (isEquipped) cls += ' equipped';
-      if (isSelected) cls += ' selected';
-      return `<div class="${cls}" data-iid="${inst.cardInstanceId}" style="border-color:${color}55;background:${color}11">
+    return [...this._instances.values()]
+      .map((inst) => {
+        const def = this._cardDefs.get(inst.cardDefId);
+        const rarity = def ? rarityOf(def) : 'Common';
+        const color = RARITY_COLOR[rarity] ?? '#aaa';
+        const type = def ? cardTypeOf(def) : '';
+        const school = def ? schoolOf(def) : '';
+        const isEquipped = this._equipped.has(inst.cardInstanceId);
+        const isSelected = inst.cardInstanceId === this._selected;
+        let cls = 'sb-card';
+        if (isEquipped) cls += ' equipped';
+        if (isSelected) cls += ' selected';
+        return `<div class="${cls}" data-iid="${inst.cardInstanceId}" style="border-color:${color}55;background:${color}11">
         ${inst.attuned ? `<div class="sb-lock">🔒</div>` : ''}
         <div class="sb-card-name" style="color:${color}">${def?.name ?? '?'}</div>
         <div class="sb-card-badges">
@@ -350,7 +373,8 @@ export class CollectionPanel {
           <div class="sb-badge">${school === 'Physical' ? '⚔' : '✦'}</div>
         </div>
       </div>`;
-    }).join('');
+      })
+      .join('');
   }
 
   private _renderActions(
@@ -364,9 +388,16 @@ export class CollectionPanel {
   ) {
     const type = cardTypeOf(def);
     const isActive = type === 'Active';
-    const usedActive  = [...this._equipped.values()].filter(e => (e.slotType as any).tag === 'Active').length;
-    const usedPassive = [...this._equipped.values()].filter(e => (e.slotType as any).tag === 'Passive').length;
-    const canEquip = this._nearSpirit && !equip && (isActive ? usedActive < maxActive : usedPassive < maxPassive);
+    const usedActive = [...this._equipped.values()].filter(
+      (e) => (e.slotType as any).tag === 'Active',
+    ).length;
+    const usedPassive = [...this._equipped.values()].filter(
+      (e) => (e.slotType as any).tag === 'Passive',
+    ).length;
+    const canEquip =
+      this._nearSpirit &&
+      !equip &&
+      (isActive ? usedActive < maxActive : usedPassive < maxPassive);
     const canUnequip = this._nearSpirit && equip != null;
     const canAttune = !inst.attuned && attunedCount < maxAttune;
     const canUnattune = inst.attuned && !equip; // can't unattune while equipped
@@ -381,10 +412,10 @@ export class CollectionPanel {
   }
 
   private _renderTooltip(inst: CardInstance, def: CardDefinition) {
-    const rarity  = rarityOf(def);
-    const color   = RARITY_COLOR[rarity] ?? '#aaa';
-    const type    = cardTypeOf(def);
-    const school  = schoolOf(def);
+    const rarity = rarityOf(def);
+    const color = RARITY_COLOR[rarity] ?? '#aaa';
+    const type = cardTypeOf(def);
+    const school = schoolOf(def);
     return `<div class="sb-tooltip">
       <div class="sb-tooltip-title" style="color:${color}">${def.name}</div>
       <div>${rarity} · ${type} · ${school}</div>
@@ -398,10 +429,12 @@ export class CollectionPanel {
   // ── Event delegation ───────────────────────────────────────────────────────
 
   private _attachListeners() {
-    this.panel.querySelector('#sb-close')?.addEventListener('click', () => this.close());
+    this.panel
+      .querySelector('#sb-close')
+      ?.addEventListener('click', () => this.close());
 
     // Card selection from collection grid or hand slots
-    this.panel.querySelectorAll('[data-iid]').forEach(el => {
+    this.panel.querySelectorAll('[data-iid]').forEach((el) => {
       const iid = (el as HTMLElement).dataset.iid;
       if (!iid) return;
       el.addEventListener('click', () => {
@@ -412,7 +445,7 @@ export class CollectionPanel {
     });
 
     // Action buttons
-    this.panel.querySelectorAll('[data-action]').forEach(el => {
+    this.panel.querySelectorAll('[data-action]').forEach((el) => {
       el.addEventListener('click', () => {
         if (!this._selected) return;
         const action = (el as HTMLElement).dataset.action!;
@@ -423,20 +456,30 @@ export class CollectionPanel {
 
   private _handleAction(action: string, iid: bigint) {
     const inst = this._instances.get(iid);
-    const def  = inst ? this._cardDefs.get(inst.cardDefId) : null;
+    const def = inst ? this._cardDefs.get(inst.cardDefId) : null;
     if (!inst || !def) return;
 
     switch (action) {
       case 'equip': {
         const type = cardTypeOf(def);
-        const eq   = [...this._equipped.values()];
-        const usedActive  = eq.filter(e => (e.slotType as any).tag === 'Active').length;
-        const usedPassive = eq.filter(e => (e.slotType as any).tag === 'Passive').length;
-        const { active: maxA, passive: maxP } = computeHandSlots(this._spiritLevel);
+        const eq = [...this._equipped.values()];
+        const usedActive = eq.filter(
+          (e) => (e.slotType as any).tag === 'Active',
+        ).length;
+        const usedPassive = eq.filter(
+          (e) => (e.slotType as any).tag === 'Passive',
+        ).length;
+        const { active: maxA, passive: maxP } = computeHandSlots(
+          this._spiritLevel,
+        );
         const slotIndex = type === 'Active' ? usedActive : usedPassive;
-        const slotMax   = type === 'Active' ? maxA : maxP;
+        const slotMax = type === 'Active' ? maxA : maxP;
         if (slotIndex >= slotMax) return;
-        this._emit('equip', { cardInstanceId: iid, slotType: type.toLowerCase(), slotIndex });
+        this._emit('equip', {
+          cardInstanceId: iid,
+          slotType: type.toLowerCase(),
+          slotIndex,
+        });
         break;
       }
       case 'unequip': {
@@ -452,7 +495,12 @@ export class CollectionPanel {
         this._emit('unattune', { cardInstanceId: iid });
         break;
       case 'sacrifice': {
-        if (!confirm(`Sacrifice "${def.name}" to the spirit? This cannot be undone.`)) return;
+        if (
+          !confirm(
+            `Sacrifice "${def.name}" to the spirit? This cannot be undone.`,
+          )
+        )
+          return;
         this._emit('sacrifice', { cardInstanceId: iid });
         break;
       }

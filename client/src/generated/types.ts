@@ -8,9 +8,9 @@ import {
   t as __t,
   type AlgebraicTypeType as __AlgebraicTypeType,
   type Infer as __Infer,
-} from "spacetimedb";
+} from 'spacetimedb';
 
-export const AccountProgress = __t.object("AccountProgress", {
+export const AccountProgress = __t.object('AccountProgress', {
   accountIdentity: __t.identity(),
   totalXpAllLives: __t.u64(),
   tutorialCompleted: __t.bool(),
@@ -19,7 +19,7 @@ export const AccountProgress = __t.object("AccountProgress", {
 export type AccountProgress = __Infer<typeof AccountProgress>;
 
 // The tagged union or sum type for the algebraic type `AggroState`.
-export const AggroState = __t.enum("AggroState", {
+export const AggroState = __t.enum('AggroState', {
   Idle: __t.unit(),
   Chasing: __t.unit(),
   Casting: __t.unit(),
@@ -29,14 +29,14 @@ export const AggroState = __t.enum("AggroState", {
 export type AggroState = __Infer<typeof AggroState>;
 
 // The tagged union or sum type for the algebraic type `ArmorWeight`.
-export const ArmorWeight = __t.enum("ArmorWeight", {
+export const ArmorWeight = __t.enum('ArmorWeight', {
   Cloth: __t.unit(),
   Chain: __t.unit(),
   Plate: __t.unit(),
 });
 export type ArmorWeight = __Infer<typeof ArmorWeight>;
 
-export const CardDefinition = __t.object("CardDefinition", {
+export const CardDefinition = __t.object('CardDefinition', {
   cardDefId: __t.u32(),
   slug: __t.string(),
   name: __t.string(),
@@ -63,7 +63,7 @@ export const CardDefinition = __t.object("CardDefinition", {
 });
 export type CardDefinition = __Infer<typeof CardDefinition>;
 
-export const CardDrop = __t.object("CardDrop", {
+export const CardDrop = __t.object('CardDrop', {
   dropId: __t.u64(),
   cardDefId: __t.u32(),
   zoneId: __t.u32(),
@@ -73,13 +73,13 @@ export const CardDrop = __t.object("CardDrop", {
 });
 export type CardDrop = __Infer<typeof CardDrop>;
 
-export const CardDropCleanupSchedule = __t.object("CardDropCleanupSchedule", {
+export const CardDropCleanupSchedule = __t.object('CardDropCleanupSchedule', {
   scheduledId: __t.u64(),
   scheduledAt: __t.scheduleAt(),
 });
 export type CardDropCleanupSchedule = __Infer<typeof CardDropCleanupSchedule>;
 
-export const CardInstance = __t.object("CardInstance", {
+export const CardInstance = __t.object('CardInstance', {
   cardInstanceId: __t.u64(),
   ownerIdentity: __t.identity(),
   cardDefId: __t.u32(),
@@ -89,13 +89,13 @@ export const CardInstance = __t.object("CardInstance", {
 export type CardInstance = __Infer<typeof CardInstance>;
 
 // The tagged union or sum type for the algebraic type `CardType`.
-export const CardType = __t.enum("CardType", {
+export const CardType = __t.enum('CardType', {
   Active: __t.unit(),
   Passive: __t.unit(),
 });
 export type CardType = __Infer<typeof CardType>;
 
-export const Character = __t.object("Character", {
+export const Character = __t.object('Character', {
   characterId: __t.u64(),
   accountIdentity: __t.identity(),
   level: __t.u32(),
@@ -113,13 +113,13 @@ export const Character = __t.object("Character", {
 export type Character = __Infer<typeof Character>;
 
 // The tagged union or sum type for the algebraic type `DamageSchool`.
-export const DamageSchool = __t.enum("DamageSchool", {
+export const DamageSchool = __t.enum('DamageSchool', {
   Physical: __t.unit(),
   Magical: __t.unit(),
 });
 export type DamageSchool = __Infer<typeof DamageSchool>;
 
-export const Enemy = __t.object("Enemy", {
+export const Enemy = __t.object('Enemy', {
   enemyId: __t.u64(),
   zoneId: __t.u32(),
   posX: __t.f32(),
@@ -148,21 +148,21 @@ export const Enemy = __t.object("Enemy", {
 });
 export type Enemy = __Infer<typeof Enemy>;
 
-export const EnemyRespawnSchedule = __t.object("EnemyRespawnSchedule", {
+export const EnemyRespawnSchedule = __t.object('EnemyRespawnSchedule', {
   scheduledId: __t.u64(),
   scheduledAt: __t.scheduleAt(),
   enemyId: __t.u64(),
 });
 export type EnemyRespawnSchedule = __Infer<typeof EnemyRespawnSchedule>;
 
-export const EnemyTickSchedule = __t.object("EnemyTickSchedule", {
+export const EnemyTickSchedule = __t.object('EnemyTickSchedule', {
   scheduledId: __t.u64(),
   scheduledAt: __t.scheduleAt(),
 });
 export type EnemyTickSchedule = __Infer<typeof EnemyTickSchedule>;
 
 // The tagged union or sum type for the algebraic type `EquipSlot`.
-export const EquipSlot = __t.enum("EquipSlot", {
+export const EquipSlot = __t.enum('EquipSlot', {
   Head: __t.unit(),
   Chest: __t.unit(),
   Hands: __t.unit(),
@@ -176,7 +176,7 @@ export const EquipSlot = __t.enum("EquipSlot", {
 });
 export type EquipSlot = __Infer<typeof EquipSlot>;
 
-export const EquippedCard = __t.object("EquippedCard", {
+export const EquippedCard = __t.object('EquippedCard', {
   equippedCardId: __t.u64(),
   characterId: __t.u64(),
   cardInstanceId: __t.u64(),
@@ -187,7 +187,7 @@ export const EquippedCard = __t.object("EquippedCard", {
 });
 export type EquippedCard = __Infer<typeof EquippedCard>;
 
-export const EquippedItem = __t.object("EquippedItem", {
+export const EquippedItem = __t.object('EquippedItem', {
   equippedItemId: __t.u64(),
   characterId: __t.u64(),
   itemInstanceId: __t.u64(),
@@ -199,7 +199,7 @@ export const EquippedItem = __t.object("EquippedItem", {
 export type EquippedItem = __Infer<typeof EquippedItem>;
 
 // The tagged union or sum type for the algebraic type `ItemCategory`.
-export const ItemCategory = __t.enum("ItemCategory", {
+export const ItemCategory = __t.enum('ItemCategory', {
   Equipment: __t.unit(),
   Consumable: __t.unit(),
   Material: __t.unit(),
@@ -209,7 +209,7 @@ export const ItemCategory = __t.enum("ItemCategory", {
 });
 export type ItemCategory = __Infer<typeof ItemCategory>;
 
-export const ItemDefinition = __t.object("ItemDefinition", {
+export const ItemDefinition = __t.object('ItemDefinition', {
   itemDefId: __t.u64(),
   slug: __t.string(),
   name: __t.string(),
@@ -241,7 +241,7 @@ export const ItemDefinition = __t.object("ItemDefinition", {
 });
 export type ItemDefinition = __Infer<typeof ItemDefinition>;
 
-export const ItemDrop = __t.object("ItemDrop", {
+export const ItemDrop = __t.object('ItemDrop', {
   itemDropId: __t.u64(),
   itemDefId: __t.u64(),
   zoneId: __t.u32(),
@@ -251,7 +251,7 @@ export const ItemDrop = __t.object("ItemDrop", {
 });
 export type ItemDrop = __Infer<typeof ItemDrop>;
 
-export const ItemInstance = __t.object("ItemInstance", {
+export const ItemInstance = __t.object('ItemInstance', {
   itemInstanceId: __t.u64(),
   ownerCharacterId: __t.u64(),
   itemDefId: __t.u64(),
@@ -260,14 +260,14 @@ export const ItemInstance = __t.object("ItemInstance", {
 export type ItemInstance = __Infer<typeof ItemInstance>;
 
 // The tagged union or sum type for the algebraic type `PassiveKind`.
-export const PassiveKind = __t.enum("PassiveKind", {
+export const PassiveKind = __t.enum('PassiveKind', {
   Ward: __t.unit(),
   Triggered: __t.unit(),
   None: __t.unit(),
 });
 export type PassiveKind = __Infer<typeof PassiveKind>;
 
-export const PersonalSpirit = __t.object("PersonalSpirit", {
+export const PersonalSpirit = __t.object('PersonalSpirit', {
   accountIdentity: __t.identity(),
   name: __t.string(),
   level: __t.u32(),
@@ -276,7 +276,7 @@ export const PersonalSpirit = __t.object("PersonalSpirit", {
 export type PersonalSpirit = __Infer<typeof PersonalSpirit>;
 
 // The tagged union or sum type for the algebraic type `Rarity`.
-export const Rarity = __t.enum("Rarity", {
+export const Rarity = __t.enum('Rarity', {
   Common: __t.unit(),
   Uncommon: __t.unit(),
   Rare: __t.unit(),
@@ -286,7 +286,7 @@ export const Rarity = __t.enum("Rarity", {
 export type Rarity = __Infer<typeof Rarity>;
 
 // The tagged union or sum type for the algebraic type `ShapeType`.
-export const ShapeType = __t.enum("ShapeType", {
+export const ShapeType = __t.enum('ShapeType', {
   Cone: __t.unit(),
   Line: __t.unit(),
   Arc: __t.unit(),
@@ -294,7 +294,7 @@ export const ShapeType = __t.enum("ShapeType", {
 });
 export type ShapeType = __Infer<typeof ShapeType>;
 
-export const StatBlock = __t.object("StatBlock", {
+export const StatBlock = __t.object('StatBlock', {
   power: __t.i32(),
   knowledge: __t.i32(),
   health: __t.i32(),
@@ -325,7 +325,7 @@ export const StatBlock = __t.object("StatBlock", {
 });
 export type StatBlock = __Infer<typeof StatBlock>;
 
-export const Zone = __t.object("Zone", {
+export const Zone = __t.object('Zone', {
   zoneId: __t.u32(),
   name: __t.string(),
   minLevel: __t.u32(),
@@ -334,4 +334,3 @@ export const Zone = __t.object("Zone", {
   description: __t.string(),
 });
 export type Zone = __Infer<typeof Zone>;
-

@@ -1,12 +1,6 @@
 {
   "permissions": {
-    "allow": [
-      "Bash(curl *)",
-      "Bash(docker run *)",
-      "Bash(pnpm *)"
-    ]
+    "allow": ["Bash(curl *)", "Bash(docker run *)", "Bash(pnpm *)"]
   },
-  "deny": [
-    "Bash(git push *)"
-  ]
+  "deny": ["Bash(git push *)"]
 }

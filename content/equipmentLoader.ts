@@ -6,6 +6,8 @@ import type { ItemDef } from './validateEquipment';
 
 export function loadEquipment(): ItemDef[] {
   const dir = dirname(fileURLToPath(import.meta.url));
-  const raw: unknown[] = JSON.parse(readFileSync(join(dir, 'equipment.json'), 'utf-8'));
+  const raw: unknown[] = JSON.parse(
+    readFileSync(join(dir, 'equipment.json'), 'utf-8'),
+  );
   return parseEquipment(raw);
 }

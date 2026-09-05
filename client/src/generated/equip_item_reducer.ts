@@ -8,11 +8,9 @@ import {
   t as __t,
   type AlgebraicTypeType as __AlgebraicTypeType,
   type Infer as __Infer,
-} from "spacetimedb";
+} from 'spacetimedb';
 
-import {
-  EquipSlot,
-} from "./types";
+import { EquipSlot } from './types';
 
 export default {
   itemInstanceId: __t.u64(),

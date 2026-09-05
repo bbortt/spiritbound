@@ -24,15 +24,15 @@ without contradicting itself. Read `docs/GAME_DESIGN.md` and `docs/LORE.md`
   grant, and purge a person's cards. Spirits have levels and rarity (up to
   legendary). This is not just a game system — it is how the world works, and
   in-world text should treat it as lived reality, not UI.
-- **Two kinds of spirits:** *location spirits* (fixed to places, public, generally
-  higher level, the powerful/legendary ones) and *personal spirits* (travel with a
+- **Two kinds of spirits:** _location spirits_ (fixed to places, public, generally
+  higher level, the powerful/legendary ones) and _personal spirits_ (travel with a
   person, generally weaker, the one that protects your cards through death). The
   Stormwind-archive idea — people binding to spirits, spirits as keepers of one's
   essence — is the tonal touchstone.
 - **Cards are your soul; gear is your body.** Cards can survive death through your
   spirit; physical equipment is always lost. Frame this in-world as a spiritual
   truth, not a respawn mechanic.
-- **The opening:** the player had a falling-out with their *previous* spirit. The
+- **The opening:** the player had a falling-out with their _previous_ spirit. The
   spirit, enraged, purged all their cards and threw them off a cliff. The player
   begins at the bottom with nothing. That spirit is a named, recurring character —
   rival, eventual questline, possible reconciliation where the player reclaims
@@ -56,7 +56,7 @@ inside the fiction.
 2. Tie new elements back to the spirit/card/gear cosmology — a new zone should
    imply which spirits dwell there; a new legendary card should imply a story for
    why it's rare.
-3. Give spirits *character and motive*, not just stats. A legendary location
+3. Give spirits _character and motive_, not just stats. A legendary location
    spirit should feel like meeting a person with history.
 4. Keep names consistent in feel. Before inventing a name, scan existing names in
    `docs/LORE.md` for the established naming conventions and stay within them.

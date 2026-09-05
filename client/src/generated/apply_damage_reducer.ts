@@ -8,11 +8,9 @@ import {
   t as __t,
   type AlgebraicTypeType as __AlgebraicTypeType,
   type Infer as __Infer,
-} from "spacetimedb";
+} from 'spacetimedb';
 
-import {
-  DamageSchool,
-} from "./types";
+import { DamageSchool } from './types';
 
 export default {
   targetCharacterId: __t.u64(),

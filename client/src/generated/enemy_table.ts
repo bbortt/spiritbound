@@ -8,37 +8,33 @@ import {
   t as __t,
   type AlgebraicTypeType as __AlgebraicTypeType,
   type Infer as __Infer,
-} from "spacetimedb";
-import {
-  ShapeType,
-  AggroState,
-} from "./types";
-
+} from 'spacetimedb';
+import { ShapeType, AggroState } from './types';
 
 export default __t.row({
-  enemyId: __t.u64().primaryKey().name("enemy_id"),
-  zoneId: __t.u32().name("zone_id"),
-  posX: __t.f32().name("pos_x"),
-  posY: __t.f32().name("pos_y"),
-  spawnX: __t.f32().name("spawn_x"),
-  spawnY: __t.f32().name("spawn_y"),
-  currentHp: __t.i32().name("current_hp"),
-  maxHp: __t.i32().name("max_hp"),
+  enemyId: __t.u64().primaryKey().name('enemy_id'),
+  zoneId: __t.u32().name('zone_id'),
+  posX: __t.f32().name('pos_x'),
+  posY: __t.f32().name('pos_y'),
+  spawnX: __t.f32().name('spawn_x'),
+  spawnY: __t.f32().name('spawn_y'),
+  currentHp: __t.i32().name('current_hp'),
+  maxHp: __t.i32().name('max_hp'),
   alive: __t.bool(),
-  damagePerHit: __t.i32().name("damage_per_hit"),
-  attackRangePx: __t.f32().name("attack_range_px"),
-  attackCooldownSeconds: __t.f32().name("attack_cooldown_seconds"),
-  lastAttackAt: __t.option(__t.timestamp()).name("last_attack_at"),
+  damagePerHit: __t.i32().name('damage_per_hit'),
+  attackRangePx: __t.f32().name('attack_range_px'),
+  attackCooldownSeconds: __t.f32().name('attack_cooldown_seconds'),
+  lastAttackAt: __t.option(__t.timestamp()).name('last_attack_at'),
   get aggroState() {
-    return AggroState.name("aggro_state");
+    return AggroState.name('aggro_state');
   },
-  targetCharacterId: __t.option(__t.u64()).name("target_character_id"),
-  lastSeenTargetAt: __t.option(__t.timestamp()).name("last_seen_target_at"),
-  castStartedAt: __t.option(__t.timestamp()).name("cast_started_at"),
-  castDurationSeconds: __t.f32().name("cast_duration_seconds"),
+  targetCharacterId: __t.option(__t.u64()).name('target_character_id'),
+  lastSeenTargetAt: __t.option(__t.timestamp()).name('last_seen_target_at'),
+  castStartedAt: __t.option(__t.timestamp()).name('cast_started_at'),
+  castDurationSeconds: __t.f32().name('cast_duration_seconds'),
   get castShape() {
-    return ShapeType.name("cast_shape");
+    return ShapeType.name('cast_shape');
   },
-  castDamage: __t.i32().name("cast_damage"),
-  xpReward: __t.u64().name("xp_reward"),
+  castDamage: __t.i32().name('cast_damage'),
+  xpReward: __t.u64().name('xp_reward'),
 });

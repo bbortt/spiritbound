@@ -8,20 +8,20 @@ import {
   t as __t,
   type AlgebraicTypeType as __AlgebraicTypeType,
   type Infer as __Infer,
-} from "spacetimedb";
+} from 'spacetimedb';
 
 export default __t.row({
-  characterId: __t.u64().primaryKey().name("character_id"),
-  accountIdentity: __t.identity().name("account_identity"),
+  characterId: __t.u64().primaryKey().name('character_id'),
+  accountIdentity: __t.identity().name('account_identity'),
   level: __t.u32(),
   xp: __t.u64(),
-  zoneId: __t.u32().name("zone_id"),
-  posX: __t.f32().name("pos_x"),
-  posY: __t.f32().name("pos_y"),
-  currentHp: __t.i32().name("current_hp"),
-  currentMp: __t.i32().name("current_mp"),
+  zoneId: __t.u32().name('zone_id'),
+  posX: __t.f32().name('pos_x'),
+  posY: __t.f32().name('pos_y'),
+  currentHp: __t.i32().name('current_hp'),
+  currentMp: __t.i32().name('current_mp'),
   alive: __t.bool(),
-  createdAt: __t.timestamp().name("created_at"),
-  diedAt: __t.option(__t.timestamp()).name("died_at"),
-  lastLevelUpAt: __t.option(__t.timestamp()).name("last_level_up_at"),
+  createdAt: __t.timestamp().name('created_at'),
+  diedAt: __t.option(__t.timestamp()).name('died_at'),
+  lastLevelUpAt: __t.option(__t.timestamp()).name('last_level_up_at'),
 });

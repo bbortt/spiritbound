@@ -4,15 +4,15 @@ title: Controls
 
 Everything you need is one hand on the mouse, one on the keyboard.
 
-| Action              | Input                      |
-|---------------------|-----------------------------|
-| Move                | Left click                 |
-| Basic attack        | Right click                |
-| Card 1–10           | Hold 1–0, release to fire  |
-| Pick up item        | F                           |
-| Open collection     | C                           |
-| Interact / Spirit   | E                           |
-| Cancel cast         | Escape                     |
+| Action            | Input                     |
+| ----------------- | ------------------------- |
+| Move              | Left click                |
+| Basic attack      | Right click               |
+| Card 1–10         | Hold 1–0, release to fire |
+| Pick up item      | F                         |
+| Open collection   | C                         |
+| Interact / Spirit | E                         |
+| Cancel cast       | Escape                    |
 
 A few notes on feel:
 

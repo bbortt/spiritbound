@@ -31,297 +31,493 @@ import {
   type RemoteModule as __RemoteModule,
   type SubscriptionEventContextInterface as __SubscriptionEventContextInterface,
   type SubscriptionHandleImpl as __SubscriptionHandleImpl,
-} from "spacetimedb";
+} from 'spacetimedb';
 
 // Import all reducer arg schemas
-import ApplyDamageReducer from "./apply_damage_reducer";
-import CardDropCleanupReducer from "./card_drop_cleanup_reducer";
-import DamageEnemyReducer from "./damage_enemy_reducer";
-import EnemyTickReducer from "./enemy_tick_reducer";
-import EquipCardReducer from "./equip_card_reducer";
-import EquipItemReducer from "./equip_item_reducer";
-import GrantXpReducer from "./grant_xp_reducer";
-import MoveReducer from "./move_reducer";
-import PickupCardReducer from "./pickup_card_reducer";
-import PickupItemReducer from "./pickup_item_reducer";
-import RespawnEnemyReducer from "./respawn_enemy_reducer";
-import SacrificeCardReducer from "./sacrifice_card_reducer";
-import SeedCardsReducer from "./seed_cards_reducer";
-import SeedItemsReducer from "./seed_items_reducer";
-import SpawnEnemyReducer from "./spawn_enemy_reducer";
-import StartLifeReducer from "./start_life_reducer";
-import ToggleAttuneReducer from "./toggle_attune_reducer";
-import UnequipCardReducer from "./unequip_card_reducer";
-import UnequipItemReducer from "./unequip_item_reducer";
+import ApplyDamageReducer from './apply_damage_reducer';
+import CardDropCleanupReducer from './card_drop_cleanup_reducer';
+import DamageEnemyReducer from './damage_enemy_reducer';
+import EnemyTickReducer from './enemy_tick_reducer';
+import EquipCardReducer from './equip_card_reducer';
+import EquipItemReducer from './equip_item_reducer';
+import GrantXpReducer from './grant_xp_reducer';
+import MoveReducer from './move_reducer';
+import PickupCardReducer from './pickup_card_reducer';
+import PickupItemReducer from './pickup_item_reducer';
+import RespawnEnemyReducer from './respawn_enemy_reducer';
+import SacrificeCardReducer from './sacrifice_card_reducer';
+import SeedCardsReducer from './seed_cards_reducer';
+import SeedItemsReducer from './seed_items_reducer';
+import SpawnEnemyReducer from './spawn_enemy_reducer';
+import StartLifeReducer from './start_life_reducer';
+import ToggleAttuneReducer from './toggle_attune_reducer';
+import UnequipCardReducer from './unequip_card_reducer';
+import UnequipItemReducer from './unequip_item_reducer';
 
 // Import all procedure arg schemas
 
 // Import all table schema definitions
-import AccountProgressRow from "./account_progress_table";
-import CardDefinitionRow from "./card_definition_table";
-import CardDropRow from "./card_drop_table";
-import CardDropCleanupScheduleRow from "./card_drop_cleanup_schedule_table";
-import CardInstanceRow from "./card_instance_table";
-import CharacterRow from "./character_table";
-import EnemyRow from "./enemy_table";
-import EnemyRespawnScheduleRow from "./enemy_respawn_schedule_table";
-import EnemyTickScheduleRow from "./enemy_tick_schedule_table";
-import EquippedCardRow from "./equipped_card_table";
-import EquippedItemRow from "./equipped_item_table";
-import ItemDefinitionRow from "./item_definition_table";
-import ItemDropRow from "./item_drop_table";
-import ItemInstanceRow from "./item_instance_table";
-import PersonalSpiritRow from "./personal_spirit_table";
-import ZoneRow from "./zone_table";
+import AccountProgressRow from './account_progress_table';
+import CardDefinitionRow from './card_definition_table';
+import CardDropRow from './card_drop_table';
+import CardDropCleanupScheduleRow from './card_drop_cleanup_schedule_table';
+import CardInstanceRow from './card_instance_table';
+import CharacterRow from './character_table';
+import EnemyRow from './enemy_table';
+import EnemyRespawnScheduleRow from './enemy_respawn_schedule_table';
+import EnemyTickScheduleRow from './enemy_tick_schedule_table';
+import EquippedCardRow from './equipped_card_table';
+import EquippedItemRow from './equipped_item_table';
+import ItemDefinitionRow from './item_definition_table';
+import ItemDropRow from './item_drop_table';
+import ItemInstanceRow from './item_instance_table';
+import PersonalSpiritRow from './personal_spirit_table';
+import ZoneRow from './zone_table';
 
 /** Type-only namespace exports for generated type groups. */
 
 /** The schema information for all tables in this module. This is defined the same was as the tables would have been defined in the server. */
 const tablesSchema = __schema({
-  accountProgress: __table({
-    name: 'account_progress',
-    indexes: [
-      { accessor: 'accountIdentity', name: 'account_progress_account_identity_idx_btree', algorithm: 'btree', columns: [
-        'accountIdentity',
-      ] },
-    ],
-    constraints: [
-      { name: 'account_progress_account_identity_key', constraint: 'unique', columns: ['accountIdentity'] },
-    ],
-  }, AccountProgressRow),
-  cardDefinition: __table({
-    name: 'card_definition',
-    indexes: [
-      { accessor: 'cardDefId', name: 'card_definition_card_def_id_idx_btree', algorithm: 'btree', columns: [
-        'cardDefId',
-      ] },
-      { accessor: 'slug', name: 'card_definition_slug_idx_btree', algorithm: 'btree', columns: [
-        'slug',
-      ] },
-    ],
-    constraints: [
-      { name: 'card_definition_card_def_id_key', constraint: 'unique', columns: ['cardDefId'] },
-      { name: 'card_definition_slug_key', constraint: 'unique', columns: ['slug'] },
-    ],
-  }, CardDefinitionRow),
-  cardDrop: __table({
-    name: 'card_drop',
-    indexes: [
-      { accessor: 'dropId', name: 'card_drop_drop_id_idx_btree', algorithm: 'btree', columns: [
-        'dropId',
-      ] },
-      { accessor: 'by_zone', name: 'card_drop_zone_id_idx_btree', algorithm: 'btree', columns: [
-        'zoneId',
-      ] },
-    ],
-    constraints: [
-      { name: 'card_drop_drop_id_key', constraint: 'unique', columns: ['dropId'] },
-    ],
-  }, CardDropRow),
-  cardDropCleanupSchedule: __table({
-    name: 'card_drop_cleanup_schedule',
-    indexes: [
-      { accessor: 'scheduledId', name: 'card_drop_cleanup_schedule_scheduled_id_idx_btree', algorithm: 'btree', columns: [
-        'scheduledId',
-      ] },
-    ],
-    constraints: [
-      { name: 'card_drop_cleanup_schedule_scheduled_id_key', constraint: 'unique', columns: ['scheduledId'] },
-    ],
-  }, CardDropCleanupScheduleRow),
-  cardInstance: __table({
-    name: 'card_instance',
-    indexes: [
-      { accessor: 'cardInstanceId', name: 'card_instance_card_instance_id_idx_btree', algorithm: 'btree', columns: [
-        'cardInstanceId',
-      ] },
-      { accessor: 'by_owner', name: 'card_instance_owner_identity_idx_btree', algorithm: 'btree', columns: [
-        'ownerIdentity',
-      ] },
-    ],
-    constraints: [
-      { name: 'card_instance_card_instance_id_key', constraint: 'unique', columns: ['cardInstanceId'] },
-    ],
-  }, CardInstanceRow),
-  character: __table({
-    name: 'character',
-    indexes: [
-      { accessor: 'by_account', name: 'character_account_identity_idx_btree', algorithm: 'btree', columns: [
-        'accountIdentity',
-      ] },
-      { accessor: 'characterId', name: 'character_character_id_idx_btree', algorithm: 'btree', columns: [
-        'characterId',
-      ] },
-      { accessor: 'by_zone', name: 'character_zone_id_idx_btree', algorithm: 'btree', columns: [
-        'zoneId',
-      ] },
-    ],
-    constraints: [
-      { name: 'character_character_id_key', constraint: 'unique', columns: ['characterId'] },
-    ],
-  }, CharacterRow),
-  enemy: __table({
-    name: 'enemy',
-    indexes: [
-      { accessor: 'enemyId', name: 'enemy_enemy_id_idx_btree', algorithm: 'btree', columns: [
-        'enemyId',
-      ] },
-      { accessor: 'by_zone', name: 'enemy_zone_id_idx_btree', algorithm: 'btree', columns: [
-        'zoneId',
-      ] },
-    ],
-    constraints: [
-      { name: 'enemy_enemy_id_key', constraint: 'unique', columns: ['enemyId'] },
-    ],
-  }, EnemyRow),
-  enemyRespawnSchedule: __table({
-    name: 'enemy_respawn_schedule',
-    indexes: [
-      { accessor: 'scheduledId', name: 'enemy_respawn_schedule_scheduled_id_idx_btree', algorithm: 'btree', columns: [
-        'scheduledId',
-      ] },
-    ],
-    constraints: [
-      { name: 'enemy_respawn_schedule_scheduled_id_key', constraint: 'unique', columns: ['scheduledId'] },
-    ],
-  }, EnemyRespawnScheduleRow),
-  enemyTickSchedule: __table({
-    name: 'enemy_tick_schedule',
-    indexes: [
-      { accessor: 'scheduledId', name: 'enemy_tick_schedule_scheduled_id_idx_btree', algorithm: 'btree', columns: [
-        'scheduledId',
-      ] },
-    ],
-    constraints: [
-      { name: 'enemy_tick_schedule_scheduled_id_key', constraint: 'unique', columns: ['scheduledId'] },
-    ],
-  }, EnemyTickScheduleRow),
-  equippedCard: __table({
-    name: 'equipped_card',
-    indexes: [
-      { accessor: 'by_character', name: 'equipped_card_character_id_idx_btree', algorithm: 'btree', columns: [
-        'characterId',
-      ] },
-      { accessor: 'equippedCardId', name: 'equipped_card_equipped_card_id_idx_btree', algorithm: 'btree', columns: [
-        'equippedCardId',
-      ] },
-    ],
-    constraints: [
-      { name: 'equipped_card_equipped_card_id_key', constraint: 'unique', columns: ['equippedCardId'] },
-    ],
-  }, EquippedCardRow),
-  equippedItem: __table({
-    name: 'equipped_item',
-    indexes: [
-      { accessor: 'by_character', name: 'equipped_item_character_id_idx_btree', algorithm: 'btree', columns: [
-        'characterId',
-      ] },
-      { accessor: 'equippedItemId', name: 'equipped_item_equipped_item_id_idx_btree', algorithm: 'btree', columns: [
-        'equippedItemId',
-      ] },
-    ],
-    constraints: [
-      { name: 'equipped_item_equipped_item_id_key', constraint: 'unique', columns: ['equippedItemId'] },
-    ],
-  }, EquippedItemRow),
-  itemDefinition: __table({
-    name: 'item_definition',
-    indexes: [
-      { accessor: 'itemDefId', name: 'item_definition_item_def_id_idx_btree', algorithm: 'btree', columns: [
-        'itemDefId',
-      ] },
-      { accessor: 'slug', name: 'item_definition_slug_idx_btree', algorithm: 'btree', columns: [
-        'slug',
-      ] },
-    ],
-    constraints: [
-      { name: 'item_definition_item_def_id_key', constraint: 'unique', columns: ['itemDefId'] },
-      { name: 'item_definition_slug_key', constraint: 'unique', columns: ['slug'] },
-    ],
-  }, ItemDefinitionRow),
-  itemDrop: __table({
-    name: 'item_drop',
-    indexes: [
-      { accessor: 'itemDropId', name: 'item_drop_item_drop_id_idx_btree', algorithm: 'btree', columns: [
-        'itemDropId',
-      ] },
-      { accessor: 'by_zone', name: 'item_drop_zone_id_idx_btree', algorithm: 'btree', columns: [
-        'zoneId',
-      ] },
-    ],
-    constraints: [
-      { name: 'item_drop_item_drop_id_key', constraint: 'unique', columns: ['itemDropId'] },
-    ],
-  }, ItemDropRow),
-  itemInstance: __table({
-    name: 'item_instance',
-    indexes: [
-      { accessor: 'itemInstanceId', name: 'item_instance_item_instance_id_idx_btree', algorithm: 'btree', columns: [
-        'itemInstanceId',
-      ] },
-      { accessor: 'by_character', name: 'item_instance_owner_character_id_idx_btree', algorithm: 'btree', columns: [
-        'ownerCharacterId',
-      ] },
-    ],
-    constraints: [
-      { name: 'item_instance_item_instance_id_key', constraint: 'unique', columns: ['itemInstanceId'] },
-    ],
-  }, ItemInstanceRow),
-  personalSpirit: __table({
-    name: 'personal_spirit',
-    indexes: [
-      { accessor: 'accountIdentity', name: 'personal_spirit_account_identity_idx_btree', algorithm: 'btree', columns: [
-        'accountIdentity',
-      ] },
-    ],
-    constraints: [
-      { name: 'personal_spirit_account_identity_key', constraint: 'unique', columns: ['accountIdentity'] },
-    ],
-  }, PersonalSpiritRow),
-  zone: __table({
-    name: 'zone',
-    indexes: [
-      { accessor: 'zoneId', name: 'zone_zone_id_idx_btree', algorithm: 'btree', columns: [
-        'zoneId',
-      ] },
-    ],
-    constraints: [
-      { name: 'zone_zone_id_key', constraint: 'unique', columns: ['zoneId'] },
-    ],
-  }, ZoneRow),
+  accountProgress: __table(
+    {
+      name: 'account_progress',
+      indexes: [
+        {
+          accessor: 'accountIdentity',
+          name: 'account_progress_account_identity_idx_btree',
+          algorithm: 'btree',
+          columns: ['accountIdentity'],
+        },
+      ],
+      constraints: [
+        {
+          name: 'account_progress_account_identity_key',
+          constraint: 'unique',
+          columns: ['accountIdentity'],
+        },
+      ],
+    },
+    AccountProgressRow,
+  ),
+  cardDefinition: __table(
+    {
+      name: 'card_definition',
+      indexes: [
+        {
+          accessor: 'cardDefId',
+          name: 'card_definition_card_def_id_idx_btree',
+          algorithm: 'btree',
+          columns: ['cardDefId'],
+        },
+        {
+          accessor: 'slug',
+          name: 'card_definition_slug_idx_btree',
+          algorithm: 'btree',
+          columns: ['slug'],
+        },
+      ],
+      constraints: [
+        {
+          name: 'card_definition_card_def_id_key',
+          constraint: 'unique',
+          columns: ['cardDefId'],
+        },
+        {
+          name: 'card_definition_slug_key',
+          constraint: 'unique',
+          columns: ['slug'],
+        },
+      ],
+    },
+    CardDefinitionRow,
+  ),
+  cardDrop: __table(
+    {
+      name: 'card_drop',
+      indexes: [
+        {
+          accessor: 'dropId',
+          name: 'card_drop_drop_id_idx_btree',
+          algorithm: 'btree',
+          columns: ['dropId'],
+        },
+        {
+          accessor: 'by_zone',
+          name: 'card_drop_zone_id_idx_btree',
+          algorithm: 'btree',
+          columns: ['zoneId'],
+        },
+      ],
+      constraints: [
+        {
+          name: 'card_drop_drop_id_key',
+          constraint: 'unique',
+          columns: ['dropId'],
+        },
+      ],
+    },
+    CardDropRow,
+  ),
+  cardDropCleanupSchedule: __table(
+    {
+      name: 'card_drop_cleanup_schedule',
+      indexes: [
+        {
+          accessor: 'scheduledId',
+          name: 'card_drop_cleanup_schedule_scheduled_id_idx_btree',
+          algorithm: 'btree',
+          columns: ['scheduledId'],
+        },
+      ],
+      constraints: [
+        {
+          name: 'card_drop_cleanup_schedule_scheduled_id_key',
+          constraint: 'unique',
+          columns: ['scheduledId'],
+        },
+      ],
+    },
+    CardDropCleanupScheduleRow,
+  ),
+  cardInstance: __table(
+    {
+      name: 'card_instance',
+      indexes: [
+        {
+          accessor: 'cardInstanceId',
+          name: 'card_instance_card_instance_id_idx_btree',
+          algorithm: 'btree',
+          columns: ['cardInstanceId'],
+        },
+        {
+          accessor: 'by_owner',
+          name: 'card_instance_owner_identity_idx_btree',
+          algorithm: 'btree',
+          columns: ['ownerIdentity'],
+        },
+      ],
+      constraints: [
+        {
+          name: 'card_instance_card_instance_id_key',
+          constraint: 'unique',
+          columns: ['cardInstanceId'],
+        },
+      ],
+    },
+    CardInstanceRow,
+  ),
+  character: __table(
+    {
+      name: 'character',
+      indexes: [
+        {
+          accessor: 'by_account',
+          name: 'character_account_identity_idx_btree',
+          algorithm: 'btree',
+          columns: ['accountIdentity'],
+        },
+        {
+          accessor: 'characterId',
+          name: 'character_character_id_idx_btree',
+          algorithm: 'btree',
+          columns: ['characterId'],
+        },
+        {
+          accessor: 'by_zone',
+          name: 'character_zone_id_idx_btree',
+          algorithm: 'btree',
+          columns: ['zoneId'],
+        },
+      ],
+      constraints: [
+        {
+          name: 'character_character_id_key',
+          constraint: 'unique',
+          columns: ['characterId'],
+        },
+      ],
+    },
+    CharacterRow,
+  ),
+  enemy: __table(
+    {
+      name: 'enemy',
+      indexes: [
+        {
+          accessor: 'enemyId',
+          name: 'enemy_enemy_id_idx_btree',
+          algorithm: 'btree',
+          columns: ['enemyId'],
+        },
+        {
+          accessor: 'by_zone',
+          name: 'enemy_zone_id_idx_btree',
+          algorithm: 'btree',
+          columns: ['zoneId'],
+        },
+      ],
+      constraints: [
+        {
+          name: 'enemy_enemy_id_key',
+          constraint: 'unique',
+          columns: ['enemyId'],
+        },
+      ],
+    },
+    EnemyRow,
+  ),
+  enemyRespawnSchedule: __table(
+    {
+      name: 'enemy_respawn_schedule',
+      indexes: [
+        {
+          accessor: 'scheduledId',
+          name: 'enemy_respawn_schedule_scheduled_id_idx_btree',
+          algorithm: 'btree',
+          columns: ['scheduledId'],
+        },
+      ],
+      constraints: [
+        {
+          name: 'enemy_respawn_schedule_scheduled_id_key',
+          constraint: 'unique',
+          columns: ['scheduledId'],
+        },
+      ],
+    },
+    EnemyRespawnScheduleRow,
+  ),
+  enemyTickSchedule: __table(
+    {
+      name: 'enemy_tick_schedule',
+      indexes: [
+        {
+          accessor: 'scheduledId',
+          name: 'enemy_tick_schedule_scheduled_id_idx_btree',
+          algorithm: 'btree',
+          columns: ['scheduledId'],
+        },
+      ],
+      constraints: [
+        {
+          name: 'enemy_tick_schedule_scheduled_id_key',
+          constraint: 'unique',
+          columns: ['scheduledId'],
+        },
+      ],
+    },
+    EnemyTickScheduleRow,
+  ),
+  equippedCard: __table(
+    {
+      name: 'equipped_card',
+      indexes: [
+        {
+          accessor: 'by_character',
+          name: 'equipped_card_character_id_idx_btree',
+          algorithm: 'btree',
+          columns: ['characterId'],
+        },
+        {
+          accessor: 'equippedCardId',
+          name: 'equipped_card_equipped_card_id_idx_btree',
+          algorithm: 'btree',
+          columns: ['equippedCardId'],
+        },
+      ],
+      constraints: [
+        {
+          name: 'equipped_card_equipped_card_id_key',
+          constraint: 'unique',
+          columns: ['equippedCardId'],
+        },
+      ],
+    },
+    EquippedCardRow,
+  ),
+  equippedItem: __table(
+    {
+      name: 'equipped_item',
+      indexes: [
+        {
+          accessor: 'by_character',
+          name: 'equipped_item_character_id_idx_btree',
+          algorithm: 'btree',
+          columns: ['characterId'],
+        },
+        {
+          accessor: 'equippedItemId',
+          name: 'equipped_item_equipped_item_id_idx_btree',
+          algorithm: 'btree',
+          columns: ['equippedItemId'],
+        },
+      ],
+      constraints: [
+        {
+          name: 'equipped_item_equipped_item_id_key',
+          constraint: 'unique',
+          columns: ['equippedItemId'],
+        },
+      ],
+    },
+    EquippedItemRow,
+  ),
+  itemDefinition: __table(
+    {
+      name: 'item_definition',
+      indexes: [
+        {
+          accessor: 'itemDefId',
+          name: 'item_definition_item_def_id_idx_btree',
+          algorithm: 'btree',
+          columns: ['itemDefId'],
+        },
+        {
+          accessor: 'slug',
+          name: 'item_definition_slug_idx_btree',
+          algorithm: 'btree',
+          columns: ['slug'],
+        },
+      ],
+      constraints: [
+        {
+          name: 'item_definition_item_def_id_key',
+          constraint: 'unique',
+          columns: ['itemDefId'],
+        },
+        {
+          name: 'item_definition_slug_key',
+          constraint: 'unique',
+          columns: ['slug'],
+        },
+      ],
+    },
+    ItemDefinitionRow,
+  ),
+  itemDrop: __table(
+    {
+      name: 'item_drop',
+      indexes: [
+        {
+          accessor: 'itemDropId',
+          name: 'item_drop_item_drop_id_idx_btree',
+          algorithm: 'btree',
+          columns: ['itemDropId'],
+        },
+        {
+          accessor: 'by_zone',
+          name: 'item_drop_zone_id_idx_btree',
+          algorithm: 'btree',
+          columns: ['zoneId'],
+        },
+      ],
+      constraints: [
+        {
+          name: 'item_drop_item_drop_id_key',
+          constraint: 'unique',
+          columns: ['itemDropId'],
+        },
+      ],
+    },
+    ItemDropRow,
+  ),
+  itemInstance: __table(
+    {
+      name: 'item_instance',
+      indexes: [
+        {
+          accessor: 'itemInstanceId',
+          name: 'item_instance_item_instance_id_idx_btree',
+          algorithm: 'btree',
+          columns: ['itemInstanceId'],
+        },
+        {
+          accessor: 'by_character',
+          name: 'item_instance_owner_character_id_idx_btree',
+          algorithm: 'btree',
+          columns: ['ownerCharacterId'],
+        },
+      ],
+      constraints: [
+        {
+          name: 'item_instance_item_instance_id_key',
+          constraint: 'unique',
+          columns: ['itemInstanceId'],
+        },
+      ],
+    },
+    ItemInstanceRow,
+  ),
+  personalSpirit: __table(
+    {
+      name: 'personal_spirit',
+      indexes: [
+        {
+          accessor: 'accountIdentity',
+          name: 'personal_spirit_account_identity_idx_btree',
+          algorithm: 'btree',
+          columns: ['accountIdentity'],
+        },
+      ],
+      constraints: [
+        {
+          name: 'personal_spirit_account_identity_key',
+          constraint: 'unique',
+          columns: ['accountIdentity'],
+        },
+      ],
+    },
+    PersonalSpiritRow,
+  ),
+  zone: __table(
+    {
+      name: 'zone',
+      indexes: [
+        {
+          accessor: 'zoneId',
+          name: 'zone_zone_id_idx_btree',
+          algorithm: 'btree',
+          columns: ['zoneId'],
+        },
+      ],
+      constraints: [
+        { name: 'zone_zone_id_key', constraint: 'unique', columns: ['zoneId'] },
+      ],
+    },
+    ZoneRow,
+  ),
 });
 
 /** The schema information for all reducers in this module. This is defined the same way as the reducers would have been defined in the server, except the body of the reducer is omitted in code generation. */
 const reducersSchema = __reducers(
-  __reducerSchema("apply_damage", ApplyDamageReducer),
-  __reducerSchema("card_drop_cleanup", CardDropCleanupReducer),
-  __reducerSchema("damage_enemy", DamageEnemyReducer),
-  __reducerSchema("enemy_tick", EnemyTickReducer),
-  __reducerSchema("equip_card", EquipCardReducer),
-  __reducerSchema("equip_item", EquipItemReducer),
-  __reducerSchema("grant_xp", GrantXpReducer),
-  __reducerSchema("move", MoveReducer),
-  __reducerSchema("pickup_card", PickupCardReducer),
-  __reducerSchema("pickup_item", PickupItemReducer),
-  __reducerSchema("respawn_enemy", RespawnEnemyReducer),
-  __reducerSchema("sacrifice_card", SacrificeCardReducer),
-  __reducerSchema("seed_cards", SeedCardsReducer),
-  __reducerSchema("seed_items", SeedItemsReducer),
-  __reducerSchema("spawn_enemy", SpawnEnemyReducer),
-  __reducerSchema("start_life", StartLifeReducer),
-  __reducerSchema("toggle_attune", ToggleAttuneReducer),
-  __reducerSchema("unequip_card", UnequipCardReducer),
-  __reducerSchema("unequip_item", UnequipItemReducer),
+  __reducerSchema('apply_damage', ApplyDamageReducer),
+  __reducerSchema('card_drop_cleanup', CardDropCleanupReducer),
+  __reducerSchema('damage_enemy', DamageEnemyReducer),
+  __reducerSchema('enemy_tick', EnemyTickReducer),
+  __reducerSchema('equip_card', EquipCardReducer),
+  __reducerSchema('equip_item', EquipItemReducer),
+  __reducerSchema('grant_xp', GrantXpReducer),
+  __reducerSchema('move', MoveReducer),
+  __reducerSchema('pickup_card', PickupCardReducer),
+  __reducerSchema('pickup_item', PickupItemReducer),
+  __reducerSchema('respawn_enemy', RespawnEnemyReducer),
+  __reducerSchema('sacrifice_card', SacrificeCardReducer),
+  __reducerSchema('seed_cards', SeedCardsReducer),
+  __reducerSchema('seed_items', SeedItemsReducer),
+  __reducerSchema('spawn_enemy', SpawnEnemyReducer),
+  __reducerSchema('start_life', StartLifeReducer),
+  __reducerSchema('toggle_attune', ToggleAttuneReducer),
+  __reducerSchema('unequip_card', UnequipCardReducer),
+  __reducerSchema('unequip_item', UnequipItemReducer),
 );
 
 /** The schema information for all procedures in this module. This is defined the same way as the procedures would have been defined in the server. */
-const proceduresSchema = __procedures(
-);
+const proceduresSchema = __procedures();
 
 /** The remote SpacetimeDB module schema, both runtime and type information. */
 const REMOTE_MODULE = {
   versionInfo: {
-    cliVersion: "2.6.0" as const,
+    cliVersion: '2.6.0' as const,
   },
   tables: tablesSchema.schemaType.tables,
   reducers: reducersSchema.reducersType.reducers,
@@ -333,10 +529,13 @@ const REMOTE_MODULE = {
 >;
 
 /** The tables available in this remote SpacetimeDB module. Each table reference doubles as a query builder. */
-export const tables: __QueryBuilder<typeof tablesSchema.schemaType> = __makeQueryBuilder(tablesSchema.schemaType);
+export const tables: __QueryBuilder<typeof tablesSchema.schemaType> =
+  __makeQueryBuilder(tablesSchema.schemaType);
 
 /** The reducers available in this remote SpacetimeDB module. */
-export const reducers = __convertToAccessorMap(reducersSchema.reducersType.reducers);
+export const reducers = __convertToAccessorMap(
+  reducersSchema.reducersType.reducers,
+);
 
 /** The procedures available in this remote SpacetimeDB module. */
 export const procedures = __convertToAccessorMap(proceduresSchema.procedures);
@@ -344,16 +543,22 @@ export const procedures = __convertToAccessorMap(proceduresSchema.procedures);
 /** The context type returned in callbacks for all possible events. */
 export type EventContext = __EventContextInterface<typeof REMOTE_MODULE>;
 /** The context type returned in callbacks for reducer events. */
-export type ReducerEventContext = __ReducerEventContextInterface<typeof REMOTE_MODULE>;
+export type ReducerEventContext = __ReducerEventContextInterface<
+  typeof REMOTE_MODULE
+>;
 /** The context type returned in callbacks for subscription events. */
-export type SubscriptionEventContext = __SubscriptionEventContextInterface<typeof REMOTE_MODULE>;
+export type SubscriptionEventContext = __SubscriptionEventContextInterface<
+  typeof REMOTE_MODULE
+>;
 /** The context type returned in callbacks for error events. */
 export type ErrorContext = __ErrorContextInterface<typeof REMOTE_MODULE>;
 /** The subscription handle type to manage active subscriptions created from a {@link SubscriptionBuilder}. */
 export type SubscriptionHandle = __SubscriptionHandleImpl<typeof REMOTE_MODULE>;
 
 /** Builder class to configure a new subscription to the remote SpacetimeDB instance. */
-export class SubscriptionBuilder extends __SubscriptionBuilderImpl<typeof REMOTE_MODULE> {}
+export class SubscriptionBuilder extends __SubscriptionBuilderImpl<
+  typeof REMOTE_MODULE
+> {}
 
 /** Builder class to configure a new database connection to the remote SpacetimeDB instance. */
 export class DbConnectionBuilder extends __DbConnectionBuilder<DbConnection> {}
@@ -362,7 +567,11 @@ export class DbConnectionBuilder extends __DbConnectionBuilder<DbConnection> {}
 export class DbConnection extends __DbConnectionImpl<typeof REMOTE_MODULE> {
   /** Creates a new {@link DbConnectionBuilder} to configure and connect to the remote SpacetimeDB instance. */
   static builder = (): DbConnectionBuilder => {
-    return new DbConnectionBuilder(REMOTE_MODULE, (config: __DbConnectionConfig<typeof REMOTE_MODULE>) => new DbConnection(config));
+    return new DbConnectionBuilder(
+      REMOTE_MODULE,
+      (config: __DbConnectionConfig<typeof REMOTE_MODULE>) =>
+        new DbConnection(config),
+    );
   };
 
   /** Creates a new {@link SubscriptionBuilder} to configure a subscription to the remote SpacetimeDB instance. */
@@ -370,4 +579,3 @@ export class DbConnection extends __DbConnectionImpl<typeof REMOTE_MODULE> {
     return new SubscriptionBuilder(this);
   };
 }
-

@@ -16,7 +16,7 @@ description: >
 
 You are the architectural memory for **Spiritbound**. Read `docs/GAME_DESIGN.md`
 first if you have not this session — it is the source of truth for intent.
-This skill encodes the *how it's built* so structure stays consistent across
+This skill encodes the _how it's built_ so structure stays consistent across
 sessions.
 
 ## Stack (authoritative)
@@ -35,14 +35,14 @@ that AND against vendor lock-in:
 
 - Reducers are a **thin transactional shell** — validate, load rows, call a pure
   game-rules function, write rows back, done.
-- All game *rules* (damage math, merge results, retention rolls, level scaling)
+- All game _rules_ (damage math, merge results, retention rolls, level scaling)
   live in **plain TS functions** in a `rules/` module with no SpacetimeDB imports.
 - Benefit: rules are unit-testable in isolation, and if the beta runtime
   disappoints, modules can be re-shelled in Rust/C# (same table/reducer concepts)
   without rewriting the game.
 
-When asked to add logic, default to: *does this belong in a pure rules function,
-or is it genuinely transactional/data-access?* Push it into `rules/` unless it
+When asked to add logic, default to: _does this belong in a pure rules function,
+or is it genuinely transactional/data-access?_ Push it into `rules/` unless it
 must touch the DB.
 
 ## Server authority
@@ -50,7 +50,7 @@ must touch the DB.
 The server is authoritative for everything that affects fairness or persistence:
 positions, combat resolution, card retention on death, merges, spirit leveling,
 inventory. The client predicts/renders but never decides outcomes. Treat any
-client input as a *request*, validated server-side.
+client input as a _request_, validated server-side.
 
 ## The login server (separate by design)
 

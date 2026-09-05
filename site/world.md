@@ -2,15 +2,15 @@
 title: The World
 ---
 
-*This page is a stub — the world is still being written. Consider this the
-traveler's first impression, not the whole map.*
+_This page is a stub — the world is still being written. Consider this the
+traveler's first impression, not the whole map._
 
 ## A kind world, mostly
 
 Spiritbound's surface is warm on purpose. Sunlit villages, festivals thrown
 in honor of the warriors who protect them, shrines that hum with a warmth you
 can feel standing near them. This isn't a grimdark world wearing a smile —
-it's an *actually* welcoming one. That's not a trick. It's just not the whole
+it's an _actually_ welcoming one. That's not a trick. It's just not the whole
 truth either.
 
 ## Spirits
@@ -31,7 +31,7 @@ have earned it.
 ## The Hollowing
 
 Not every spirit keeps its purpose. Somewhere in the difference between
-*stewarding* a soul and *consuming* one, something can go wrong — a spirit
+_stewarding_ a soul and _consuming_ one, something can go wrong — a spirit
 that takes instead of holds grows stronger for it, and darker. Where that
 rot settles into the land, people call it **the Hollowing**: a leak that
 turns ordinary animals feral, and — in the worst and rarest cases — leaves a
@@ -48,7 +48,7 @@ a question the game would rather you sit with for a while.
 The trust placed in the Spiritbound isn't naive — it's load-bearing. In a
 world where your soul can be devoured and your body can fall for good, the
 warriors who protect you are the only real safety net most people have.
-That's precisely why it matters so much *whom* you trust, and precisely why
+That's precisely why it matters so much _whom_ you trust, and precisely why
 the game isn't going to make that an easy question to answer.
 
 More to come as the world fills in.

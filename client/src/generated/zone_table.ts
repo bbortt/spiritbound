@@ -8,13 +8,13 @@ import {
   t as __t,
   type AlgebraicTypeType as __AlgebraicTypeType,
   type Infer as __Infer,
-} from "spacetimedb";
+} from 'spacetimedb';
 
 export default __t.row({
-  zoneId: __t.u32().primaryKey().name("zone_id"),
+  zoneId: __t.u32().primaryKey().name('zone_id'),
   name: __t.string(),
-  minLevel: __t.u32().name("min_level"),
-  recommendedLevel: __t.u32().name("recommended_level"),
-  maxLevel: __t.u32().name("max_level"),
+  minLevel: __t.u32().name('min_level'),
+  recommendedLevel: __t.u32().name('recommended_level'),
+  maxLevel: __t.u32().name('max_level'),
   description: __t.string(),
 });

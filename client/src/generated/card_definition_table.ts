@@ -8,38 +8,37 @@ import {
   t as __t,
   type AlgebraicTypeType as __AlgebraicTypeType,
   type Infer as __Infer,
-} from "spacetimedb";
+} from 'spacetimedb';
 import {
   Rarity,
   CardType,
   PassiveKind,
   DamageSchool,
   ShapeType,
-} from "./types";
-
+} from './types';
 
 export default __t.row({
-  cardDefId: __t.u32().primaryKey().name("card_def_id"),
+  cardDefId: __t.u32().primaryKey().name('card_def_id'),
   slug: __t.string(),
   name: __t.string(),
   get rarity() {
     return Rarity;
   },
   get cardType() {
-    return CardType.name("card_type");
+    return CardType.name('card_type');
   },
   get passiveKind() {
-    return PassiveKind.name("passive_kind");
+    return PassiveKind.name('passive_kind');
   },
   get scalingSchool() {
-    return DamageSchool.name("scaling_school");
+    return DamageSchool.name('scaling_school');
   },
   get baseShape() {
-    return ShapeType.name("base_shape");
+    return ShapeType.name('base_shape');
   },
-  basePower: __t.f32().name("base_power"),
-  baseCooldown: __t.f32().name("base_cooldown"),
-  mpCost: __t.i32().name("mp_cost"),
-  minCharacterLevel: __t.u32().name("min_character_level"),
+  basePower: __t.f32().name('base_power'),
+  baseCooldown: __t.f32().name('base_cooldown'),
+  mpCost: __t.i32().name('mp_cost'),
+  minCharacterLevel: __t.u32().name('min_character_level'),
   flavor: __t.string(),
 });

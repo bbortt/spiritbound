@@ -5,6 +5,13 @@
  */
 
 import type { Rarity, AttunementSlots, HandSlots } from '../types';
+import {
+  concerns,
+  realizes,
+  ArchTraceables,
+  SwTraceables,
+  SysTraceables,
+} from '../../../src/clew/traceables/clew';
 
 // ─── Spirit level curves ──────────────────────────────────────────────────────
 // These are stubs pending real playtest data (ability-balancer owns the numbers).
@@ -15,21 +22,24 @@ import type { Rarity, AttunementSlots, HandSlots } from '../types';
  * Placeholder curve: roughly log-shaped so early levels feel fast.
  * To be replaced with a real XP table once playtest data exists.
  */
-export function computeSpiritLevel(bondXp: bigint): number {
-  // ~100 XP = level 1, ~10 000 XP = level 10, ~1 000 000 XP = level 50
-  const xp = Number(bondXp);
-  return Math.max(1, Math.min(50, Math.floor(Math.log10(xp + 1) * 17)));
-}
+export const computeSpiritLevel = realizes(
+  SwTraceables.SW_024_SPIRIT_LEVEL_IS_A_LOG_SHAPED_CURVE_OVER_BOND_XP,
+  function computeSpiritLevel(bondXp: bigint): number {
+    // ~100 XP = level 1, ~10 000 XP = level 10, ~1 000 000 XP = level 50
+    const xp = Number(bondXp);
+    return Math.max(1, Math.min(50, Math.floor(Math.log10(xp + 1) * 17)));
+  },
+);
 
 /**
  * XP awarded for sacrificing a card of a given rarity.
  * Burning a legendary is a real decision: 3 000 XP vs ~10 for a common.
  */
 export const SACRIFICE_XP: Record<Rarity, bigint> = {
-  common:    10n,
-  uncommon:  50n,
-  rare:      200n,
-  epic:      800n,
+  common: 10n,
+  uncommon: 50n,
+  rare: 200n,
+  epic: 800n,
   legendary: 3000n,
 };
 
@@ -42,16 +52,19 @@ export const SACRIFICE_XP: Record<Rarity, bigint> = {
  * Design rule: you cannot hoard 10 legendaries through death.
  * You choose WHICH legendary is worth saving.
  */
-export function computeAttunementSlots(spiritLevel: number): AttunementSlots {
-  const l = spiritLevel;
-  return {
-    common:    Math.min(8,  Math.floor(l * 0.6) + 1),
-    uncommon:  Math.min(6,  Math.floor(l * 0.4)),
-    rare:      Math.min(4,  Math.floor(l * 0.2)),
-    epic:      Math.min(2,  Math.floor(l * 0.08)),
-    legendary: Math.min(1,  l >= 30 ? 1 : 0),       // unlocks at spirit level 30
-  };
-}
+export const computeAttunementSlots = realizes(
+  SwTraceables.SW_023_ATTUNEMENT_SLOTS_PER_RARITY_GROW_WITH_SPIRIT_LEVEL_LEGENDARY_GATED_AT_THIRTY,
+  function computeAttunementSlots(spiritLevel: number): AttunementSlots {
+    const l = spiritLevel;
+    return {
+      common: Math.min(8, Math.floor(l * 0.6) + 1),
+      uncommon: Math.min(6, Math.floor(l * 0.4)),
+      rare: Math.min(4, Math.floor(l * 0.2)),
+      epic: Math.min(2, Math.floor(l * 0.08)),
+      legendary: Math.min(1, l >= 30 ? 1 : 0), // unlocks at spirit level 30
+    };
+  },
+);
 
 // ─── Hand slots (how many cards can be equipped) ──────────────────────────────
 
@@ -60,27 +73,33 @@ export function computeAttunementSlots(spiritLevel: number): AttunementSlots {
  * Starts 2/1 at level 1; caps at 10/5 around spirit level 40.
  * Spirit level is the gate, not character level.
  */
-export function computeHandSlots(spiritLevel: number): HandSlots {
-  const l = spiritLevel;
-  return {
-    active:  Math.min(10, 2 + Math.floor(l * 0.2)),
-    passive: Math.min(5,  1 + Math.floor(l * 0.1)),
-  };
-}
+export const computeHandSlots = concerns(
+  SysTraceables.SYS_007_THE_HAND_IS_A_SPIRIT_LEVEL_GATED_CARD_LOADOUT,
+  realizes(
+    SwTraceables.SW_027_HAND_SLOT_CAPS_GROW_WITH_SPIRIT_LEVEL_INDEPENDENTLY_FOR_ACTIVE_AND_PASSIVE,
+    function computeHandSlots(spiritLevel: number): HandSlots {
+      const l = spiritLevel;
+      return {
+        active: Math.min(10, 2 + Math.floor(l * 0.2)),
+        passive: Math.min(5, 1 + Math.floor(l * 0.1)),
+      };
+    },
+  ),
+);
 
 // ─── Retention logic ─────────────────────────────────────────────────────────
 
 export interface CardForRetention {
   cardInstanceId: bigint;
-  rarity:         Rarity;
-  attuned:        boolean;
+  rarity: Rarity;
+  attuned: boolean;
 }
 
 export interface RetentionResult {
   /** Card IDs that survive death (attuned + within rarity slot budget). */
   surviving: Set<bigint>;
   /** Card IDs to be permanently deleted. */
-  lost:      Set<bigint>;
+  lost: Set<bigint>;
 }
 
 /**
@@ -96,37 +115,40 @@ export interface RetentionResult {
  *
  * No RNG — the player decided what was safe before venturing out.
  */
-export function computeRetention(
-  cards:  CardForRetention[],
-  slots:  AttunementSlots,
-): RetentionResult {
-  const surviving = new Set<bigint>();
-  const lost      = new Set<bigint>();
+export const computeRetention = realizes(
+  SwTraceables.SW_022_ONLY_ATTUNED_CARDS_SURVIVE_CONSUMING_A_RARITY_SLOT_EACH,
+  function computeRetention(
+    cards: CardForRetention[],
+    slots: AttunementSlots,
+  ): RetentionResult {
+    const surviving = new Set<bigint>();
+    const lost = new Set<bigint>();
 
-  // Separate attuned from un-attuned
-  const attuned   = cards.filter(c => c.attuned);
-  const unAttuned = cards.filter(c => !c.attuned);
+    // Separate attuned from un-attuned
+    const attuned = cards.filter((c) => c.attuned);
+    const unAttuned = cards.filter((c) => !c.attuned);
 
-  // Process attuned cards, consuming slots per rarity
-  const remaining = { ...slots };
-  for (const card of attuned) {
-    const r = card.rarity;
-    if (remaining[r] > 0) {
-      remaining[r]--;
-      surviving.add(card.cardInstanceId);
-    } else {
-      // Over-attuned (UI should prevent this, but guard anyway)
+    // Process attuned cards, consuming slots per rarity
+    const remaining = { ...slots };
+    for (const card of attuned) {
+      const r = card.rarity;
+      if (remaining[r] > 0) {
+        remaining[r]--;
+        surviving.add(card.cardInstanceId);
+      } else {
+        // Over-attuned (UI should prevent this, but guard anyway)
+        lost.add(card.cardInstanceId);
+      }
+    }
+
+    // Un-attuned are always destroyed
+    for (const card of unAttuned) {
       lost.add(card.cardInstanceId);
     }
-  }
 
-  // Un-attuned are always destroyed
-  for (const card of unAttuned) {
-    lost.add(card.cardInstanceId);
-  }
-
-  return { surviving, lost };
-}
+    return { surviving, lost };
+  },
+);
 
 // ─── Character level curve ────────────────────────────────────────────────────
 
@@ -140,8 +162,14 @@ export function computeRetention(
  * needs this curve but can't import across the client/server module boundary
  * — see ARCHITECTURE.md). Keep both copies in sync by hand.
  */
-export function computeCharacterLevel(xp: bigint): number {
-  const x = Number(xp);
-  // Rough power curve; real values owned by ability-balancer in BALANCE.md
-  return Math.max(1, Math.min(50, Math.floor(Math.pow(x / 80, 0.55))));
-}
+export const computeCharacterLevel = concerns(
+  ArchTraceables.ARCH_006_CLIENT_LEVEL_CURVE_DUPLICATES_COMPUTE_CHARACTER_LEVEL_AND_DERIVES_THRESHOLDS_BY_BINARY_SEARCH,
+  realizes(
+    SwTraceables.SW_021_CHARACTER_LEVEL_IS_A_FIXED_POWER_CURVE_OVER_XP_CLAMPED_ONE_TO_FIFTY,
+    function computeCharacterLevel(xp: bigint): number {
+      const x = Number(xp);
+      // Rough power curve; real values owned by ability-balancer in BALANCE.md
+      return Math.max(1, Math.min(50, Math.floor(Math.pow(x / 80, 0.55))));
+    },
+  ),
+);

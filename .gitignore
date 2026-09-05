@@ -10,3 +10,7 @@ site/_site/
 site/.jekyll-cache/
 site/.jekyll-metadata
 site/vendor/
+
+# clew: regenerated tool output (state.json stays tracked)
+.clew/locations.json
+.clew/coverage.json

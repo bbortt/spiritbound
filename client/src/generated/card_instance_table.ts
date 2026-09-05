@@ -8,12 +8,12 @@ import {
   t as __t,
   type AlgebraicTypeType as __AlgebraicTypeType,
   type Infer as __Infer,
-} from "spacetimedb";
+} from 'spacetimedb';
 
 export default __t.row({
-  cardInstanceId: __t.u64().primaryKey().name("card_instance_id"),
-  ownerIdentity: __t.identity().name("owner_identity"),
-  cardDefId: __t.u32().name("card_def_id"),
-  mergeLevel: __t.u32().name("merge_level"),
+  cardInstanceId: __t.u64().primaryKey().name('card_instance_id'),
+  ownerIdentity: __t.identity().name('owner_identity'),
+  cardDefId: __t.u32().name('card_def_id'),
+  mergeLevel: __t.u32().name('merge_level'),
   attuned: __t.bool(),
 });

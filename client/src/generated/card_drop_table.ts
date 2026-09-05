@@ -8,13 +8,13 @@ import {
   t as __t,
   type AlgebraicTypeType as __AlgebraicTypeType,
   type Infer as __Infer,
-} from "spacetimedb";
+} from 'spacetimedb';
 
 export default __t.row({
-  dropId: __t.u64().primaryKey().name("drop_id"),
-  cardDefId: __t.u32().name("card_def_id"),
-  zoneId: __t.u32().name("zone_id"),
-  posX: __t.f32().name("pos_x"),
-  posY: __t.f32().name("pos_y"),
-  createdAt: __t.timestamp().name("created_at"),
+  dropId: __t.u64().primaryKey().name('drop_id'),
+  cardDefId: __t.u32().name('card_def_id'),
+  zoneId: __t.u32().name('zone_id'),
+  posX: __t.f32().name('pos_x'),
+  posY: __t.f32().name('pos_y'),
+  createdAt: __t.timestamp().name('created_at'),
 });

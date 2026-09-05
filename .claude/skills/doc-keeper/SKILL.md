@@ -25,15 +25,18 @@ enemy.
 Each document has a purpose and an owner. Update only what changed.
 
 ### `CLAUDE.md` (root)
+
 **What it is:** The "start here" orientation for Claude Code.
 **Update when:** Stack changes, new skills are added, Next Steps change.
 **Rarely changes.** Touch it only for genuine structural shifts.
 **Format:** Short, punchy, points to real docs. Never duplicate content.
 
 ### `docs/GAME_DESIGN.md`
+
 **What it is:** Complete game design — mechanics, systems, death, economy.
 **Update when:** Any mechanic is implemented, changed, or resolved.
 **Key sections to maintain:**
+
 - **Resolved:** (bottom) — move things here when they're actually built.
   Format: `· thing-name (brief description)` — one line per item.
 - **Open Questions:** remove items when resolved; add new ones when they arise.
@@ -42,6 +45,7 @@ Each document has a purpose and an owner. Update only what changed.
   **Never add speculation** — only document what is actually built or decided.
 
 ### `docs/LORE.md`
+
 **What it is:** Canonical world and story. Owned jointly by lore-keeper.
 **Update when:** Any new name is coined (enemy type, zone, NPC, spirit),
 any story beat is established, any world mechanic is explained in-game.
@@ -51,10 +55,12 @@ add it. Scan existing names before coining new ones.
 **Never contradict** existing canon — flag conflicts instead.
 
 ### `docs/DATA_MODEL.puml`
+
 **What it is:** SpacetimeDB schema — single source of truth for tables.
 **Update when:** ANY table, column, enum, or relationship is added,
 removed, or changed. This must stay 1:1 with `server/src/index.ts`.
 **Key rules:**
+
 - Every table in `index.ts` needs a class in the puml.
 - Every enum in `index.ts` needs an enum in the puml.
 - New columns go in the right package (Definitions vs Runtime vs Social).
@@ -65,29 +71,35 @@ removed, or changed. This must stay 1:1 with `server/src/index.ts`.
   **Check against:** run a mental diff of `server/src/index.ts` vs the puml
   and list every discrepancy. Fix all of them.
 
-### `docs/ARCHITECTURE.md` *(create if missing)*
+### `docs/ARCHITECTURE.md` _(create if missing)_
+
 **What it is:** ADR-style record of architectural decisions.
 **Update when:** Any decision about system structure (where logic lives,
 how two systems communicate, what's deferred and why).
 **Format per entry:**
+
 ```
 ## [Short title] — [date]
 **Context:** why this decision needed to be made.
 **Decision:** what was decided.
 **Consequences:** trade-offs, risks, what it rules out.
 ```
+
 If the file doesn't exist yet, create it with entries for:
+
 - SpacetimeDB + TypeScript chosen over Java backend
 - Thin reducers / pure rules functions pattern
 - Login server deferred (SpacetimeDB identity sufficient for now)
 - Client-side hit detection, server-side damage application
 
-### `docs/BALANCE.md` *(create if missing)*
+### `docs/BALANCE.md` _(create if missing)_
+
 **What it is:** Shared reference for ability-balancer and item-balancer.
 Contains stat curves, conversion anchors, and tuning decisions.
 **Update when:** Any number is decided (move speed, attack range, crit
 cap, XP curve, damage formula constants, drop rates).
 **If the file doesn't exist:** create it with a stub for each section:
+
 - Character level XP curve (current formula + "pending playtest")
 - Spirit level bond XP curve (current formula + "pending playtest")
 - Stat conversion anchors (placeholder: "pending playtest")
@@ -97,6 +109,7 @@ cap, XP curve, damage formula constants, drop rates).
 - Drop rates (70% drop chance — note as placeholder)
 
 ### `content/cards.json`
+
 **What it is:** Single source of truth for all card definitions.
 **Update when:** A new card is added, a balance number is changed.
 **Never update manually** — always go through the validator pipeline
@@ -106,12 +119,13 @@ Flag if cards are being hard-coded anywhere in the codebase instead
 of living here.
 
 ### `site/` (Jekyll site)
+
 **Update when:** Mechanics change that affect player-facing docs,
 new cards are added (auto-generated from _data/cards.json — just
 verify the symlink/copy is current), new controls are added.
 **site/mechanics.md** — update if movement, combat, or card mechanics change.
 **site/controls.md** — update if any keybinding changes.
-**site/_data/cards.json** — must stay in sync with content/cards.json.
+**site/\_data/cards.json** — must stay in sync with content/cards.json.
 If it's not symlinked, note it as a manual sync risk.
 
 ---
@@ -198,7 +212,7 @@ These are the most common ways docs go stale. Check for them explicitly:
   aggro range (300px), cast duration (1.8s) etc. exist only in code.
 - **New names coined in code but not in LORE.md** — enemy names, zone
   names, spirit names used in seeder/content but not canonised.
-- **site/_data/cards.json diverging from content/cards.json** — if
+- **site/\_data/cards.json diverging from content/cards.json** — if
   not symlinked, these will drift. Flag it every session.
 - **ARCHITECTURE.md not existing** — this file has been deferred since
   the architect skill was written. It needs to exist.

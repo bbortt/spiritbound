@@ -2,8 +2,8 @@
 
 ADR-style record of system-structure decisions: where logic lives, how systems
 communicate, and what's deliberately deferred. Owned by the `architect` skill.
-Gameplay *numbers* live in `BALANCE.md`; table shapes live in `DATA_MODEL.puml`.
-This file explains *why* the structure looks the way it does.
+Gameplay _numbers_ live in `BALANCE.md`; table shapes live in `DATA_MODEL.puml`.
+This file explains _why_ the structure looks the way it does.
 
 ---
 
@@ -52,10 +52,10 @@ swapping in verified identities later shouldn't require reworking reducers.
 (cone/line/arc/circle vs. target position) is naturally cheap and immediate
 on the client, but trusting the client with damage numbers would make the
 server non-authoritative.
-**Decision:** The client determines *whether* an attack geometrically
+**Decision:** The client determines _whether_ an attack geometrically
 connects (aim vs. shape vs. target position) and tells the server "this
 target was hit." The server (via `rules/combat.ts#resolveHit`) is the sole
-authority on *how much* damage that translates to — level scaling, defense,
+authority on _how much_ damage that translates to — level scaling, defense,
 avoidance, crit — and is the only thing that writes to `currentHp`.
 **Consequences:** Matches the design pillar "hitting is skill, mitigation is
 stats." Client can never inflate its own damage. Costs one extra round-trip
@@ -80,7 +80,7 @@ simulation, which is an accepted tradeoff for correctness and simplicity.
 
 ## Telegraph is client-visual-only; server owns cast damage — 2026
 
-**Context:** Players need to *see* an incoming enemy attack (cast bar, ground
+**Context:** Players need to _see_ an incoming enemy attack (cast bar, ground
 AoE indicator) far enough ahead to react, per the "preparation over
 reaction" pillar — but that telegraph must never be something the client can
 spoof or suppress to avoid damage.
@@ -119,7 +119,7 @@ tables in the same 10s tick — one schedule, one age check, applied twice.
 **Context:** The previous session deliberately made `itemInstance` and
 `equippedItem` `public: false` ("character-owned, private"). Building
 InventoryPanel/CharacterSheet requires the client to subscribe to a
-character's own bag and gear, but this SDK's `public: false` means *no*
+character's own bag and gear, but this SDK's `public: false` means _no_
 client subscription at all — there's no way to expose rows to only their
 owner that way.
 **Decision:** Flip both tables to `public: true`, matching the existing
@@ -170,7 +170,7 @@ table subscriptions and reducer calls, and the architecture rule is that
 derived values (a level computed from XP) are never stored on a row. The
 server does store `character.xp` and now `character.level`/
 `lastLevelUpAt` directly (since level is checked and written by `_grantXp`
-on every kill), but the *thresholds* (how much XP each level boundary
+on every kill), but the _thresholds_ (how much XP each level boundary
 needs) are only known by evaluating `computeCharacterLevel` — the client
 has no way to ask the server "how much XP until level 6."
 **Decision:** `client/src/levelCurve.ts` duplicates
@@ -184,7 +184,7 @@ other file.
 curve shape changes, the client's XP bar will silently show wrong
 thresholds until someone remembers to copy the change over. Deriving
 `xpForLevel` by binary search (instead of algebraically inverting the
-curve) means at least the *inversion* can never drift even if the curve
+curve) means at least the _inversion_ can never drift even if the curve
 itself does — only the one duplicated function needs to stay in sync, not
 two independently-written ones. Same long-term fix as the `effectiveStats`
 entry: a shared package built from `rules/`, or a server-computed row, if

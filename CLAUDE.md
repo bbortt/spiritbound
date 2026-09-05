@@ -5,17 +5,45 @@
 ## Design & Pillars
 
 Read `docs/GAME_DESIGN.md` first. The core pillars:
+
 1. Cards are your soul, gear is your body.
 2. Preparation over reaction (spirits as bonfires).
 3. PvE-first (no open PvP).
 4. Every drop has value (gear loss = permanent economy sink).
+
+## Requirements & Traceability (clew)
+
+This project uses **[clew](.clewrc.json)** for spec-to-code traceability on
+all TypeScript code (server, client, content pipeline — see
+`004-technology-contract.md`). This is not optional tooling: it is how
+requirements are recorded and how code proves it satisfies them.
+
+- **Load `.claude/.ai-project-context/` in numerical order (000→006) before
+  any task** — `000` is the agent bootstrap contract, `001` the charter,
+  `002`/`004`/`005` the architecture/technology/testing contracts, `003`/`006`
+  developer guidelines and spec conventions. These govern _how_ you work;
+  they carry binding authority per `000`'s priority model.
+- **`docs/spec/`** is the requirements corpus: `stories/` (the increments of
+  work) and `specs/` (STK/SYS/SW/ARCH/NF/CON — the atomic, checkable
+  requirements a story realizes), laid out per `.clewrc.json`. This is the
+  source of truth for _what the system must do_, alongside the narrative
+  design docs below.
+- **Every new feature or behavior change**: draft the story/specs
+  (`clew-draft`), ground them against existing code and specs
+  (`clew-context`), get them approved and finalized (`clew-promote`), then
+  implement with the spec set `active` and the code (and its test, where
+  the testing contract requires one) **anchored** to it (`clew-implement` /
+  `clew-anchor`). Run `clew-review` on the changed specs before calling the
+  work done. Never write game-affecting code without a spec it anchors to.
+- Check `clew status` / `clew coverage` / `clew check` when in doubt about
+  what's covered.
 
 ## Key Documents
 
 - **`docs/GAME_DESIGN.md`** — complete design: mechanics, progression, death, social, economy, tech stack.
 - **`docs/LORE.md`** — canonical world: tone, cosmology, conspiracy, enemy types, story hooks.
 - **`docs/DATA_MODEL.puml`** — SpacetimeDB schema (PlantUML). Tables, enums, relationships, all rules live in plain TS functions.
-- **`docs/ARCHITECTURE.md`** — ADR-style log of system-structure decisions (where logic lives, how systems communicate).
+- **`docs/ARCHITECTURE.md`** — ADR-style log of system-structure decisions (where logic lives, how systems communicate). `docs/spec/architecture.md` is the current-state narrative clew's ARCH/CON specs check against.
 - **`docs/BALANCE.md`** — shared numeric reference for `ability-balancer` / `item-balancer` (XP curves, combat constants, drop rates).
 
 ## Skills (Claude Code context owners)
@@ -37,7 +65,7 @@ See the shared seam between ability-balancer and item-balancer in their `SKILL.m
   - Reducers are thin shells; game rules live in plain TS functions in `rules/`.
   - Keep the codebase portable: rules are not SpacetimeDB-specific.
 - **Login server:** separate, conventional service.
-    Game module trusts verified identity, not credentials.
+  Game module trusts verified identity, not credentials.
 
 ## Next Steps
 
@@ -78,4 +106,4 @@ player-facing Jekyll reference site (`site/`) generated from
 ---
 
 When in doubt, **read the docs first**.
-The skills, design, and lore are the source of truth — they're written to be read before coding.
+The skills, design, lore, and `docs/spec/` requirements corpus are the source of truth — they're written to be read before coding.

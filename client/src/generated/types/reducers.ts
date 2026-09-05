@@ -3,29 +3,29 @@
 
 /* eslint-disable */
 /* tslint:disable */
-import { type Infer as __Infer } from "spacetimedb";
+import { type Infer as __Infer } from 'spacetimedb';
 
 // Import all reducer arg schemas
-import ApplyDamageReducer from "../apply_damage_reducer";
-import CardDropCleanupReducer from "../card_drop_cleanup_reducer";
-import DamageEnemyReducer from "../damage_enemy_reducer";
-import EnemyTickReducer from "../enemy_tick_reducer";
-import EquipCardReducer from "../equip_card_reducer";
-import EquipItemReducer from "../equip_item_reducer";
-import GrantXpReducer from "../grant_xp_reducer";
-import MoveReducer from "../move_reducer";
-import OnConnectReducer from "../on_connect_reducer";
-import PickupCardReducer from "../pickup_card_reducer";
-import PickupItemReducer from "../pickup_item_reducer";
-import RespawnEnemyReducer from "../respawn_enemy_reducer";
-import SacrificeCardReducer from "../sacrifice_card_reducer";
-import SeedCardsReducer from "../seed_cards_reducer";
-import SeedItemsReducer from "../seed_items_reducer";
-import SpawnEnemyReducer from "../spawn_enemy_reducer";
-import StartLifeReducer from "../start_life_reducer";
-import ToggleAttuneReducer from "../toggle_attune_reducer";
-import UnequipCardReducer from "../unequip_card_reducer";
-import UnequipItemReducer from "../unequip_item_reducer";
+import ApplyDamageReducer from '../apply_damage_reducer';
+import CardDropCleanupReducer from '../card_drop_cleanup_reducer';
+import DamageEnemyReducer from '../damage_enemy_reducer';
+import EnemyTickReducer from '../enemy_tick_reducer';
+import EquipCardReducer from '../equip_card_reducer';
+import EquipItemReducer from '../equip_item_reducer';
+import GrantXpReducer from '../grant_xp_reducer';
+import MoveReducer from '../move_reducer';
+import OnConnectReducer from '../on_connect_reducer';
+import PickupCardReducer from '../pickup_card_reducer';
+import PickupItemReducer from '../pickup_item_reducer';
+import RespawnEnemyReducer from '../respawn_enemy_reducer';
+import SacrificeCardReducer from '../sacrifice_card_reducer';
+import SeedCardsReducer from '../seed_cards_reducer';
+import SeedItemsReducer from '../seed_items_reducer';
+import SpawnEnemyReducer from '../spawn_enemy_reducer';
+import StartLifeReducer from '../start_life_reducer';
+import ToggleAttuneReducer from '../toggle_attune_reducer';
+import UnequipCardReducer from '../unequip_card_reducer';
+import UnequipItemReducer from '../unequip_item_reducer';
 
 export type ApplyDamageParams = __Infer<typeof ApplyDamageReducer>;
 export type CardDropCleanupParams = __Infer<typeof CardDropCleanupReducer>;
@@ -47,4 +47,3 @@ export type StartLifeParams = __Infer<typeof StartLifeReducer>;
 export type ToggleAttuneParams = __Infer<typeof ToggleAttuneReducer>;
 export type UnequipCardParams = __Infer<typeof UnequipCardReducer>;
 export type UnequipItemParams = __Infer<typeof UnequipItemReducer>;
-

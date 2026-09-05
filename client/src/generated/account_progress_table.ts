@@ -8,11 +8,11 @@ import {
   t as __t,
   type AlgebraicTypeType as __AlgebraicTypeType,
   type Infer as __Infer,
-} from "spacetimedb";
+} from 'spacetimedb';
 
 export default __t.row({
-  accountIdentity: __t.identity().primaryKey().name("account_identity"),
-  totalXpAllLives: __t.u64().name("total_xp_all_lives"),
-  tutorialCompleted: __t.bool().name("tutorial_completed"),
-  unlockedMilestoneIds: __t.array(__t.u32()).name("unlocked_milestone_ids"),
+  accountIdentity: __t.identity().primaryKey().name('account_identity'),
+  totalXpAllLives: __t.u64().name('total_xp_all_lives'),
+  tutorialCompleted: __t.bool().name('tutorial_completed'),
+  unlockedMilestoneIds: __t.array(__t.u32()).name('unlocked_milestone_ids'),
 });

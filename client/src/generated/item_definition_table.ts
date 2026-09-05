@@ -8,7 +8,7 @@ import {
   t as __t,
   type AlgebraicTypeType as __AlgebraicTypeType,
   type Infer as __Infer,
-} from "spacetimedb";
+} from 'spacetimedb';
 import {
   Rarity,
   DamageSchool,
@@ -17,17 +17,16 @@ import {
   EquipSlot,
   ArmorWeight,
   StatBlock,
-} from "./types";
-
+} from './types';
 
 export default __t.row({
-  itemDefId: __t.u64().primaryKey().name("item_def_id"),
+  itemDefId: __t.u64().primaryKey().name('item_def_id'),
   slug: __t.string(),
   name: __t.string(),
   get rarity() {
     return Rarity;
   },
-  minLevel: __t.u32().name("min_level"),
+  minLevel: __t.u32().name('min_level'),
   get category() {
     return ItemCategory;
   },
@@ -35,18 +34,18 @@ export default __t.row({
     return __t.option(EquipSlot);
   },
   get armorWeight() {
-    return __t.option(ArmorWeight).name("armor_weight");
+    return __t.option(ArmorWeight).name('armor_weight');
   },
   get weaponSchool() {
-    return __t.option(DamageSchool).name("weapon_school");
+    return __t.option(DamageSchool).name('weapon_school');
   },
   get geometryShape() {
-    return __t.option(ShapeType).name("geometry_shape");
+    return __t.option(ShapeType).name('geometry_shape');
   },
-  geometryWidth: __t.option(__t.f32()).name("geometry_width"),
-  geometryRange: __t.option(__t.f32()).name("geometry_range"),
+  geometryWidth: __t.option(__t.f32()).name('geometry_width'),
+  geometryRange: __t.option(__t.f32()).name('geometry_range'),
   get statModifiers() {
-    return StatBlock.name("stat_modifiers");
+    return StatBlock.name('stat_modifiers');
   },
   flavor: __t.string(),
 });

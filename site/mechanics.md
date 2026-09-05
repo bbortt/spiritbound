@@ -26,7 +26,7 @@ pointed, not automatically at "the nearest thing." That means:
   specific geometry — a tight **cone**, a long thin **line**, a broad **arc**,
   or a wide **circle**. A dagger's cone is short and unforgiving; a staff's
   circle is generous but comes at the cost of raw power. No weapon gets to be
-  both strong *and* wide — that trade is the game's core balance lever.
+  both strong _and_ wide — that trade is the game's core balance lever.
 - **Connect, then resolve.** Landing a hit is about your aim and the
   weapon's shape. Once it connects, your target's defenses take over —
   mitigation, a glancing evasion, a parry — deciding how much of that hit
@@ -49,7 +49,7 @@ mid-fight loadout swap; you commit to a build before you go looking for
 trouble, and live with that choice until you're somewhere safe enough to
 reconsider it.
 
-Cards you're *not* currently wielding still live in your collection — nothing
+Cards you're _not_ currently wielding still live in your collection — nothing
 you've learned is ever truly lost, only unequipped.
 
 ## Spirits
@@ -72,7 +72,7 @@ Spirits are equal parts bonfire, bank, and progression tree:
 
 ## Death
 
-Falling is not the end of your story — it's the end of *this* body.
+Falling is not the end of your story — it's the end of _this_ body.
 
 - **Your gear is always lost.** No exceptions, no insurance for it. This is
   by design: every death feeds the wider economy, and nothing you're wearing
@@ -80,13 +80,13 @@ Falling is not the end of your story — it's the end of *this* body.
   anyway.
 - **Your cards are a choice, not a coin flip.** Before you go anywhere
   dangerous, you decide which cards your spirit will hold onto for you —
-  *attune* them. If you fall, attuned cards come back with your next life.
+  _attune_ them. If you fall, attuned cards come back with your next life.
   Everything un-attuned is lost with the body. No random rolls, no
   save-or-lose — just a decision you made ahead of time, the way a
   seasoned adventurer should.
 - **The choice has real weight.** You can't attune everything — your
   spirit's capacity is limited, and rarer cards are harder to protect than
-  common ones. Deciding what's worth saving *is* the game.
+  common ones. Deciding what's worth saving _is_ the game.
 
 ## Enemies
 

@@ -1,10 +1,16 @@
-import type { ItemDefinition, ItemInstance, EquippedItem, StatBlock } from '../db';
+import type {
+  ItemDefinition,
+  ItemInstance,
+  EquippedItem,
+  StatBlock,
+} from '../db';
+import { decideEquipAction } from '../equipDecision';
 
 const RARITY_COLOR: Record<string, string> = {
-  Common:    '#aaaaaa',
-  Uncommon:  '#44cc44',
-  Rare:      '#4488ff',
-  Epic:      '#cc44ff',
+  Common: '#aaaaaa',
+  Uncommon: '#44cc44',
+  Rare: '#4488ff',
+  Epic: '#cc44ff',
   Legendary: '#ffcc00',
 };
 
@@ -15,36 +21,91 @@ const ARMOR_TINT: Record<string, string> = {
 };
 
 const SLOT_ICON: Record<string, string> = {
-  Head: '🪖', Chest: '🛡', Hands: '🧤', Legs: '👖', Boots: '👢',
-  MainHand: '⚔', OffHand: '🔯', Necklace: '📿', Ring: '💍', Earring: '💎',
+  Head: '🪖',
+  Chest: '🛡',
+  Hands: '🧤',
+  Legs: '👖',
+  Boots: '👢',
+  MainHand: '⚔',
+  OffHand: '🔯',
+  Necklace: '📿',
+  Ring: '💍',
+  Earring: '💎',
 };
 
 // Rate-like stats read as "multiplier delta" — shown as a percentage of the delta.
 const PERCENT_STATS = new Set<keyof StatBlock>([
-  'moveSpeed', 'attackSpeed', 'castingSpeed', 'physicalCrit', 'magicCrit',
-  'evasion', 'parry', 'block', 'magicResist', 'healingBoost',
+  'moveSpeed',
+  'attackSpeed',
+  'castingSpeed',
+  'physicalCrit',
+  'magicCrit',
+  'evasion',
+  'parry',
+  'block',
+  'magicResist',
+  'healingBoost',
 ]);
 
 const STAT_LABEL: Record<keyof StatBlock, string> = {
-  power: 'Power', knowledge: 'Knowledge', health: 'Health', will: 'Will',
-  agility: 'Agility', precision: 'Precision',
-  maxHp: 'Max HP', hpRegen: 'HP Regen', maxMp: 'Max MP', mpRegen: 'MP Regen',
+  power: 'Power',
+  knowledge: 'Knowledge',
+  health: 'Health',
+  will: 'Will',
+  agility: 'Agility',
+  precision: 'Precision',
+  maxHp: 'Max HP',
+  hpRegen: 'HP Regen',
+  maxMp: 'Max MP',
+  mpRegen: 'MP Regen',
   moveSpeed: 'Move Speed',
-  weaponDamage: 'Weapon Dmg', physicalAttack: 'Phys Atk', magicAttack: 'Mag Atk',
-  attackSpeed: 'Atk Speed', castingSpeed: 'Cast Speed',
-  physicalCrit: 'Phys Crit', magicCrit: 'Mag Crit',
-  accuracy: 'Accuracy', magicAccuracy: 'Mag Accuracy', healingBoost: 'Healing',
-  physicalDef: 'Phys Def', magicDef: 'Mag Def', evasion: 'Evasion',
-  parry: 'Parry', block: 'Block', magicResist: 'Mag Resist',
+  weaponDamage: 'Weapon Dmg',
+  physicalAttack: 'Phys Atk',
+  magicAttack: 'Mag Atk',
+  attackSpeed: 'Atk Speed',
+  castingSpeed: 'Cast Speed',
+  physicalCrit: 'Phys Crit',
+  magicCrit: 'Mag Crit',
+  accuracy: 'Accuracy',
+  magicAccuracy: 'Mag Accuracy',
+  healingBoost: 'Healing',
+  physicalDef: 'Phys Def',
+  magicDef: 'Mag Def',
+  evasion: 'Evasion',
+  parry: 'Parry',
+  block: 'Block',
+  magicResist: 'Mag Resist',
 };
 
 // Priority order for picking the single "key stat" shown on a bag cell.
 const PREVIEW_PRIORITY: (keyof StatBlock)[] = [
-  'weaponDamage', 'physicalAttack', 'magicAttack', 'physicalDef', 'magicDef',
-  'maxHp', 'maxMp', 'evasion', 'moveSpeed', 'healingBoost', 'magicResist',
-  'accuracy', 'magicAccuracy', 'physicalCrit', 'magicCrit', 'attackSpeed',
-  'castingSpeed', 'parry', 'block', 'hpRegen', 'mpRegen',
-  'power', 'knowledge', 'health', 'will', 'agility', 'precision',
+  'weaponDamage',
+  'physicalAttack',
+  'magicAttack',
+  'physicalDef',
+  'magicDef',
+  'maxHp',
+  'maxMp',
+  'evasion',
+  'moveSpeed',
+  'healingBoost',
+  'magicResist',
+  'accuracy',
+  'magicAccuracy',
+  'physicalCrit',
+  'magicCrit',
+  'attackSpeed',
+  'castingSpeed',
+  'parry',
+  'block',
+  'hpRegen',
+  'mpRegen',
+  'power',
+  'knowledge',
+  'health',
+  'will',
+  'agility',
+  'precision',
 ];
 
 function fmtStat(key: keyof StatBlock, value: number): string {
@@ -56,8 +117,8 @@ function fmtStat(key: keyof StatBlock, value: number): string {
 
 function nonZeroStats(stats: StatBlock): [keyof StatBlock, number][] {
   return (Object.keys(stats) as (keyof StatBlock)[])
-    .filter(k => stats[k] !== 0)
-    .map(k => [k, stats[k]]);
+    .filter((k) => stats[k] !== 0)
+    .map((k) => [k, stats[k]]);
 }
 
 function rarityTag(v: unknown): string {
@@ -138,9 +199,9 @@ export class InventoryPanel {
   private _open = false;
   private _slotFilter: string | null = null;
 
-  private _defs      = new Map<bigint, ItemDefinition>();
-  private _instances  = new Map<bigint, ItemInstance>();
-  private _equipped   = new Map<bigint, EquippedItem>(); // key = equippedItemId
+  private _defs = new Map<bigint, ItemDefinition>();
+  private _instances = new Map<bigint, ItemInstance>();
+  private _equipped = new Map<bigint, EquippedItem>(); // key = equippedItemId
 
   constructor() {
     if (!document.getElementById('sb-panel-css')) {
@@ -169,12 +230,22 @@ export class InventoryPanel {
     this._render();
   }
 
-  open()  { this._open = true;  this.panel.classList.add('open'); }
-  close() { this._open = false; this.panel.classList.remove('open'); this._hideTooltip(); }
+  open() {
+    this._open = true;
+    this.panel.classList.add('open');
+  }
+  close() {
+    this._open = false;
+    this.panel.classList.remove('open');
+    this._hideTooltip();
+  }
 
   /** Normal I-key toggle — always shows the whole bag. */
   toggle() {
-    if (this._open) { this.close(); return; }
+    if (this._open) {
+      this.close();
+      return;
+    }
     this._slotFilter = null;
     this.open();
     this._render();
@@ -187,7 +258,9 @@ export class InventoryPanel {
     this._render();
   }
 
-  isOpen() { return this._open; }
+  isOpen() {
+    return this._open;
+  }
 
   // ── Table callbacks ────────────────────────────────────────────────────────
 
@@ -218,22 +291,22 @@ export class InventoryPanel {
 
   /** Fully replace the visible bag — called when the local character changes (new life). */
   reset(instances: ItemInstance[], equipped: EquippedItem[]) {
-    this._instances = new Map(instances.map(i => [i.itemInstanceId, i]));
-    this._equipped  = new Map(equipped.map(e => [e.equippedItemId, e]));
+    this._instances = new Map(instances.map((i) => [i.itemInstanceId, i]));
+    this._equipped = new Map(equipped.map((e) => [e.equippedItemId, e]));
     this._render();
   }
 
   // ── Rendering ──────────────────────────────────────────────────────────────
 
   private _equippedInstanceIds(): Set<bigint> {
-    return new Set([...this._equipped.values()].map(e => e.itemInstanceId));
+    return new Set([...this._equipped.values()].map((e) => e.itemInstanceId));
   }
 
   private _render() {
     const equippedIds = this._equippedInstanceIds();
     const allItems = [...this._instances.values()];
     const items = this._slotFilter
-      ? allItems.filter(i => {
+      ? allItems.filter((i) => {
           const def = this._defs.get(i.itemDefId);
           return def?.slot && rarityTag(def.slot) === this._slotFilter;
         })
@@ -244,38 +317,48 @@ export class InventoryPanel {
         <span style="font-size:15px;font-weight:700;color:#fff">Bag (${allItems.length})</span>
         <span style="cursor:pointer;color:#888;font-size:18px" id="sb-inv-close">✕</span>
       </div>
-      ${this._slotFilter
-        ? `<div class="sb-filter-chip" id="sb-inv-clear-filter">Showing: ${this._slotFilter} · Show All ✕</div>`
-        : ''}
-      ${items.length === 0
-        ? `<div class="sb-empty-note">${this._slotFilter
-            ? `No ${this._slotFilter} items in your bag.`
-            : 'Nothing in your bag yet. Kill enemies for a chance at gear.'}</div>`
-        : `<div class="sb-grid">${items.map(i => this._renderCell(i, equippedIds)).join('')}</div>`}
+      ${
+        this._slotFilter
+          ? `<div class="sb-filter-chip" id="sb-inv-clear-filter">Showing: ${this._slotFilter} · Show All ✕</div>`
+          : ''
+      }
+      ${
+        items.length === 0
+          ? `<div class="sb-empty-note">${
+              this._slotFilter
+                ? `No ${this._slotFilter} items in your bag.`
+                : 'Nothing in your bag yet. Kill enemies for a chance at gear.'
+            }</div>`
+          : `<div class="sb-grid">${items.map((i) => this._renderCell(i, equippedIds)).join('')}</div>`
+      }
     `;
 
-    this.panel.querySelector('#sb-inv-close')?.addEventListener('click', () => this.close());
-    this.panel.querySelector('#sb-inv-clear-filter')?.addEventListener('click', () => {
-      this._slotFilter = null;
-      this._render();
-    });
+    this.panel
+      .querySelector('#sb-inv-close')
+      ?.addEventListener('click', () => this.close());
+    this.panel
+      .querySelector('#sb-inv-clear-filter')
+      ?.addEventListener('click', () => {
+        this._slotFilter = null;
+        this._render();
+      });
     this._attachCellListeners();
   }
 
   private _renderCell(inst: ItemInstance, equippedIds: Set<bigint>): string {
     const def = this._defs.get(inst.itemDefId);
     if (!def) return '';
-    const rarity   = rarityTag(def.rarity);
-    const color    = RARITY_COLOR[rarity] ?? '#aaa';
-    const armor    = def.armorWeight ? rarityTag(def.armorWeight) : null;
-    const slotTag  = def.slot ? rarityTag(def.slot) : null;
-    const icon     = slotTag ? SLOT_ICON[slotTag] ?? '❔' : '❔';
-    const isEquip  = equippedIds.has(inst.itemInstanceId);
+    const rarity = rarityTag(def.rarity);
+    const color = RARITY_COLOR[rarity] ?? '#aaa';
+    const armor = def.armorWeight ? rarityTag(def.armorWeight) : null;
+    const slotTag = def.slot ? rarityTag(def.slot) : null;
+    const icon = slotTag ? (SLOT_ICON[slotTag] ?? '❔') : '❔';
+    const isEquip = equippedIds.has(inst.itemInstanceId);
 
     const stats = nonZeroStats(def.statModifiers);
-    const preview = PREVIEW_PRIORITY
-      .map(k => stats.find(([sk]) => sk === k))
-      .find((s): s is [keyof StatBlock, number] => !!s);
+    const preview = PREVIEW_PRIORITY.map((k) =>
+      stats.find(([sk]) => sk === k),
+    ).find((s): s is [keyof StatBlock, number] => !!s);
     const previewText = preview
       ? `${fmtStat(preview[0], preview[1])} ${STAT_LABEL[preview[0]].toLowerCase()}`
       : '';
@@ -295,8 +378,8 @@ export class InventoryPanel {
     const def = this._defs.get(inst.itemDefId);
     if (!def) return '';
     const rarity = rarityTag(def.rarity);
-    const color  = RARITY_COLOR[rarity] ?? '#aaa';
-    const armor  = def.armorWeight ? rarityTag(def.armorWeight) : null;
+    const color = RARITY_COLOR[rarity] ?? '#aaa';
+    const armor = def.armorWeight ? rarityTag(def.armorWeight) : null;
     const slotTag = def.slot ? rarityTag(def.slot) : null;
     const stats = nonZeroStats(def.statModifiers);
     return `
@@ -315,7 +398,7 @@ export class InventoryPanel {
   // ── Event delegation ───────────────────────────────────────────────────────
 
   private _attachCellListeners() {
-    this.panel.querySelectorAll<HTMLElement>('[data-iid]').forEach(el => {
+    this.panel.querySelectorAll<HTMLElement>('[data-iid]').forEach((el) => {
       const iid = BigInt(el.dataset.iid!);
 
       el.addEventListener('mouseenter', () => {
@@ -324,7 +407,7 @@ export class InventoryPanel {
         this.tooltip.innerHTML = this._renderTooltip(inst);
         const rect = el.getBoundingClientRect();
         this.tooltip.style.left = `${rect.right + 8}px`;
-        this.tooltip.style.top  = `${rect.top}px`;
+        this.tooltip.style.top = `${rect.top}px`;
         this.tooltip.style.display = 'block';
       });
       el.addEventListener('mouseleave', () => this._hideTooltip());
@@ -334,40 +417,36 @@ export class InventoryPanel {
 
   private _handleClick(itemInstanceId: bigint) {
     const inst = this._instances.get(itemInstanceId);
-    const def  = inst ? this._defs.get(inst.itemDefId) : null;
+    const def = inst ? this._defs.get(inst.itemDefId) : null;
     if (!inst || !def || !def.slot) return;
     const slotTag = rarityTag(def.slot);
-
-    // Already equipped -> unequip.
-    const myEquip = [...this._equipped.values()].find(e => e.itemInstanceId === itemInstanceId);
-    if (myEquip) {
-      if (confirm(`Unequip ${def.name}?`)) {
-        this._emit('unequipItem', { equippedItemId: myEquip.equippedItemId });
-      }
-      return;
-    }
-
     const isDual = slotTag === 'Ring' || slotTag === 'Earring';
-    const occupant = (ordinal: number) =>
-      [...this._equipped.values()].find(e => rarityTag(e.slot) === slotTag && e.slotOrdinal === ordinal);
 
-    if (isDual) {
-      const occ0 = occupant(0);
-      const occ1 = occupant(1);
-      if (!occ0) { this._equip(itemInstanceId, slotTag, 0); return; }
-      if (!occ1) { this._equip(itemInstanceId, slotTag, 1); return; }
-      this._confirmReplace(occ0, () => this._equip(itemInstanceId, slotTag, 0));
-      return;
+    const decision = decideEquipAction(itemInstanceId, slotTag, isDual, [
+      ...this._equipped.values(),
+    ]);
+    switch (decision.kind) {
+      case 'unequip':
+        if (confirm(`Unequip ${def.name}?`)) {
+          this._emit('unequipItem', {
+            equippedItemId: decision.equippedItemId,
+          });
+        }
+        return;
+      case 'equip':
+        this._equip(itemInstanceId, decision.slot, decision.slotOrdinal);
+        return;
+      case 'replace':
+        this._confirmReplace(decision.occupant, () =>
+          this._equip(itemInstanceId, decision.slot, decision.slotOrdinal),
+        );
+        return;
     }
-
-    const occ = occupant(0);
-    if (!occ) { this._equip(itemInstanceId, slotTag, 0); return; }
-    this._confirmReplace(occ, () => this._equip(itemInstanceId, slotTag, 0));
   }
 
   private _confirmReplace(occupant: EquippedItem, onConfirm: () => void) {
     const curInst = this._instances.get(occupant.itemInstanceId);
-    const curDef  = curInst ? this._defs.get(curInst.itemDefId) : null;
+    const curDef = curInst ? this._defs.get(curInst.itemDefId) : null;
     if (confirm(`Replace ${curDef?.name ?? 'equipped item'}?`)) onConfirm();
   }
 

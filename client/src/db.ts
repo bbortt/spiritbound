@@ -62,7 +62,10 @@ function _subscribeSlice(
     })
     .onError((ctx) => {
       const err = (ctx as any).event;
-      console.error('[spacetime] core subscription error:', err?.message ?? err);
+      console.error(
+        '[spacetime] core subscription error:',
+        err?.message ?? err,
+      );
     })
     .subscribe([
       'SELECT * FROM character',
@@ -80,7 +83,10 @@ function _subscribeCards(conn: DbConnection): void {
     .onApplied(() => console.log('[spacetime] card subscription active'))
     .onError((ctx) => {
       const err = (ctx as any).event;
-      console.error('[spacetime] card subscription error:', err?.message ?? err);
+      console.error(
+        '[spacetime] card subscription error:',
+        err?.message ?? err,
+      );
     })
     .subscribe([
       'SELECT * FROM card_drop',
@@ -95,7 +101,10 @@ function _subscribeItems(conn: DbConnection): void {
     .onApplied(() => console.log('[spacetime] item subscription active'))
     .onError((ctx) => {
       const err = (ctx as any).event;
-      console.error('[spacetime] item subscription error:', err?.message ?? err);
+      console.error(
+        '[spacetime] item subscription error:',
+        err?.message ?? err,
+      );
     })
     .subscribe([
       'SELECT * FROM item_definition',

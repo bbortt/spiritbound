@@ -36,12 +36,12 @@ level 50. Log-shaped so early levels feel fast. **Pending playtest.**
 rarity for spirit bond XP:
 
 | Rarity    | XP awarded |
-|-----------|-----------:|
-| common    | 10         |
-| uncommon  | 50         |
-| rare      | 200        |
-| epic      | 800        |
-| legendary | 3,000      |
+| --------- | ---------: |
+| common    |         10 |
+| uncommon  |         50 |
+| rare      |        200 |
+| epic      |        800 |
+| legendary |      3,000 |
 
 ### Hand slots by spirit level
 
@@ -79,12 +79,12 @@ numbers once combat is played at scale.
 
 `spacetimedb/src/rules/combat.ts` — used by `resolveHit` / `resolveHeal`:
 
-| Constant                  | Value | Meaning |
-|---------------------------|------:|---------|
-| `LEVEL_SCALING_PER_LEVEL` | 0.05  | Each character level adds 5% of a card's base power. |
-| `CRIT_MULTIPLIER`         | 1.5   | Damage multiplier on a crit roll. |
-| `MAX_GLANCING_REDUCTION`  | 0.20  | Evasion/parry/magic-resist caps at 20% damage reduction — glancing blow, never full negation. |
-| `MIN_DAMAGE`              | 1     | Damage floor after all mitigation. |
+| Constant                  | Value | Meaning                                                                                       |
+| ------------------------- | ----: | --------------------------------------------------------------------------------------------- |
+| `LEVEL_SCALING_PER_LEVEL` |  0.05 | Each character level adds 5% of a card's base power.                                          |
+| `CRIT_MULTIPLIER`         |   1.5 | Damage multiplier on a crit roll.                                                             |
+| `MAX_GLANCING_REDUCTION`  |  0.20 | Evasion/parry/magic-resist caps at 20% damage reduction — glancing blow, never full negation. |
+| `MIN_DAMAGE`              |     1 | Damage floor after all mitigation.                                                            |
 
 Accuracy-vs-avoidance interaction is currently `effectiveAvoidance =
 max(0, rawAvoidance - accuracyStat * 0.002)` — the `0.002` conversion rate is
@@ -95,27 +95,27 @@ a placeholder, not a tuned value.
 `spacetimedb/src/index.ts` — chase-AI tuning constants (module-level,
 shared by every enemy) plus current per-enemy seed values:
 
-| Constant             | Value      | Meaning |
-|-----------------------|-----------:|---------|
-| `AGGRO_RANGE`          | 300px      | Distance at which an idle enemy notices a player. |
-| `ATTACK_RANGE`         | 180px      | Distance at which a chasing enemy stops and casts. |
-| `DEAGGRO_RANGE`        | 500px      | Distance at which a chasing/cooldown enemy gives up and resets. |
-| `CHASE_SPEED`          | 110px/s    | Always slower than the player's 180px/s move speed — a chase is always escapable. |
-| `RESET_SPEED`          | 80px/s     | Walk-back-to-spawn speed while resetting. |
-| `RESET_HP_PER_TICK`    | 10 HP      | Healed per tick (every 500ms) while resetting. |
-| `TICK_SECONDS`         | 0.5s       | `enemyTick` cadence. |
+| Constant            |   Value | Meaning                                                                           |
+| ------------------- | ------: | --------------------------------------------------------------------------------- |
+| `AGGRO_RANGE`       |   300px | Distance at which an idle enemy notices a player.                                 |
+| `ATTACK_RANGE`      |   180px | Distance at which a chasing enemy stops and casts.                                |
+| `DEAGGRO_RANGE`     |   500px | Distance at which a chasing/cooldown enemy gives up and resets.                   |
+| `CHASE_SPEED`       | 110px/s | Always slower than the player's 180px/s move speed — a chase is always escapable. |
+| `RESET_SPEED`       |  80px/s | Walk-back-to-spawn speed while resetting.                                         |
+| `RESET_HP_PER_TICK` |   10 HP | Healed per tick (every 500ms) while resetting.                                    |
+| `TICK_SECONDS`      |    0.5s | `enemyTick` cadence.                                                              |
 
 Current seeded enemy stats (`_seedZone1Enemies` / `spawnEnemy`, zone 1):
 
-| Field                    | Value   |
-|--------------------------|--------:|
-| `currentHp` / `maxHp`    | 100     |
-| `damagePerHit`           | 8       |
-| `attackRangePx`          | 220px   |
-| `attackCooldownSeconds`  | 3.0s    |
-| `castDurationSeconds`    | 1.8s    |
-| `castShape`              | circle  |
-| `castDamage`             | 15      |
+| Field                   |  Value |
+| ----------------------- | -----: |
+| `currentHp` / `maxHp`   |    100 |
+| `damagePerHit`          |      8 |
+| `attackRangePx`         |  220px |
+| `attackCooldownSeconds` |   3.0s |
+| `castDurationSeconds`   |   1.8s |
+| `castShape`             | circle |
+| `castDamage`            |     15 |
 
 All of the above are first-pass placeholder values, not balanced against
 real player stats yet.
@@ -135,12 +135,12 @@ level`, then a rarity tier is picked via `_pickWeightedRarity` before
 sampling within that tier:
 
 | Rarity    | Weight |
-|-----------|-------:|
-| common    | 60%    |
-| uncommon  | 25%    |
-| rare      | 12%    |
-| epic      | 3%     |
-| legendary | 0%     |
+| --------- | -----: |
+| common    |    60% |
+| uncommon  |    25% |
+| rare      |    12% |
+| epic      |     3% |
+| legendary |     0% |
 
 **Legendary cards never drop from trash mobs** — the weight is 0 by design;
 they're reserved for bosses and dungeon tiers (not yet implemented). If the
@@ -191,12 +191,12 @@ client/server level-curve duplication this feature depends on.
 placeholder, ignores its `raceId` argument. This is the character's stat
 floor before any gear:
 
-| Field | Value | Field | Value |
-|-------|------:|-------|------:|
-| power / knowledge / will / agility / precision | 10 | health | 12 |
-| maxHp | 100 | maxMp | 60 |
-| hpRegen | 0.5 | mpRegen | 0.3 |
-| moveSpeed / attackSpeed / castingSpeed / healingBoost | 1.0 | everything else | 0 |
+| Field                                                 | Value | Field           | Value |
+| ----------------------------------------------------- | ----: | --------------- | ----: |
+| power / knowledge / will / agility / precision        |    10 | health          |    12 |
+| maxHp                                                 |   100 | maxMp           |    60 |
+| hpRegen                                               |   0.5 | mpRegen         |   0.3 |
+| moveSpeed / attackSpeed / castingSpeed / healingBoost |   1.0 | everything else |     0 |
 
 **Behavior change:** `startLife` used to grant `100 + level*15` HP and
 `50 + level*8` MP (character level scaled starting resources directly).
@@ -229,14 +229,14 @@ structural rules in `content/validateEquipment.ts` (main_hand needs full
 geometry, armorWeight null on weapons/off_hand, evasion < 0.20, moveSpeed <
 0.5, epic/legendary stat floors, and the power-vs-area rule below).
 
-| Item              | Slot      | Rarity   | Weight/Geometry              | Stat line |
-|-------------------|-----------|----------|-------------------------------|-----------|
-| Worn Dagger       | main_hand | common   | cone, width 0.3, range 120    | weaponDamage 12, physicalAttack 8, attackSpeed 1.1 |
-| Apprentice Staff  | main_hand | common   | circle, width 1.8, range 280  | weaponDamage 6, magicAttack 14, castingSpeed 1.1 |
-| Leather Cap       | head      | common   | cloth                         | magicDef 8, maxHp 15 |
-| Iron Chestplate   | chest     | common   | plate                         | physicalDef 18, maxHp 30 |
-| Traveller's Boots | boots     | common   | chain                         | moveSpeed 0.08, evasion 0.03 |
-| Spirit Focus      | off_hand  | uncommon | —                              | magicDef 10, magicResist 0.05, maxMp 25 |
+| Item              | Slot      | Rarity   | Weight/Geometry              | Stat line                                          |
+| ----------------- | --------- | -------- | ---------------------------- | -------------------------------------------------- |
+| Worn Dagger       | main_hand | common   | cone, width 0.3, range 120   | weaponDamage 12, physicalAttack 8, attackSpeed 1.1 |
+| Apprentice Staff  | main_hand | common   | circle, width 1.8, range 280 | weaponDamage 6, magicAttack 14, castingSpeed 1.1   |
+| Leather Cap       | head      | common   | cloth                        | magicDef 8, maxHp 15                               |
+| Iron Chestplate   | chest     | common   | plate                        | physicalDef 18, maxHp 30                           |
+| Traveller's Boots | boots     | common   | chain                        | moveSpeed 0.08, evasion 0.03                       |
+| Spirit Focus      | off_hand  | uncommon | —                            | magicDef 10, magicResist 0.05, maxMp 25            |
 
 **Power-vs-area rule (main_hand only):** if `geometryWidth > 1.0`, then
 `weaponDamage + physicalAttack + magicAttack` must not exceed 20. Apprentice

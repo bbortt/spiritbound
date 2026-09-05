@@ -6,6 +6,8 @@ import type { CardDef } from './validate';
 
 export function loadCards(): CardDef[] {
   const dir = dirname(fileURLToPath(import.meta.url));
-  const raw: unknown[] = JSON.parse(readFileSync(join(dir, 'cards.json'), 'utf-8'));
+  const raw: unknown[] = JSON.parse(
+    readFileSync(join(dir, 'cards.json'), 'utf-8'),
+  );
   return parseCards(raw);
 }

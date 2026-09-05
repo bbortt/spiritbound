@@ -1,11 +1,18 @@
-import type { Character, ItemDefinition, ItemInstance, EquippedItem, StatBlock } from '../db';
+import type {
+  Character,
+  ItemDefinition,
+  ItemInstance,
+  EquippedItem,
+  StatBlock,
+} from '../db';
 import { RACE_BASE, computeEffectiveStats } from '../effectiveStats';
+import { BODY_SLOTS, findEquippedInSlot } from '../paperDoll';
 
 const RARITY_COLOR: Record<string, string> = {
-  Common:    '#aaaaaa',
-  Uncommon:  '#44cc44',
-  Rare:      '#4488ff',
-  Epic:      '#cc44ff',
+  Common: '#aaaaaa',
+  Uncommon: '#44cc44',
+  Rare: '#4488ff',
+  Epic: '#cc44ff',
   Legendary: '#ffcc00',
 };
 
@@ -15,46 +22,78 @@ const ARMOR_TINT: Record<string, string> = {
   Plate: '#999999',
 };
 
-// [slotTag, ordinal, gridArea, placeholder label]
-// Paper-doll layout: weapons flank the top row, the centre column is the
-// body line (head -> neck -> chest -> hands -> legs -> boots), and paired
-// accessories flank the body part they're worn near (earrings-head, rings-hands).
-const BODY_SLOTS: [string, number, string, string][] = [
-  ['OffHand', 0, 'off', 'Off'],
-  ['MainHand', 0, 'main', 'Main'],
-  ['Earring', 0, 'ear0', 'Earring'],
-  ['Head', 0, 'head', 'Head'],
-  ['Earring', 1, 'ear1', 'Earring'],
-  ['Necklace', 0, 'neck', 'Neck'],
-  ['Chest', 0, 'chest', 'Chest'],
-  ['Ring', 0, 'ring0', 'Ring'],
-  ['Hands', 0, 'hands', 'Hands'],
-  ['Ring', 1, 'ring1', 'Ring'],
-  ['Legs', 0, 'legs', 'Legs'],
-  ['Boots', 0, 'boots', 'Boots'],
+const PERCENT_FIELDS = new Set<keyof StatBlock>([
+  'evasion',
+  'parry',
+  'block',
+  'magicResist',
+  'physicalCrit',
+  'magicCrit',
+]);
+const MULTIPLIER_FIELDS = new Set<keyof StatBlock>([
+  'moveSpeed',
+  'attackSpeed',
+  'castingSpeed',
+  'healingBoost',
+]);
+
+const PRIMARY_FIELDS: (keyof StatBlock)[] = [
+  'power',
+  'knowledge',
+  'health',
+  'will',
+  'agility',
+  'precision',
 ];
-
-const PERCENT_FIELDS = new Set<keyof StatBlock>(['evasion', 'parry', 'block', 'magicResist', 'physicalCrit', 'magicCrit']);
-const MULTIPLIER_FIELDS = new Set<keyof StatBlock>(['moveSpeed', 'attackSpeed', 'castingSpeed', 'healingBoost']);
-
-const PRIMARY_FIELDS: (keyof StatBlock)[] = ['power', 'knowledge', 'health', 'will', 'agility', 'precision'];
 const OFFENSIVE_FIELDS: (keyof StatBlock)[] = [
-  'weaponDamage', 'physicalAttack', 'magicAttack', 'attackSpeed', 'castingSpeed',
-  'physicalCrit', 'magicCrit', 'accuracy', 'magicAccuracy', 'healingBoost',
+  'weaponDamage',
+  'physicalAttack',
+  'magicAttack',
+  'attackSpeed',
+  'castingSpeed',
+  'physicalCrit',
+  'magicCrit',
+  'accuracy',
+  'magicAccuracy',
+  'healingBoost',
 ];
-const DEFENSIVE_FIELDS: (keyof StatBlock)[] = ['physicalDef', 'magicDef', 'evasion', 'parry', 'block', 'magicResist'];
+const DEFENSIVE_FIELDS: (keyof StatBlock)[] = [
+  'physicalDef',
+  'magicDef',
+  'evasion',
+  'parry',
+  'block',
+  'magicResist',
+];
 
 const STAT_LABEL: Record<keyof StatBlock, string> = {
-  power: 'Power', knowledge: 'Knowledge', health: 'Health', will: 'Will',
-  agility: 'Agility', precision: 'Precision',
-  maxHp: 'Max HP', hpRegen: 'HP Regen', maxMp: 'Max MP', mpRegen: 'MP Regen',
+  power: 'Power',
+  knowledge: 'Knowledge',
+  health: 'Health',
+  will: 'Will',
+  agility: 'Agility',
+  precision: 'Precision',
+  maxHp: 'Max HP',
+  hpRegen: 'HP Regen',
+  maxMp: 'Max MP',
+  mpRegen: 'MP Regen',
   moveSpeed: 'Move Speed',
-  weaponDamage: 'Weapon Damage', physicalAttack: 'Physical Attack', magicAttack: 'Magic Attack',
-  attackSpeed: 'Attack Speed', castingSpeed: 'Casting Speed',
-  physicalCrit: 'Physical Crit', magicCrit: 'Magic Crit',
-  accuracy: 'Accuracy', magicAccuracy: 'Magic Accuracy', healingBoost: 'Healing Boost',
-  physicalDef: 'Physical Def', magicDef: 'Magic Def', evasion: 'Evasion',
-  parry: 'Parry', block: 'Block', magicResist: 'Magic Resist',
+  weaponDamage: 'Weapon Damage',
+  physicalAttack: 'Physical Attack',
+  magicAttack: 'Magic Attack',
+  attackSpeed: 'Attack Speed',
+  castingSpeed: 'Casting Speed',
+  physicalCrit: 'Physical Crit',
+  magicCrit: 'Magic Crit',
+  accuracy: 'Accuracy',
+  magicAccuracy: 'Magic Accuracy',
+  healingBoost: 'Healing Boost',
+  physicalDef: 'Physical Def',
+  magicDef: 'Magic Def',
+  evasion: 'Evasion',
+  parry: 'Parry',
+  block: 'Block',
+  magicResist: 'Magic Resist',
 };
 
 // One-liners mirror the field comments in spacetimedb/src/types.ts.
@@ -82,7 +121,8 @@ const STAT_DESC: Record<keyof StatBlock, string> = {
   healingBoost: 'Multiplier on healing-card output.',
   physicalDef: 'Flat mitigation against physical damage.',
   magicDef: 'Flat mitigation against magic damage.',
-  evasion: 'Glancing-blow chance on a connected physical hit (partial reduction, capped).',
+  evasion:
+    'Glancing-blow chance on a connected physical hit (partial reduction, capped).',
   parry: 'Reduces a connected physical hit, capped.',
   block: "Off-hand shield's damage reduction.",
   magicResist: 'Resists connected magic damage and secondary effects, capped.',
@@ -161,9 +201,9 @@ export class CharacterSheet {
   private _character: Character | null = null;
   private _spiritLevel = 1;
 
-  private _defs      = new Map<bigint, ItemDefinition>();
-  private _instances  = new Map<bigint, ItemInstance>();
-  private _equipped   = new Map<bigint, EquippedItem>(); // key = equippedItemId
+  private _defs = new Map<bigint, ItemDefinition>();
+  private _instances = new Map<bigint, ItemInstance>();
+  private _equipped = new Map<bigint, EquippedItem>(); // key = equippedItemId
 
   constructor() {
     if (!document.getElementById('sb-charsheet-css')) {
@@ -176,7 +216,7 @@ export class CharacterSheet {
     this.overlay = document.createElement('div');
     this.overlay.id = 'sb-charsheet-overlay';
     this.overlay.className = 'sb-modal-overlay';
-    this.overlay.addEventListener('click', e => {
+    this.overlay.addEventListener('click', (e) => {
       if (e.target === this.overlay) this.close();
     });
     document.body.appendChild(this.overlay);
@@ -188,10 +228,21 @@ export class CharacterSheet {
     this._render();
   }
 
-  open()  { this._open = true;  this.overlay.classList.add('open'); this._render(); }
-  close() { this._open = false; this.overlay.classList.remove('open'); }
-  toggle() { this._open ? this.close() : this.open(); }
-  isOpen() { return this._open; }
+  open() {
+    this._open = true;
+    this.overlay.classList.add('open');
+    this._render();
+  }
+  close() {
+    this._open = false;
+    this.overlay.classList.remove('open');
+  }
+  toggle() {
+    this._open ? this.close() : this.open();
+  }
+  isOpen() {
+    return this._open;
+  }
 
   // ── State setters ──────────────────────────────────────────────────────────
 
@@ -267,12 +318,14 @@ export class CharacterSheet {
       <div class="sb-sheet-cols">
         <div class="sb-sheet-left">
           ${this._renderHeader()}
-          <div class="sb-body-grid">${BODY_SLOTS.map(s => this._renderBodySlot(...s)).join('')}</div>
+          <div class="sb-body-grid">${BODY_SLOTS.map((s) => this._renderBodySlot(...s)).join('')}</div>
         </div>
         <div class="sb-sheet-right">${this._renderStats()}</div>
       </div>
     `;
-    this.modal.querySelector('#sb-sheet-close')?.addEventListener('click', () => this.close());
+    this.modal
+      .querySelector('#sb-sheet-close')
+      ?.addEventListener('click', () => this.close());
     this._attachSlotListeners();
   }
 
@@ -287,19 +340,28 @@ export class CharacterSheet {
     `;
   }
 
-  private _renderBodySlot(slotTag: string, ordinal: number, gridArea: string, placeholder: string): string {
-    const eq = [...this._equipped.values()].find(e => rarityTag(e.slot) === slotTag && e.slotOrdinal === ordinal);
+  private _renderBodySlot(
+    slotTag: string,
+    ordinal: number,
+    gridArea: string,
+    placeholder: string,
+  ): string {
+    const eq = findEquippedInSlot(
+      [...this._equipped.values()],
+      slotTag,
+      ordinal,
+    );
     if (!eq) {
       return `<div class="sb-body-slot" style="grid-area:${gridArea}" data-empty-slot="${slotTag}">${placeholder}</div>`;
     }
     const inst = this._instances.get(eq.itemInstanceId);
-    const def  = inst ? this._defs.get(inst.itemDefId) : null;
+    const def = inst ? this._defs.get(inst.itemDefId) : null;
     if (!def) {
       return `<div class="sb-body-slot" style="grid-area:${gridArea}" data-empty-slot="${slotTag}">${placeholder}</div>`;
     }
     const rarity = rarityTag(def.rarity);
-    const color  = RARITY_COLOR[rarity] ?? '#aaa';
-    const armor  = def.armorWeight ? rarityTag(def.armorWeight) : null;
+    const color = RARITY_COLOR[rarity] ?? '#aaa';
+    const armor = def.armorWeight ? rarityTag(def.armorWeight) : null;
     return `<div class="sb-body-slot filled" style="grid-area:${gridArea};border-color:${color};background:${color}22"
                  data-equipped-id="${eq.equippedItemId}" title="Click to unequip ${def.name}">
       ${armor ? `<div class="sb-armor-badge" style="background:${ARMOR_TINT[armor] ?? '#666'}"></div>` : ''}
@@ -313,25 +375,31 @@ export class CharacterSheet {
     return `
       <div class="sb-stat-group">
         <div class="sb-stat-group-title">Attributes</div>
-        ${PRIMARY_FIELDS.map(k => `
+        ${PRIMARY_FIELDS.map(
+          (k) => `
           <div class="sb-stat-row" title="${STAT_DESC[k]}">
             <span>${STAT_LABEL[k]}</span>
             <span><span class="sb-stat-base">${RACE_BASE[k]}</span> ${bonus[k] !== 0 ? `<span class="sb-stat-bonus">(+${bonus[k]})</span>` : ''} = <b>${total[k]}</b></span>
-          </div>`).join('')}
+          </div>`,
+        ).join('')}
       </div>
       <div class="sb-stat-group">
         <div class="sb-stat-group-title">Offensive</div>
-        ${OFFENSIVE_FIELDS.map(k => `
+        ${OFFENSIVE_FIELDS.map(
+          (k) => `
           <div class="sb-stat-row" title="${STAT_DESC[k]}">
             <span>${STAT_LABEL[k]}</span><span>${fmtTotal(k, total[k])}</span>
-          </div>`).join('')}
+          </div>`,
+        ).join('')}
       </div>
       <div class="sb-stat-group">
         <div class="sb-stat-group-title">Defensive</div>
-        ${DEFENSIVE_FIELDS.map(k => `
+        ${DEFENSIVE_FIELDS.map(
+          (k) => `
           <div class="sb-stat-row" title="${STAT_DESC[k]}">
             <span>${STAT_LABEL[k]}</span><span>${fmtTotal(k, total[k])}</span>
-          </div>`).join('')}
+          </div>`,
+        ).join('')}
       </div>
     `;
   }
@@ -339,14 +407,20 @@ export class CharacterSheet {
   // ── Event delegation ───────────────────────────────────────────────────────
 
   private _attachSlotListeners() {
-    this.modal.querySelectorAll<HTMLElement>('[data-equipped-id]').forEach(el => {
-      const id = BigInt(el.dataset.equippedId!);
-      el.addEventListener('click', () => this._emit('unequipItem', { equippedItemId: id }));
-    });
-    this.modal.querySelectorAll<HTMLElement>('[data-empty-slot]').forEach(el => {
-      const slot = el.dataset.emptySlot!;
-      el.addEventListener('click', () => this._emit('browseSlot', { slot }));
-    });
+    this.modal
+      .querySelectorAll<HTMLElement>('[data-equipped-id]')
+      .forEach((el) => {
+        const id = BigInt(el.dataset.equippedId!);
+        el.addEventListener('click', () =>
+          this._emit('unequipItem', { equippedItemId: id }),
+        );
+      });
+    this.modal
+      .querySelectorAll<HTMLElement>('[data-empty-slot]')
+      .forEach((el) => {
+        const slot = el.dataset.emptySlot!;
+        el.addEventListener('click', () => this._emit('browseSlot', { slot }));
+      });
   }
 
   // ── Simple event bus (mirrors CollectionPanel/InventoryPanel) ───────────────

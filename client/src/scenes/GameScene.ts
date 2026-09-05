@@ -1,7 +1,19 @@
 import Phaser from 'phaser';
 import type { Identity } from 'spacetimedb';
 import { connect, callReducer, type DbConnection } from '../db';
-import type { Character, PersonalSpirit, Enemy, CardDefinition, CardDrop, CardInstance, EquippedCard, ItemDefinition, ItemDrop, ItemInstance, EquippedItem } from '../db';
+import type {
+  Character,
+  PersonalSpirit,
+  Enemy,
+  CardDefinition,
+  CardDrop,
+  CardInstance,
+  EquippedCard,
+  ItemDefinition,
+  ItemDrop,
+  ItemInstance,
+  EquippedItem,
+} from '../db';
 import { CollectionPanel } from '../ui/CollectionPanel';
 import { InventoryPanel } from '../ui/InventoryPanel';
 import { CharacterSheet } from '../ui/CharacterSheet';
@@ -9,21 +21,21 @@ import { computeEffectiveStats } from '../effectiveStats';
 import { xpProgress } from '../levelCurve';
 
 // ── Tilemap constants ─────────────────────────────────────────────────────────
-const TILE_SIZE  = 48;
-const MAP_W      = 60;
-const MAP_H      = 60;
+const TILE_SIZE = 48;
+const MAP_W = 60;
+const MAP_H = 60;
 const TILE_GRASS = 0;
-const TILE_DIRT  = 1;
+const TILE_DIRT = 1;
 const TILE_STONE = 2;
 
-const WORLD_W = MAP_W * TILE_SIZE;  // 2880
-const WORLD_H = MAP_H * TILE_SIZE;  // 2880
+const WORLD_W = MAP_W * TILE_SIZE; // 2880
+const WORLD_H = MAP_H * TILE_SIZE; // 2880
 
 const PLAYER_R = 20;
-const OTHER_R  = 18;
-const ENEMY_R  = 24;
+const OTHER_R = 18;
+const ENEMY_R = 24;
 
-const MOVE_SPEED  = 180; // px/second
+const MOVE_SPEED = 180; // px/second
 const STOP_RADIUS = 60;
 
 // Enemy position smoothing: server ticks every 500ms, so this interpolation
@@ -32,18 +44,22 @@ const STOP_RADIUS = 60;
 const ENEMY_LERP_SPEED = 140; // px/second
 
 // Card slot dimensions
-const CARD_SW  = 52;
-const CARD_SH  = 72;
+const CARD_SW = 52;
+const CARD_SH = 72;
 const CARD_GAP = 6;
 
 // Spirit anchor
 const SPIRIT_X = 360;
 const SPIRIT_Y = 360;
 const SPIRIT_PROX_R = 100;
-const DROP_PICKUP_R  = 80;
+const DROP_PICKUP_R = 80;
 
 const DROP_COLORS: Record<string, number> = {
-  Common: 0xcccccc, Uncommon: 0x44cc44, Rare: 0x4488ff, Epic: 0xaa44ff, Legendary: 0xffcc00,
+  Common: 0xcccccc,
+  Uncommon: 0x44cc44,
+  Rare: 0x4488ff,
+  Epic: 0xaa44ff,
+  Legendary: 0xffcc00,
 };
 
 // Item drops only seed common-rarity gear for now — flat warm-orange glow.
@@ -55,33 +71,40 @@ function _rarityTag(tag: unknown): string {
 }
 
 // Basic attack (right-click)
-const ATTACK_RANGE    = 280;
-const ATTACK_HALF_ANG = 15 * Math.PI / 180;
+const ATTACK_RANGE = 280;
+const ATTACK_HALF_ANG = (15 * Math.PI) / 180;
 const ATTACK_COOLDOWN = 500;
 
 // Card 1 — Ember Strike geometry (fixed; actual power values come from DB)
-const EMBER_RANGE    = 320;
-const EMBER_HALF_ANG = 30 * Math.PI / 180;
+const EMBER_RANGE = 320;
+const EMBER_HALF_ANG = (30 * Math.PI) / 180;
 const EMBER_MP_REGEN = 2;
-
 
 // ── Map layout ────────────────────────────────────────────────────────────────
 
 function buildMap(): number[][] {
-  const rows = Array.from({ length: MAP_H }, () => Array<number>(MAP_W).fill(TILE_GRASS));
+  const rows = Array.from({ length: MAP_H }, () =>
+    Array<number>(MAP_W).fill(TILE_GRASS),
+  );
 
   for (let x = 0; x < MAP_W; x++) {
-    rows[0][x]        = TILE_STONE;
+    rows[0][x] = TILE_STONE;
     rows[MAP_H - 1][x] = TILE_STONE;
   }
   for (let y = 0; y < MAP_H; y++) {
-    rows[y][0]        = TILE_STONE;
+    rows[y][0] = TILE_STONE;
     rows[y][MAP_W - 1] = TILE_STONE;
   }
 
   const PATH = [
-    [1, 30], [12, 25], [20, 38], [30, 30],
-    [38, 18], [46, 34], [54, 28], [58, 30],
+    [1, 30],
+    [12, 25],
+    [20, 38],
+    [30, 30],
+    [38, 18],
+    [46, 34],
+    [54, 28],
+    [58, 30],
   ];
   for (let i = 0; i < PATH.length - 1; i++) {
     const [x0, y0] = PATH[i];
@@ -150,9 +173,9 @@ type CastCfg = {
 };
 
 class CastController {
-  private holding     = false;
+  private holding = false;
   private cooldownEnd = 0;
-  private flashEnd    = 0;
+  private flashEnd = 0;
   private readonly scene: Phaser.Scene;
   private readonly cfg: CastCfg;
   private readonly indicatorGfx: Phaser.GameObjects.Graphics;
@@ -160,9 +183,9 @@ class CastController {
 
   constructor(scene: Phaser.Scene, cfg: CastCfg) {
     this.scene = scene;
-    this.cfg   = cfg;
+    this.cfg = cfg;
     this.indicatorGfx = scene.add.graphics().setDepth(4);
-    this.overlayGfx   = scene.add.graphics().setScrollFactor(0).setDepth(12);
+    this.overlayGfx = scene.add.graphics().setScrollFactor(0).setDepth(12);
     this._bindKeys();
   }
 
@@ -182,21 +205,24 @@ class CastController {
 
     if (this.holding) {
       const { x, y } = this.cfg.getPlayerPos();
-      const ptr  = this.scene.input.activePointer;
-      const dx   = ptr.worldX - x;
-      const dy   = ptr.worldY - y;
+      const ptr = this.scene.input.activePointer;
+      const dx = ptr.worldX - x;
+      const dy = ptr.worldY - y;
       const dist = Math.sqrt(dx * dx + dy * dy);
-      const nx   = dist > 0 ? dx / dist : 1;
-      const ny   = dist > 0 ? dy / dist : 0;
+      const nx = dist > 0 ? dx / dist : 1;
+      const ny = dist > 0 ? dy / dist : 0;
       const base = Math.atan2(ny, nx);
-      const a1   = base - this.cfg.halfAngle;
-      const a2   = base + this.cfg.halfAngle;
+      const a1 = base - this.cfg.halfAngle;
+      const a2 = base + this.cfg.halfAngle;
 
       this.indicatorGfx.clear();
       this.indicatorGfx.lineStyle(1.5, this.cfg.indicatorColor, 0.85);
       this.indicatorGfx.beginPath();
       this.indicatorGfx.moveTo(x, y);
-      this.indicatorGfx.lineTo(x + Math.cos(a1) * this.cfg.range, y + Math.sin(a1) * this.cfg.range);
+      this.indicatorGfx.lineTo(
+        x + Math.cos(a1) * this.cfg.range,
+        y + Math.sin(a1) * this.cfg.range,
+      );
       this.indicatorGfx.arc(x, y, this.cfg.range, a1, a2, false);
       this.indicatorGfx.closePath();
       this.indicatorGfx.strokePath();
@@ -241,10 +267,10 @@ class CastController {
       this.flashEnd = now + 300;
       return;
     }
-    const ptr  = this.scene.input.activePointer;
+    const ptr = this.scene.input.activePointer;
     const { x, y } = this.cfg.getPlayerPos();
-    const dx   = ptr.worldX - x;
-    const dy   = ptr.worldY - y;
+    const dx = ptr.worldX - x;
+    const dy = ptr.worldY - y;
     const dist = Math.sqrt(dx * dx + dy * dy);
     if (dist === 0) return;
     this.cfg.spendMp();
@@ -276,7 +302,7 @@ export class GameScene extends Phaser.Scene {
 
   private emberCast!: CastController;
   private emberDef: CardDefinition | null = null;
-  private emberMpCost = 10;   // default; overwritten when card_definition row arrives
+  private emberMpCost = 10; // default; overwritten when card_definition row arrives
   private slot1X = 0;
   private slot1Y = 0;
   private slot1Label!: Phaser.GameObjects.Text;
@@ -299,19 +325,33 @@ export class GameScene extends Phaser.Scene {
   private spiritPanel!: CollectionPanel;
   private inventoryPanel!: InventoryPanel;
   private characterSheet!: CharacterSheet;
-  private _cardDefs        = new Map<number, CardDefinition>();
-  private _itemDefs        = new Map<bigint, ItemDefinition>();
-  private localItemInst    = new Map<bigint, ItemInstance>();
+  private _cardDefs = new Map<number, CardDefinition>();
+  private _itemDefs = new Map<bigint, ItemDefinition>();
+  private localItemInst = new Map<bigint, ItemInstance>();
   private localEquippedItem = new Map<bigint, EquippedItem>(); // key = equippedItemId
-  private localCardInst    = new Map<bigint, CardInstance>();
-  private localEquipped    = new Map<bigint, EquippedCard>(); // key = equippedCardId
-  private worldDrops       = new Map<bigint, { dropRow: CardDrop; gfx: Phaser.GameObjects.Graphics; label: Phaser.GameObjects.Text }>();
-  private worldItemDrops   = new Map<bigint, { dropRow: ItemDrop; gfx: Phaser.GameObjects.Graphics; label: Phaser.GameObjects.Text }>();
+  private localCardInst = new Map<bigint, CardInstance>();
+  private localEquipped = new Map<bigint, EquippedCard>(); // key = equippedCardId
+  private worldDrops = new Map<
+    bigint,
+    {
+      dropRow: CardDrop;
+      gfx: Phaser.GameObjects.Graphics;
+      label: Phaser.GameObjects.Text;
+    }
+  >();
+  private worldItemDrops = new Map<
+    bigint,
+    {
+      dropRow: ItemDrop;
+      gfx: Phaser.GameObjects.Graphics;
+      label: Phaser.GameObjects.Text;
+    }
+  >();
   // Nearest pickup within range, whichever is closer — card drop or item drop.
   private nearInteractable: { kind: 'card' | 'item'; id: bigint } | null = null;
   private spiritGfx!: Phaser.GameObjects.Graphics;
-  private spiritLabel!:  Phaser.GameObjects.Text;
-  private nearSpirit      = false;
+  private spiritLabel!: Phaser.GameObjects.Text;
+  private nearSpirit = false;
   private deathText!: Phaser.GameObjects.Text;
   private returnBtn!: Phaser.GameObjects.Text;
 
@@ -320,8 +360,12 @@ export class GameScene extends Phaser.Scene {
   }
 
   preload() {
-    const canvas = this.textures.createCanvas(TILE_TEX, TILE_SIZE * 3, TILE_SIZE)!;
-    const ctx    = canvas.getContext();
+    const canvas = this.textures.createCanvas(
+      TILE_TEX,
+      TILE_SIZE * 3,
+      TILE_SIZE,
+    )!;
+    const ctx = canvas.getContext();
 
     ctx.fillStyle = '#2d4a1e';
     ctx.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
@@ -337,8 +381,17 @@ export class GameScene extends Phaser.Scene {
 
   create() {
     // ── Tilemap ────────────────────────────────────────────────────────────────
-    const map     = this.make.tilemap({ data: MAP_DATA, tileWidth: TILE_SIZE, tileHeight: TILE_SIZE });
-    const tileset = map.addTilesetImage(TILE_TEX, TILE_TEX, TILE_SIZE, TILE_SIZE)!;
+    const map = this.make.tilemap({
+      data: MAP_DATA,
+      tileWidth: TILE_SIZE,
+      tileHeight: TILE_SIZE,
+    });
+    const tileset = map.addTilesetImage(
+      TILE_TEX,
+      TILE_TEX,
+      TILE_SIZE,
+      TILE_SIZE,
+    )!;
     map.createLayer(0, tileset, 0, 0)!.setDepth(-1);
     this.cameras.main.setBounds(0, 0, WORLD_W, WORLD_H);
 
@@ -350,7 +403,7 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.startFollow(this.playerCircle);
 
     // ── Move line & facing indicator ──────────────────────────────────────────
-    this.moveLine   = this.add.graphics().setDepth(0);
+    this.moveLine = this.add.graphics().setDepth(0);
     this.facingLine = this.add.graphics().setDepth(2);
 
     // ── HUD (must run before _createCasts so slot1X/Y are set) ───────────────
@@ -369,27 +422,44 @@ export class GameScene extends Phaser.Scene {
     this.conn = connect(this._tokenStore(), (conn) => {
       if (!this.localCharacter) {
         callReducer('startLife', () =>
-          conn.reducers.startLife({ spiritName: 'your spirit', startZoneId: 1 }),
+          conn.reducers.startLife({
+            spiritName: 'your spirit',
+            startZoneId: 1,
+          }),
         );
       }
     });
 
     this.conn.db.character.onInsert((_ctx, row) => this._onCharInsert(row));
-    this.conn.db.character.onUpdate?.((_ctx, old, row) => this._onCharUpdate(old, row));
+    this.conn.db.character.onUpdate?.((_ctx, old, row) =>
+      this._onCharUpdate(old, row),
+    );
     this.conn.db.character.onDelete((_ctx, row) => this._onCharDelete(row));
     this.conn.db.personalSpirit.onInsert((_ctx, row) => this._onSpiritRow(row));
-    this.conn.db.personalSpirit.onUpdate?.((_ctx, _old, row) => this._onSpiritRow(row));
+    this.conn.db.personalSpirit.onUpdate?.((_ctx, _old, row) =>
+      this._onSpiritRow(row),
+    );
     this.conn.db.enemy.onInsert((_ctx, row) => this._onEnemyInsert(row));
-    this.conn.db.enemy.onUpdate?.((_ctx, old, row) => this._onEnemyUpdate(old, row));
+    this.conn.db.enemy.onUpdate?.((_ctx, old, row) =>
+      this._onEnemyUpdate(old, row),
+    );
     this.conn.db.enemy.onDelete((_ctx, row) => this._onEnemyDelete(row));
-    this.conn.db.cardDefinition.onInsert((_ctx, row) => this._onCardDefRow(row));
-    this.conn.db.cardDefinition.onUpdate?.((_ctx, _old, row) => this._onCardDefRow(row));
+    this.conn.db.cardDefinition.onInsert((_ctx, row) =>
+      this._onCardDefRow(row),
+    );
+    this.conn.db.cardDefinition.onUpdate?.((_ctx, _old, row) =>
+      this._onCardDefRow(row),
+    );
 
     this.conn.db.cardDrop.onInsert((_ctx, row) => this._onDropInsert(row));
     this.conn.db.cardDrop.onDelete((_ctx, row) => this._onDropDelete(row));
 
-    this.conn.db.itemDefinition.onInsert((_ctx, row) => this._onItemDefRow(row));
-    this.conn.db.itemDefinition.onUpdate?.((_ctx, _old, row) => this._onItemDefRow(row));
+    this.conn.db.itemDefinition.onInsert((_ctx, row) =>
+      this._onItemDefRow(row),
+    );
+    this.conn.db.itemDefinition.onUpdate?.((_ctx, _old, row) =>
+      this._onItemDefRow(row),
+    );
     this.conn.db.itemDrop.onInsert((_ctx, row) => this._onItemDropInsert(row));
     this.conn.db.itemDrop.onDelete((_ctx, row) => this._onItemDropDelete(row));
 
@@ -422,15 +492,19 @@ export class GameScene extends Phaser.Scene {
 
     // ── CollectionPanel / SpiritPanel ─────────────────────────────────────────
     this.collectionPanel = new CollectionPanel({ mode: 'collection' });
-    this.spiritPanel     = new CollectionPanel({ mode: 'spirit' });
-    this.collectionPanel.onAction = (action, payload) => this._onPanelAction(action, payload);
-    this.spiritPanel.onAction     = (action, payload) => this._onPanelAction(action, payload);
+    this.spiritPanel = new CollectionPanel({ mode: 'spirit' });
+    this.collectionPanel.onAction = (action, payload) =>
+      this._onPanelAction(action, payload);
+    this.spiritPanel.onAction = (action, payload) =>
+      this._onPanelAction(action, payload);
 
     // ── InventoryPanel / CharacterSheet ────────────────────────────────────────
-    this.inventoryPanel  = new InventoryPanel();
-    this.characterSheet  = new CharacterSheet();
-    this.inventoryPanel.onAction = (action, payload) => this._onPanelAction(action, payload);
-    this.characterSheet.onAction = (action, payload) => this._onPanelAction(action, payload);
+    this.inventoryPanel = new InventoryPanel();
+    this.characterSheet = new CharacterSheet();
+    this.inventoryPanel.onAction = (action, payload) =>
+      this._onPanelAction(action, payload);
+    this.characterSheet.onAction = (action, payload) =>
+      this._onPanelAction(action, payload);
 
     this.conn.db.itemInstance.onInsert((_ctx, row) => {
       if (row.ownerCharacterId !== this.localCharacter?.characterId) return;
@@ -473,7 +547,9 @@ export class GameScene extends Phaser.Scene {
 
     this.spiritLabel = this.add
       .text(SPIRIT_X, SPIRIT_Y - 34, 'Press E — Spirit', {
-        fontSize: '11px', color: '#ffd700', fontFamily: 'monospace',
+        fontSize: '11px',
+        color: '#ffd700',
+        fontFamily: 'monospace',
       })
       .setOrigin(0.5)
       .setDepth(3)
@@ -486,8 +562,8 @@ export class GameScene extends Phaser.Scene {
     if (this.localCharacter.alive) {
       // ── Move ────────────────────────────────────────────────────────────────
       {
-        const dx   = this.targetX - this.playerCircle.x;
-        const dy   = this.targetY - this.playerCircle.y;
+        const dx = this.targetX - this.playerCircle.x;
+        const dy = this.targetY - this.playerCircle.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
         if (dist > 4) {
           const step = MOVE_SPEED * (delta / 1000);
@@ -507,15 +583,19 @@ export class GameScene extends Phaser.Scene {
       if (mdx * mdx + mdy * mdy > 25) {
         this._drawDottedLine(
           this.moveLine,
-          this.playerCircle.x, this.playerCircle.y,
-          this.targetX, this.targetY,
+          this.playerCircle.x,
+          this.playerCircle.y,
+          this.targetX,
+          this.targetY,
         );
       }
 
-      const ptr   = this.input.activePointer;
+      const ptr = this.input.activePointer;
       const angle = Phaser.Math.Angle.Between(
-        this.playerCircle.x, this.playerCircle.y,
-        ptr.worldX, ptr.worldY,
+        this.playerCircle.x,
+        this.playerCircle.y,
+        ptr.worldX,
+        ptr.worldY,
       );
       this.facingLine.clear();
       this.facingLine.fillStyle(0xffffff, 0.9);
@@ -552,7 +632,7 @@ export class GameScene extends Phaser.Scene {
     const defs: ItemDefinition[] = [];
     for (const eq of this.localEquippedItem.values()) {
       const inst = this.localItemInst.get(eq.itemInstanceId);
-      const def  = inst ? this._itemDefs.get(inst.itemDefId) : null;
+      const def = inst ? this._itemDefs.get(inst.itemDefId) : null;
       if (def) defs.push(def);
     }
     const stats = computeEffectiveStats(defs);
@@ -566,8 +646,8 @@ export class GameScene extends Phaser.Scene {
     if (this._isLocal(row.accountIdentity)) {
       this.localCharacter = row;
       this.clientMp = row.currentMp;
-      this.targetX  = row.posX;
-      this.targetY  = row.posY;
+      this.targetX = row.posX;
+      this.targetY = row.posY;
       this.playerCircle.setPosition(row.posX, row.posY);
       if (this.isDead) this._hideDeathOverlay();
       this._updateHud();
@@ -594,11 +674,11 @@ export class GameScene extends Phaser.Scene {
 
       if (!row.alive && wasAlive) {
         const survived = [...this.localCardInst.values()]
-          .filter(ci => ci.attuned)
-          .map(ci => this._cardDefs.get(ci.cardDefId)?.name ?? '?');
+          .filter((ci) => ci.attuned)
+          .map((ci) => this._cardDefs.get(ci.cardDefId)?.name ?? '?');
         const lost = [...this.localCardInst.values()]
-          .filter(ci => !ci.attuned)
-          .map(ci => this._cardDefs.get(ci.cardDefId)?.name ?? '?');
+          .filter((ci) => !ci.attuned)
+          .map((ci) => this._cardDefs.get(ci.cardDefId)?.name ?? '?');
         this._showDeathOverlay(survived, lost);
       }
 
@@ -623,7 +703,10 @@ export class GameScene extends Phaser.Scene {
       this._updateHud();
     } else {
       const g = this.otherCircles.get(row.characterId);
-      if (g) { g.destroy(); this.otherCircles.delete(row.characterId); }
+      if (g) {
+        g.destroy();
+        this.otherCircles.delete(row.characterId);
+      }
     }
   }
 
@@ -658,9 +741,9 @@ export class GameScene extends Phaser.Scene {
     bodyGfx.setPosition(row.posX, row.posY);
     bodyGfx.setDepth(1);
 
-    const hpBarGfx         = this.add.graphics().setDepth(2);
-    const castCircleGfx    = this.add.graphics().setDepth(0.5).setVisible(false);
-    const castBarGfx       = this.add.graphics().setDepth(3).setVisible(false);
+    const hpBarGfx = this.add.graphics().setDepth(2);
+    const castCircleGfx = this.add.graphics().setDepth(0.5).setVisible(false);
+    const castBarGfx = this.add.graphics().setDepth(3).setVisible(false);
     const aggroIndicatorGfx = this.add.graphics().setDepth(2).setVisible(false);
 
     const data: EnemyGfx = {
@@ -677,12 +760,12 @@ export class GameScene extends Phaser.Scene {
       castCircleGfx,
       castBarGfx,
       aggroIndicatorGfx,
-      aggroState:      row.aggroState.tag as EnemyGfx['aggroState'],
+      aggroState: row.aggroState.tag as EnemyGfx['aggroState'],
       castStartedAtMs: row.castStartedAt
         ? Number(row.castStartedAt.microsSinceUnixEpoch) / 1000
         : null,
       castDurationMs: row.castDurationSeconds * 1000,
-      castRadius:     row.attackRangePx,
+      castRadius: row.attackRangePx,
     };
     this._drawEnemyHpBar(data);
     this.dbEnemies.set(row.enemyId, data);
@@ -697,8 +780,8 @@ export class GameScene extends Phaser.Scene {
     // for the one case — teleporting home — where we do want an instant snap).
     data.serverX = row.posX;
     data.serverY = row.posY;
-    data.hp      = row.currentHp;
-    data.alive   = row.alive;
+    data.hp = row.currentHp;
+    data.alive = row.alive;
 
     const dmg = old.currentHp - row.currentHp;
     if (dmg > 0) {
@@ -707,14 +790,14 @@ export class GameScene extends Phaser.Scene {
     }
 
     // ── Aggro/cast state transitions ────────────────────────────────────────────
-    const wasCasting  = old.aggroState.tag === 'Casting';
-    const nowCasting  = row.aggroState.tag === 'Casting';
+    const wasCasting = old.aggroState.tag === 'Casting';
+    const nowCasting = row.aggroState.tag === 'Casting';
     const nowCooldown = row.aggroState.tag === 'Cooldown';
-    const nowIdle     = row.aggroState.tag === 'Idle';
+    const nowIdle = row.aggroState.tag === 'Idle';
 
     if (!wasCasting && nowCasting) {
       // → CASTING: show telegraph
-      data.aggroState      = 'Casting';
+      data.aggroState = 'Casting';
       data.castStartedAtMs = row.castStartedAt
         ? Number(row.castStartedAt.microsSinceUnixEpoch) / 1000
         : Date.now();
@@ -735,7 +818,7 @@ export class GameScene extends Phaser.Scene {
       });
     } else if (nowIdle && data.aggroState !== 'Idle') {
       // → IDLE
-      data.aggroState      = 'Idle';
+      data.aggroState = 'Idle';
       data.castStartedAtMs = null;
       data.castCircleGfx.setVisible(false).clear();
       data.castBarGfx.setVisible(false).clear();
@@ -768,8 +851,8 @@ export class GameScene extends Phaser.Scene {
       // Respawn: teleport home instantly (no slide-in) and restore visuals
       data.x = data.serverX = row.posX;
       data.y = data.serverY = row.posY;
-      data.aggroState       = 'Idle';
-      data.castStartedAtMs  = null;
+      data.aggroState = 'Idle';
+      data.castStartedAtMs = null;
       data.castCircleGfx.clear().setVisible(false);
       data.castBarGfx.clear().setVisible(false);
       data.aggroIndicatorGfx.clear().setVisible(false);
@@ -801,8 +884,8 @@ export class GameScene extends Phaser.Scene {
     for (const data of this.dbEnemies.values()) {
       if (!data.alive) continue;
 
-      const dx   = data.serverX - data.x;
-      const dy   = data.serverY - data.y;
+      const dx = data.serverX - data.x;
+      const dy = data.serverY - data.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
       if (dist > 0.5) {
         const step = ENEMY_LERP_SPEED * (delta / 1000);
@@ -842,7 +925,7 @@ export class GameScene extends Phaser.Scene {
     this.collectionPanel?.onCardDefInsert(row);
     this.spiritPanel?.onCardDefInsert(row);
     if (row.slug === 'ember-strike') {
-      this.emberDef    = row;
+      this.emberDef = row;
       this.emberMpCost = row.mpCost;
       this.emberCast.setCooldown(row.baseCooldown * 1000);
       this.slot1Label?.setText(row.name);
@@ -859,19 +942,21 @@ export class GameScene extends Phaser.Scene {
 
   private _createCasts() {
     this.emberCast = new CastController(this, {
-      key:            'ONE',
-      range:          EMBER_RANGE,
-      halfAngle:      EMBER_HALF_ANG,
+      key: 'ONE',
+      range: EMBER_RANGE,
+      halfAngle: EMBER_HALF_ANG,
       indicatorColor: 0xff7700,
-      cooldown:       1200,   // default until card_definition row arrives
-      mpCost:         this.emberMpCost,
-      slotX:          this.slot1X,
-      slotY:          this.slot1Y,
-      getPlayerPos:   () => ({ x: this.playerCircle.x, y: this.playerCircle.y }),
-      isAlive:        () => !!this.localCharacter?.alive,
-      hasMp:          () => this.clientMp >= this.emberMpCost,
-      spendMp:        () => { this.clientMp -= this.emberMpCost; },
-      onFire:         (nx, ny) => this._executeEmberStrike(nx, ny),
+      cooldown: 1200, // default until card_definition row arrives
+      mpCost: this.emberMpCost,
+      slotX: this.slot1X,
+      slotY: this.slot1Y,
+      getPlayerPos: () => ({ x: this.playerCircle.x, y: this.playerCircle.y }),
+      isAlive: () => !!this.localCharacter?.alive,
+      hasMp: () => this.clientMp >= this.emberMpCost,
+      spendMp: () => {
+        this.clientMp -= this.emberMpCost;
+      },
+      onFire: (nx, ny) => this._executeEmberStrike(nx, ny),
     });
   }
 
@@ -909,14 +994,14 @@ export class GameScene extends Phaser.Scene {
 
       if (near.kind === 'card') {
         const entry = this.worldDrops.get(near.id);
-        const def   = entry ? this._cardDefs.get(entry.dropRow.cardDefId) : null;
+        const def = entry ? this._cardDefs.get(entry.dropRow.cardDefId) : null;
         callReducer('pickup_card', () =>
           this.conn.reducers.pickupCard({ dropId: near.id }),
         );
         this._showToast(def ? `Picked up: ${def.name}` : 'Picked up card');
       } else {
         const entry = this.worldItemDrops.get(near.id);
-        const def   = entry ? this._itemDefs.get(entry.dropRow.itemDefId) : null;
+        const def = entry ? this._itemDefs.get(entry.dropRow.itemDefId) : null;
         callReducer('pickup_item', () =>
           this.conn.reducers.pickupItem({ dropId: near.id }),
         );
@@ -933,7 +1018,9 @@ export class GameScene extends Phaser.Scene {
     kb.on('keydown-C', () => this.collectionPanel.toggle());
     kb.on('keydown-I', () => this.inventoryPanel.toggle());
     kb.on('keydown-P', () => this.characterSheet.toggle());
-    kb.on('keydown-ESC', () => { if (this.characterSheet.isOpen()) this.characterSheet.close(); });
+    kb.on('keydown-ESC', () => {
+      if (this.characterSheet.isOpen()) this.characterSheet.close();
+    });
   }
 
   // ── Toast ─────────────────────────────────────────────────────────────────────
@@ -967,10 +1054,12 @@ export class GameScene extends Phaser.Scene {
 
   private _isSolid(worldX: number, worldY: number): boolean {
     const R = PLAYER_R + 2;
-    return this._tileSolid(worldX - R, worldY)
-        || this._tileSolid(worldX + R, worldY)
-        || this._tileSolid(worldX, worldY - R)
-        || this._tileSolid(worldX, worldY + R);
+    return (
+      this._tileSolid(worldX - R, worldY) ||
+      this._tileSolid(worldX + R, worldY) ||
+      this._tileSolid(worldX, worldY - R) ||
+      this._tileSolid(worldX, worldY + R)
+    );
   }
 
   private _tileSolid(worldX: number, worldY: number): boolean {
@@ -1000,7 +1089,10 @@ export class GameScene extends Phaser.Scene {
 
   // ── Movement helpers ──────────────────────────────────────────────────────────
 
-  private _resolveClickTarget(clickX: number, clickY: number): { x: number; y: number } {
+  private _resolveClickTarget(
+    clickX: number,
+    clickY: number,
+  ): { x: number; y: number } {
     for (const data of this.dbEnemies.values()) {
       if (!data.alive) continue;
       const dx = clickX - data.x;
@@ -1009,7 +1101,8 @@ export class GameScene extends Phaser.Scene {
         const pdx = data.x - this.playerCircle.x;
         const pdy = data.y - this.playerCircle.y;
         const pDist = Math.sqrt(pdx * pdx + pdy * pdy);
-        if (pDist <= STOP_RADIUS) return { x: this.playerCircle.x, y: this.playerCircle.y };
+        if (pDist <= STOP_RADIUS)
+          return { x: this.playerCircle.x, y: this.playerCircle.y };
         return {
           x: data.x - (pdx / pDist) * STOP_RADIUS,
           y: data.y - (pdy / pDist) * STOP_RADIUS,
@@ -1024,12 +1117,13 @@ export class GameScene extends Phaser.Scene {
   private _updateCastTelegraphs() {
     const now = this.time.now;
     for (const [, data] of this.dbEnemies) {
-      if (data.aggroState !== 'Casting' || data.castStartedAtMs === null) continue;
+      if (data.aggroState !== 'Casting' || data.castStartedAtMs === null)
+        continue;
 
-      const elapsed  = Date.now() - data.castStartedAtMs;
+      const elapsed = Date.now() - data.castStartedAtMs;
       const fraction = Math.min(elapsed / data.castDurationMs, 1.0);
-      const pulse    = 1.0 + 0.04 * Math.sin((now / 300) * Math.PI);
-      const r        = data.castRadius * pulse;
+      const pulse = 1.0 + 0.04 * Math.sin((now / 300) * Math.PI);
+      const r = data.castRadius * pulse;
 
       data.castCircleGfx.clear();
       data.castCircleGfx.fillStyle(0xff2222, 0.12);
@@ -1043,12 +1137,13 @@ export class GameScene extends Phaser.Scene {
 
   private _drawCastBar(data: EnemyGfx, fraction: number) {
     const remaining = 1.0 - fraction;
-    const W = 48, H = 4;
+    const W = 48,
+      H = 4;
     const bx = data.x - W / 2;
     const by = data.y - ENEMY_R - 26;
 
     // White (remaining=1) → red (remaining=0)
-    const gb       = Math.round(255 * remaining);
+    const gb = Math.round(255 * remaining);
     const barColor = (0xff << 16) | (gb << 8) | gb;
 
     data.castBarGfx.clear();
@@ -1077,8 +1172,8 @@ export class GameScene extends Phaser.Scene {
       onComplete: () => vignette.destroy(),
     });
 
-    const px  = this.playerCircle.x;
-    const py  = this.playerCircle.y;
+    const px = this.playerCircle.x;
+    const py = this.playerCircle.y;
     const txt = this.add
       .text(px, py - PLAYER_R - 10, `-${damage}`, {
         fontSize: '18px',
@@ -1103,7 +1198,8 @@ export class GameScene extends Phaser.Scene {
   // ── Enemy HP bar ──────────────────────────────────────────────────────────────
 
   private _drawEnemyHpBar(data: EnemyGfx) {
-    const W = 48, H = 6;
+    const W = 48,
+      H = 6;
     const bx = data.x - W / 2;
     const by = data.y - ENEMY_R - 14;
     data.hpBarGfx.clear();
@@ -1133,7 +1229,15 @@ export class GameScene extends Phaser.Scene {
     const travelDist = Math.min(dist, ATTACK_RANGE);
 
     this._muzzleFlash(ox, oy);
-    this._showConePreview(ox, oy, nx, ny, ATTACK_RANGE, ATTACK_HALF_ANG, 0xffffff);
+    this._showConePreview(
+      ox,
+      oy,
+      nx,
+      ny,
+      ATTACK_RANGE,
+      ATTACK_HALF_ANG,
+      0xffffff,
+    );
 
     const proj = this.add.graphics();
     proj.fillStyle(0xffffaa, 1);
@@ -1152,11 +1256,22 @@ export class GameScene extends Phaser.Scene {
         let hitAny = false;
         for (const [, data] of this.dbEnemies) {
           if (!data.alive) continue;
-          if (this._inCone(data.x, data.y, ox, oy, nx, ny, ATTACK_RANGE, ATTACK_HALF_ANG)) {
+          if (
+            this._inCone(
+              data.x,
+              data.y,
+              ox,
+              oy,
+              nx,
+              ny,
+              ATTACK_RANGE,
+              ATTACK_HALF_ANG,
+            )
+          ) {
             // cardDefId 0 = bare weapon swing (no card) — server resolves real damage.
             callReducer('damageEnemy', () =>
               this.conn.reducers.damageEnemy({
-                enemyId:   data.enemyId,
+                enemyId: data.enemyId,
                 cardDefId: 0,
               }),
             );
@@ -1173,7 +1288,15 @@ export class GameScene extends Phaser.Scene {
     const oy = this.playerCircle.y;
 
     this._muzzleFlash(ox, oy);
-    this._showConePreview(ox, oy, nx, ny, EMBER_RANGE, EMBER_HALF_ANG, 0xff7700);
+    this._showConePreview(
+      ox,
+      oy,
+      nx,
+      ny,
+      EMBER_RANGE,
+      EMBER_HALF_ANG,
+      0xff7700,
+    );
 
     const proj = this.add.graphics();
     proj.fillStyle(0xff7700, 1);
@@ -1192,11 +1315,22 @@ export class GameScene extends Phaser.Scene {
         let hitAny = false;
         for (const [, data] of this.dbEnemies) {
           if (!data.alive) continue;
-          if (this._inCone(data.x, data.y, ox, oy, nx, ny, EMBER_RANGE, EMBER_HALF_ANG)) {
+          if (
+            this._inCone(
+              data.x,
+              data.y,
+              ox,
+              oy,
+              nx,
+              ny,
+              EMBER_RANGE,
+              EMBER_HALF_ANG,
+            )
+          ) {
             if (this.emberDef) {
               callReducer('damageEnemy', () =>
                 this.conn.reducers.damageEnemy({
-                  enemyId:   data.enemyId,
+                  enemyId: data.enemyId,
                   cardDefId: this.emberDef!.cardDefId,
                 }),
               );
@@ -1211,10 +1345,14 @@ export class GameScene extends Phaser.Scene {
   }
 
   private _inCone(
-    ex: number, ey: number,
-    ox: number, oy: number,
-    nx: number, ny: number,
-    range: number, halfAngle: number,
+    ex: number,
+    ey: number,
+    ox: number,
+    oy: number,
+    nx: number,
+    ny: number,
+    range: number,
+    halfAngle: number,
   ): boolean {
     const dx = ex - ox;
     const dy = ey - oy;
@@ -1240,7 +1378,12 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  private _showFloatingDamage(x: number, y: number, amount: number, color: string) {
+  private _showFloatingDamage(
+    x: number,
+    y: number,
+    amount: number,
+    color: string,
+  ) {
     const txt = this.add
       .text(x, y, `-${amount}`, {
         fontSize: '16px',
@@ -1294,10 +1437,13 @@ export class GameScene extends Phaser.Scene {
    * any actual slot unlock, which still only ever comes from the server via
    * spirit level.
    */
-  private _computeHandSlotsLocal(level: number): { active: number; passive: number } {
+  private _computeHandSlotsLocal(level: number): {
+    active: number;
+    passive: number;
+  } {
     return {
-      active:  Math.min(10, 2 + Math.floor(level * 0.2)),
-      passive: Math.min(5,  1 + Math.floor(level * 0.1)),
+      active: Math.min(10, 2 + Math.floor(level * 0.2)),
+      passive: Math.min(5, 1 + Math.floor(level * 0.1)),
     };
   }
 
@@ -1412,9 +1558,12 @@ export class GameScene extends Phaser.Scene {
   }
 
   private _showConePreview(
-    ox: number, oy: number,
-    nx: number, ny: number,
-    range: number, halfAngle: number,
+    ox: number,
+    oy: number,
+    nx: number,
+    ny: number,
+    range: number,
+    halfAngle: number,
     color: number,
   ) {
     const g = this.add.graphics();
@@ -1422,8 +1571,8 @@ export class GameScene extends Phaser.Scene {
     g.setDepth(4);
 
     const base = Math.atan2(ny, nx);
-    const a1   = base - halfAngle;
-    const a2   = base + halfAngle;
+    const a1 = base - halfAngle;
+    const a2 = base + halfAngle;
 
     g.beginPath();
     g.moveTo(ox, oy);
@@ -1445,15 +1594,17 @@ export class GameScene extends Phaser.Scene {
 
   private _drawDottedLine(
     g: Phaser.GameObjects.Graphics,
-    x1: number, y1: number,
-    x2: number, y2: number,
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
   ) {
     const DOT_SPACING = 12;
-    const dx  = x2 - x1;
-    const dy  = y2 - y1;
+    const dx = x2 - x1;
+    const dy = y2 - y1;
     const len = Math.sqrt(dx * dx + dy * dy);
-    const nx  = dx / len;
-    const ny  = dy / len;
+    const nx = dx / len;
+    const ny = dy / len;
     g.fillStyle(0xffffff, 0.35);
     for (let d = DOT_SPACING; d < len; d += DOT_SPACING) {
       g.fillCircle(x1 + nx * d, y1 + ny * d, 2);
@@ -1466,9 +1617,7 @@ export class GameScene extends Phaser.Scene {
     const W = this.cameras.main.width;
     const H = this.cameras.main.height;
 
-    this.deathOverlay = this.add.graphics()
-      .setScrollFactor(0)
-      .setDepth(20);
+    this.deathOverlay = this.add.graphics().setScrollFactor(0).setDepth(20);
     this.deathOverlay.fillStyle(0x000000, 0.72);
     this.deathOverlay.fillRect(0, 0, W, H);
     this.deathOverlay.setVisible(false);
@@ -1500,12 +1649,15 @@ export class GameScene extends Phaser.Scene {
       .setVisible(false)
       .setInteractive({ useHandCursor: true });
 
-    this.returnBtn.on('pointerover',  () => this.returnBtn.setColor('#ffcc44'));
-    this.returnBtn.on('pointerout',   () => this.returnBtn.setColor('#ffffff'));
-    this.returnBtn.on('pointerdown',  () => {
+    this.returnBtn.on('pointerover', () => this.returnBtn.setColor('#ffcc44'));
+    this.returnBtn.on('pointerout', () => this.returnBtn.setColor('#ffffff'));
+    this.returnBtn.on('pointerdown', () => {
       this.returnBtn.setVisible(false);
       callReducer('startLife', () =>
-        this.conn.reducers.startLife({ spiritName: 'your spirit', startZoneId: 1 }),
+        this.conn.reducers.startLife({
+          spiritName: 'your spirit',
+          startZoneId: 1,
+        }),
       );
     });
   }
@@ -1521,13 +1673,20 @@ export class GameScene extends Phaser.Scene {
     const W = this.cameras.main.width;
     const H = this.cameras.main.height;
     const lines = [
-      survived.length ? `Survived (attuned): ${survived.join(', ')}` : 'No cards were attuned.',
-      lost.length     ? `Lost: ${lost.join(', ')}` : '',
-    ].filter(Boolean).join('\n');
+      survived.length
+        ? `Survived (attuned): ${survived.join(', ')}`
+        : 'No cards were attuned.',
+      lost.length ? `Lost: ${lost.join(', ')}` : '',
+    ]
+      .filter(Boolean)
+      .join('\n');
     this.deathSummaryText = this.add
       .text(W / 2, H / 2 - 140, lines, {
-        fontSize: '13px', color: '#aaaaaa', fontFamily: 'monospace',
-        align: 'center', lineSpacing: 6,
+        fontSize: '13px',
+        color: '#aaaaaa',
+        fontFamily: 'monospace',
+        align: 'center',
+        lineSpacing: 6,
       })
       .setOrigin(0.5)
       .setScrollFactor(0)
@@ -1535,8 +1694,13 @@ export class GameScene extends Phaser.Scene {
     this.time.delayedCall(3500, () => {
       if (this.deathSummaryText) {
         this.tweens.add({
-          targets: this.deathSummaryText, alpha: 0, duration: 500,
-          onComplete: () => { this.deathSummaryText?.destroy(); this.deathSummaryText = null; },
+          targets: this.deathSummaryText,
+          alpha: 0,
+          duration: 500,
+          onComplete: () => {
+            this.deathSummaryText?.destroy();
+            this.deathSummaryText = null;
+          },
         });
       }
     });
@@ -1580,13 +1744,21 @@ export class GameScene extends Phaser.Scene {
       .setDepth(11);
 
     this.levelText = this.add
-      .text(W - 16, 16, 'Lv 1', { fontSize: '16px', color: '#ffffff', fontFamily: 'monospace' })
+      .text(W - 16, 16, 'Lv 1', {
+        fontSize: '16px',
+        color: '#ffffff',
+        fontFamily: 'monospace',
+      })
       .setOrigin(1, 0)
       .setScrollFactor(0)
       .setDepth(11);
 
     this.spiritLevelText = this.add
-      .text(W - 16, 40, 'Spirit Lv 1', { fontSize: '14px', color: '#a0c4ff', fontFamily: 'monospace' })
+      .text(W - 16, 40, 'Spirit Lv 1', {
+        fontSize: '14px',
+        color: '#a0c4ff',
+        fontFamily: 'monospace',
+      })
       .setOrigin(1, 0)
       .setScrollFactor(0)
       .setDepth(11);
@@ -1594,7 +1766,11 @@ export class GameScene extends Phaser.Scene {
     // XP bar — thin strip along the bottom edge, full width.
     this.xpBarGfx = this.add.graphics().setScrollFactor(0).setDepth(10);
     this.xpBarText = this.add
-      .text(W / 2, H - 16, '', { fontSize: '11px', color: '#ffffff', fontFamily: 'monospace' })
+      .text(W / 2, H - 16, '', {
+        fontSize: '11px',
+        color: '#ffffff',
+        fontFamily: 'monospace',
+      })
       .setOrigin(0.5)
       .setScrollFactor(0)
       .setDepth(11);
@@ -1604,13 +1780,13 @@ export class GameScene extends Phaser.Scene {
   }
 
   private _drawCardSlots(camW: number, camH: number) {
-    const activeCount  = 10;
+    const activeCount = 10;
     const passiveCount = 5;
-    const activeW  = activeCount  * CARD_SW + (activeCount  - 1) * CARD_GAP;
+    const activeW = activeCount * CARD_SW + (activeCount - 1) * CARD_GAP;
     const passiveW = passiveCount * CARD_SW + (passiveCount - 1) * CARD_GAP;
-    const activeY  = camH - CARD_SH - 12;
+    const activeY = camH - CARD_SH - 12;
     const passiveY = activeY - CARD_SH - 8;
-    const ax = (camW - activeW)  / 2;
+    const ax = (camW - activeW) / 2;
     const px = (camW - passiveW) / 2;
 
     this.slot1X = ax;
@@ -1645,38 +1821,50 @@ export class GameScene extends Phaser.Scene {
 
   private _updateHud() {
     const c = this.localCharacter;
-    const BAR_W = 200, BAR_H = 18, X = 12;
+    const BAR_W = 200,
+      BAR_H = 18,
+      X = 12;
 
     this.hudBars.clear();
     this.hudBars.fillStyle(0x2a0000, 0.85).fillRect(X, 12, BAR_W, BAR_H);
     this.hudBars.fillStyle(0x001a3a, 0.85).fillRect(X, 38, BAR_W, BAR_H);
 
     if (c) {
-      const hp  = Math.max(0, c.currentHp);
-      const mp  = Math.max(0, Math.floor(this.clientMp));
+      const hp = Math.max(0, c.currentHp);
+      const mp = Math.max(0, Math.floor(this.clientMp));
       const { maxHp: mhp, maxMp: mmp } = this._localMaxResources();
 
-      if (hp > 0) this.hudBars.fillStyle(0xef5350, 1).fillRect(X, 12, BAR_W * (hp / mhp), BAR_H);
-      if (mp > 0) this.hudBars.fillStyle(0x42a5f5, 1).fillRect(X, 38, BAR_W * (mp / mmp), BAR_H);
+      if (hp > 0)
+        this.hudBars
+          .fillStyle(0xef5350, 1)
+          .fillRect(X, 12, BAR_W * (hp / mhp), BAR_H);
+      if (mp > 0)
+        this.hudBars
+          .fillStyle(0x42a5f5, 1)
+          .fillRect(X, 38, BAR_W * (mp / mmp), BAR_H);
 
       this.hpText.setText(`HP  ${hp} / ${mhp}`);
       this.mpText.setText(`MP  ${mp} / ${mmp}`);
       this.levelText.setText(`Lv ${c.level}`);
 
       const { level, levelStart, levelEnd } = xpProgress(c.xp);
-      const span     = levelEnd - levelStart;
+      const span = levelEnd - levelStart;
       const progress = c.xp - levelStart;
-      const frac     = span > 0n ? Number(progress) / Number(span) : 1;
+      const frac = span > 0n ? Number(progress) / Number(span) : 1;
 
       const barW = this.cameras.main.width;
       const barH = 6;
       const barY = this.cameras.main.height - barH;
       this.xpBarGfx.clear();
       this.xpBarGfx.fillStyle(0x1a1a2a, 0.9).fillRect(0, barY, barW, barH);
-      this.xpBarGfx.fillStyle(0xffdd55, 1).fillRect(0, barY, barW * Math.max(0, Math.min(1, frac)), barH);
+      this.xpBarGfx
+        .fillStyle(0xffdd55, 1)
+        .fillRect(0, barY, barW * Math.max(0, Math.min(1, frac)), barH);
       this.xpBarText.setPosition(barW / 2, barY - 10);
       this.xpBarText.setText(
-        level >= 50 ? `Lv ${level} — MAX` : `Lv ${level} — ${progress} / ${span} XP`,
+        level >= 50
+          ? `Lv ${level} — MAX`
+          : `Lv ${level} — ${progress} / ${span} XP`,
       );
     } else {
       this.hpText.setText('HP  ---');
@@ -1693,9 +1881,9 @@ export class GameScene extends Phaser.Scene {
   // ── Card drops ────────────────────────────────────────────────────────────────
 
   private _onDropInsert(row: CardDrop) {
-    const def    = this._cardDefs.get(row.cardDefId);
+    const def = this._cardDefs.get(row.cardDefId);
     const rarity = def ? _rarityTag(def.rarity) : 'Common';
-    const color  = DROP_COLORS[rarity] ?? 0xcccccc;
+    const color = DROP_COLORS[rarity] ?? 0xcccccc;
 
     const gfx = this.add.graphics().setDepth(1);
     gfx.fillStyle(color, 0.9);
@@ -1713,7 +1901,9 @@ export class GameScene extends Phaser.Scene {
 
     const label = this.add
       .text(row.posX, row.posY - 18, 'F', {
-        fontSize: '10px', color: '#ffffff', fontFamily: 'monospace',
+        fontSize: '10px',
+        color: '#ffffff',
+        fontFamily: 'monospace',
         backgroundColor: '#00000099',
         padding: { x: 3, y: 1 },
       })
@@ -1753,7 +1943,9 @@ export class GameScene extends Phaser.Scene {
 
     const label = this.add
       .text(row.posX, row.posY - 18, 'F', {
-        fontSize: '10px', color: '#ffffff', fontFamily: 'monospace',
+        fontSize: '10px',
+        color: '#ffffff',
+        fontFamily: 'monospace',
         backgroundColor: '#00000099',
         padding: { x: 3, y: 1 },
       })
@@ -1801,13 +1993,19 @@ export class GameScene extends Phaser.Scene {
       const dx = px - dropRow.posX;
       const dy = py - dropRow.posY;
       const d2 = dx * dx + dy * dy;
-      if (d2 < closestD2) { closestD2 = d2; closest = { kind: 'card', id }; }
+      if (d2 < closestD2) {
+        closestD2 = d2;
+        closest = { kind: 'card', id };
+      }
     }
     for (const [id, { dropRow }] of this.worldItemDrops) {
       const dx = px - dropRow.posX;
       const dy = py - dropRow.posY;
       const d2 = dx * dx + dy * dy;
-      if (d2 < closestD2) { closestD2 = d2; closest = { kind: 'item', id }; }
+      if (d2 < closestD2) {
+        closestD2 = d2;
+        closest = { kind: 'item', id };
+      }
     }
     this.nearInteractable = closest;
     for (const [id, { label }] of this.worldDrops) {
@@ -1826,39 +2024,52 @@ export class GameScene extends Phaser.Scene {
         callReducer('equip_card', () =>
           this.conn.reducers.equipCard({
             cardInstanceId: payload.cardInstanceId as bigint,
-            slotType:       { tag: (payload.slotType as string) === 'active' ? 'Active' : 'Passive' },
-            slotIndex:      payload.slotIndex as number,
+            slotType: {
+              tag:
+                (payload.slotType as string) === 'active'
+                  ? 'Active'
+                  : 'Passive',
+            },
+            slotIndex: payload.slotIndex as number,
           }),
         );
         break;
       case 'unequip':
         callReducer('unequip_card', () =>
-          this.conn.reducers.unequipCard({ equippedCardId: payload.equippedCardId as bigint }),
+          this.conn.reducers.unequipCard({
+            equippedCardId: payload.equippedCardId as bigint,
+          }),
         );
         break;
       case 'attune':
       case 'unattune':
         callReducer('toggle_attune', () =>
-          this.conn.reducers.toggleAttune({ cardInstanceId: payload.cardInstanceId as bigint }),
+          this.conn.reducers.toggleAttune({
+            cardInstanceId: payload.cardInstanceId as bigint,
+          }),
         );
         break;
       case 'sacrifice':
         callReducer('sacrifice_card', () =>
-          this.conn.reducers.sacrificeCard({ cardInstanceId: payload.cardInstanceId as bigint }),
+          this.conn.reducers.sacrificeCard({
+            cardInstanceId: payload.cardInstanceId as bigint,
+          }),
         );
         break;
       case 'equipItem':
         callReducer('equip_item', () =>
           this.conn.reducers.equipItem({
             itemInstanceId: payload.itemInstanceId as bigint,
-            slot:           { tag: payload.slot as any },
-            slotOrdinal:    payload.slotOrdinal as number,
+            slot: { tag: payload.slot as any },
+            slotOrdinal: payload.slotOrdinal as number,
           }),
         );
         break;
       case 'unequipItem':
         callReducer('unequip_item', () =>
-          this.conn.reducers.unequipItem({ equippedItemId: payload.equippedItemId as bigint }),
+          this.conn.reducers.unequipItem({
+            equippedItemId: payload.equippedItemId as bigint,
+          }),
         );
         break;
       case 'browseSlot':
@@ -1871,9 +2082,14 @@ export class GameScene extends Phaser.Scene {
 
   private _tokenStore() {
     return {
-      get: (): string | undefined => localStorage.getItem('sb_token') ?? undefined,
-      set: (t: string): void => { localStorage.setItem('sb_token', t); },
-      clear: (): void => { localStorage.removeItem('sb_token'); },
+      get: (): string | undefined =>
+        localStorage.getItem('sb_token') ?? undefined,
+      set: (t: string): void => {
+        localStorage.setItem('sb_token', t);
+      },
+      clear: (): void => {
+        localStorage.removeItem('sb_token');
+      },
     };
   }
 }

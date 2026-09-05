@@ -2,18 +2,109 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="5b82f24a-a837-4858-bdad-b79b887f77ac" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/.husky/commit-msg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.husky/pre-commit" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.markdownlint.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.markdownlintignore" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.prettierignore" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/lint-staged.config.mjs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/prettier.config.mjs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.claude/backend-reference/SPACETIMEDB_REFERENCE.md" beforeDir="false" afterPath="$PROJECT_DIR$/.claude/backend-reference/SPACETIMEDB_REFERENCE.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.claude/settings.json" beforeDir="false" afterPath="$PROJECT_DIR$/.claude/settings.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.claude/skills/ability-balancer/SKILL.md" beforeDir="false" afterPath="$PROJECT_DIR$/.claude/skills/ability-balancer/SKILL.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.claude/skills/architect/SKILL.md" beforeDir="false" afterPath="$PROJECT_DIR$/.claude/skills/architect/SKILL.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.claude/skills/doc-keeper/SKILL.md" beforeDir="false" afterPath="$PROJECT_DIR$/.claude/skills/doc-keeper/SKILL.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.claude/skills/item-balancer/SKILL.md" beforeDir="false" afterPath="$PROJECT_DIR$/.claude/skills/item-balancer/SKILL.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.claude/skills/lore-keeper/SKILL.md" beforeDir="false" afterPath="$PROJECT_DIR$/.claude/skills/lore-keeper/SKILL.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.github/copilot-instructions.md" beforeDir="false" afterPath="$PROJECT_DIR$/.github/copilot-instructions.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/AGENTS.md" beforeDir="false" afterPath="$PROJECT_DIR$/AGENTS.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/CLAUDE.md" beforeDir="false" afterPath="$PROJECT_DIR$/CLAUDE.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/client/package.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/counter.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/db.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/db.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/effectiveStats.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/effectiveStats.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/generated/account_progress_table.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/generated/account_progress_table.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/generated/apply_damage_reducer.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/generated/apply_damage_reducer.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/generated/card_definition_table.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/generated/card_definition_table.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/generated/card_drop_cleanup_reducer.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/generated/card_drop_cleanup_reducer.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/generated/card_drop_cleanup_schedule_table.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/generated/card_drop_cleanup_schedule_table.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/generated/card_drop_table.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/generated/card_drop_table.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/generated/card_instance_table.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/generated/card_instance_table.ts" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/client/src/generated/character_table.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/generated/character_table.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/generated/damage_enemy_reducer.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/generated/damage_enemy_reducer.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/generated/enemy_respawn_schedule_table.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/generated/enemy_respawn_schedule_table.ts" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/client/src/generated/enemy_table.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/generated/enemy_table.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/generated/enemy_tick_reducer.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/generated/enemy_tick_reducer.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/generated/enemy_tick_schedule_table.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/generated/enemy_tick_schedule_table.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/generated/equip_card_reducer.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/generated/equip_card_reducer.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/generated/equip_item_reducer.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/generated/equip_item_reducer.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/generated/equipped_card_table.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/generated/equipped_card_table.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/generated/equipped_item_table.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/generated/equipped_item_table.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/generated/grant_xp_reducer.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/generated/grant_xp_reducer.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/generated/index.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/generated/index.ts" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/client/src/generated/item_definition_table.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/generated/item_definition_table.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/generated/item_drop_table.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/generated/item_drop_table.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/generated/item_instance_table.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/generated/item_instance_table.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/generated/move_reducer.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/generated/move_reducer.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/generated/on_connect_reducer.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/generated/on_connect_reducer.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/generated/personal_spirit_table.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/generated/personal_spirit_table.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/generated/pickup_card_reducer.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/generated/pickup_card_reducer.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/generated/pickup_item_reducer.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/generated/pickup_item_reducer.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/generated/respawn_enemy_reducer.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/generated/respawn_enemy_reducer.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/generated/sacrifice_card_reducer.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/generated/sacrifice_card_reducer.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/generated/seed_cards_reducer.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/generated/seed_cards_reducer.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/generated/seed_items_reducer.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/generated/seed_items_reducer.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/generated/spawn_enemy_reducer.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/generated/spawn_enemy_reducer.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/generated/start_life_reducer.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/generated/start_life_reducer.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/generated/toggle_attune_reducer.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/generated/toggle_attune_reducer.ts" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/client/src/generated/types.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/generated/types.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/generated/types/procedures.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/generated/types/procedures.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/generated/types/reducers.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/generated/types/reducers.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/generated/unequip_card_reducer.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/generated/unequip_card_reducer.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/generated/unequip_item_reducer.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/generated/unequip_item_reducer.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/generated/zone_table.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/generated/zone_table.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/levelCurve.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/levelCurve.ts" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/client/src/scenes/GameScene.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/scenes/GameScene.ts" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/client/src/ui/CharacterSheet.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/ui/CharacterSheet.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/content/equipment.json" beforeDir="false" afterPath="$PROJECT_DIR$/content/equipment.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/ui/CollectionPanel.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/ui/CollectionPanel.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/ui/InventoryPanel.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/ui/InventoryPanel.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/content/cards.test.ts" beforeDir="false" afterPath="$PROJECT_DIR$/content/cards.test.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/content/equipment.test.ts" beforeDir="false" afterPath="$PROJECT_DIR$/content/equipment.test.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/content/equipmentLoader.ts" beforeDir="false" afterPath="$PROJECT_DIR$/content/equipmentLoader.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/content/loader.ts" beforeDir="false" afterPath="$PROJECT_DIR$/content/loader.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/content/validate.ts" beforeDir="false" afterPath="$PROJECT_DIR$/content/validate.ts" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/content/validateEquipment.ts" beforeDir="false" afterPath="$PROJECT_DIR$/content/validateEquipment.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/ARCHITECTURE.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/ARCHITECTURE.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/BALANCE.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/BALANCE.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/GAME_DESIGN.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/GAME_DESIGN.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/LORE.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/LORE.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pnpm-lock.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/pnpm-lock.yaml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/site/_config.yml" beforeDir="false" afterPath="$PROJECT_DIR$/site/_config.yml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/site/controls.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/controls.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/site/index.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/index.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/site/mechanics.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/mechanics.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/site/world.md" beforeDir="false" afterPath="$PROJECT_DIR$/site/world.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/spacetime.json" beforeDir="false" afterPath="$PROJECT_DIR$/spacetime.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/spacetimedb/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/spacetimedb/package.json" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/spacetimedb/src/index.ts" beforeDir="false" afterPath="$PROJECT_DIR$/spacetimedb/src/index.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/spacetimedb/src/rules/combat.ts" beforeDir="false" afterPath="$PROJECT_DIR$/spacetimedb/src/rules/combat.ts" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/spacetimedb/src/rules/death.ts" beforeDir="false" afterPath="$PROJECT_DIR$/spacetimedb/src/rules/death.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/spacetimedb/src/rules/stats.ts" beforeDir="false" afterPath="$PROJECT_DIR$/spacetimedb/src/rules/stats.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/spacetimedb/src/types.ts" beforeDir="false" afterPath="$PROJECT_DIR$/spacetimedb/src/types.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/spacetimedb/tsconfig.json" beforeDir="false" afterPath="$PROJECT_DIR$/spacetimedb/tsconfig.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/module_bindings/add_reducer.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/module_bindings/index.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/module_bindings/person_table.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/module_bindings/say_hello_reducer.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/module_bindings/types.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/module_bindings/types/procedures.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/module_bindings/types/reducers.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/tsconfig.json" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -37,38 +128,43 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.typescript.service.memoryLimit.init&quot;: &quot;true&quot;,
-    &quot;codeWithMe.voiceChat.enabledByDefault&quot;: &quot;false&quot;,
-    &quot;copilot.chat.legacySessionMetadata.migrated&quot;: &quot;true&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;feat/one-more-time&quot;,
-    &quot;javascript.preferred.runtime.type.id&quot;: &quot;node&quot;,
-    &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
-    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
-    &quot;node.js.detected.package.jshint&quot;: &quot;true&quot;,
-    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
-    &quot;node.js.selected.package.jshint&quot;: &quot;&quot;,
-    &quot;nodejs_package_manager_path&quot;: &quot;pnpm&quot;,
-    &quot;npm.db:start.executor&quot;: &quot;Run&quot;,
-    &quot;npm.dev.executor&quot;: &quot;Run&quot;,
-    &quot;npm.spacetime:publish:local.executor&quot;: &quot;Run&quot;,
-    &quot;npm.ui:dev.executor&quot;: &quot;Run&quot;,
-    &quot;npm.ui:start.executor&quot;: &quot;Run&quot;,
-    &quot;ts.external.directory.path&quot;: &quot;D:\\dev\\workspaces\\fun\\eldoria\\node_modules\\typescript\\lib&quot;,
-    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
+    "codeWithMe.voiceChat.enabledByDefault": "false",
+    "copilot.chat.legacySessionMetadata.migrated": "true",
+    "git-widget-placeholder": "main",
+    "javascript.preferred.runtime.type.id": "node",
+    "kotlin-language-version-configured": "true",
+    "last_opened_file_path": "D:/dev/workspaces/fun/eldoria",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.jshint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.jshint": "",
+    "nodejs_package_manager_path": "pnpm",
+    "npm.db:start.executor": "Run",
+    "npm.dev.executor": "Run",
+    "npm.spacetime:publish:local.executor": "Run",
+    "npm.ui:dev.executor": "Run",
+    "npm.ui:start.executor": "Run",
+    "ts.external.directory.path": "D:\\dev\\workspaces\\fun\\eldoria\\node_modules\\typescript\\lib",
+    "vue.rearranger.settings.migration": "true"
   },
-  &quot;keyToStringList&quot;: {
-    &quot;com.intellij.ide.scratch.ScratchImplUtil$2/New Scratch File&quot;: [
-      &quot;TEXT&quot;
+  "keyToStringList": {
+    "com.intellij.ide.scratch.ScratchImplUtil$2/New Scratch File": [
+      "TEXT"
     ]
   }
-}</component>
+}]]></component>
   <component name="RecentsManager">
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="D:\dev\workspaces\fun\eldoria" />
+      <recent name="D:\dev\workspaces\fun\eldoria\.husky" />
+    </key>
     <key name="MoveFile.RECENT_KEYS">
       <recent name="D:\dev\workspaces\fun\eldoria" />
       <recent name="D:\dev\workspaces\fun\eldoria\src\core" />
@@ -121,7 +217,7 @@
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
-        <option value="bundled-jdk-30f59d01ecdd-34e2839f716b-intellij.indexing.shared.core-IU-262.9437.185" />
+        <option value="bundled-jdk-30f59d01ecdd-a203e0a19954-intellij.indexing.shared.core-IU-262.10315.125" />
       </set>
     </attachedChunks>
   </component>
@@ -154,7 +250,8 @@
       <workItem from="1785069416160" duration="3077000" />
       <workItem from="1785686122821" duration="1040000" />
       <workItem from="1785687366109" duration="2542000" />
-      <workItem from="1786888760180" duration="6065000" />
+      <workItem from="1786888760180" duration="6273000" />
+      <workItem from="1788589289610" duration="6314000" />
     </task>
     <servers />
   </component>

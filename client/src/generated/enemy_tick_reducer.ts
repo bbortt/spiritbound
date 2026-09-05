@@ -8,11 +8,9 @@ import {
   t as __t,
   type AlgebraicTypeType as __AlgebraicTypeType,
   type Infer as __Infer,
-} from "spacetimedb";
+} from 'spacetimedb';
 
-import {
-  EnemyTickSchedule,
-} from "./types";
+import { EnemyTickSchedule } from './types';
 
 export default {
   get scheduleRow() {

@@ -8,18 +8,15 @@ import {
   t as __t,
   type AlgebraicTypeType as __AlgebraicTypeType,
   type Infer as __Infer,
-} from "spacetimedb";
-import {
-  EquipSlot,
-} from "./types";
-
+} from 'spacetimedb';
+import { EquipSlot } from './types';
 
 export default __t.row({
-  equippedItemId: __t.u64().primaryKey().name("equipped_item_id"),
-  characterId: __t.u64().name("character_id"),
-  itemInstanceId: __t.u64().name("item_instance_id"),
+  equippedItemId: __t.u64().primaryKey().name('equipped_item_id'),
+  characterId: __t.u64().name('character_id'),
+  itemInstanceId: __t.u64().name('item_instance_id'),
   get slot() {
     return EquipSlot;
   },
-  slotOrdinal: __t.u32().name("slot_ordinal"),
+  slotOrdinal: __t.u32().name('slot_ordinal'),
 });

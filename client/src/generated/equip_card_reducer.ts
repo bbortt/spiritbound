@@ -8,11 +8,9 @@ import {
   t as __t,
   type AlgebraicTypeType as __AlgebraicTypeType,
   type Infer as __Infer,
-} from "spacetimedb";
+} from 'spacetimedb';
 
-import {
-  CardType,
-} from "./types";
+import { CardType } from './types';
 
 export default {
   cardInstanceId: __t.u64(),
