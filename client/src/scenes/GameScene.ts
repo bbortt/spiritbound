@@ -19,6 +19,8 @@ import { InventoryPanel } from '../ui/InventoryPanel';
 import { CharacterSheet } from '../ui/CharacterSheet';
 import { computeEffectiveStats } from '../effectiveStats';
 import { xpProgress } from '../levelCurve';
+import { enemyLevelColor } from '../enemyLevelBand';
+import { rewardForKill } from '../xpReward';
 
 // ── Tilemap constants ─────────────────────────────────────────────────────────
 const TILE_SIZE = 48;
@@ -136,6 +138,7 @@ const TILE_TEX = 'tiles';
 
 type EnemyGfx = {
   enemyId: bigint;
+  level: number;
   x: number;
   y: number;
   serverX: number;
@@ -145,6 +148,7 @@ type EnemyGfx = {
   alive: boolean;
   bodyGfx: Phaser.GameObjects.Graphics;
   hpBarGfx: Phaser.GameObjects.Graphics;
+  levelLabel: Phaser.GameObjects.Text;
   castCircleGfx: Phaser.GameObjects.Graphics;
   castBarGfx: Phaser.GameObjects.Graphics;
   aggroIndicatorGfx: Phaser.GameObjects.Graphics;
@@ -672,6 +676,10 @@ export class GameScene extends Phaser.Scene {
         if (row.level > old.level) this._triggerLevelUp(old.level, row.level);
       }
 
+      // Enemy level colours are relative to the player, so they restate
+      // themselves whenever the player's own level moves.
+      if (row.level !== old.level) this._refreshAllEnemyLevelLabels();
+
       if (!row.alive && wasAlive) {
         const survived = [...this.localCardInst.values()]
           .filter((ci) => ci.attuned)
@@ -742,12 +750,24 @@ export class GameScene extends Phaser.Scene {
     bodyGfx.setDepth(1);
 
     const hpBarGfx = this.add.graphics().setDepth(2);
+    // "Lv N" above the HP bar, coloured by how it reads against the player.
+    const levelLabel = this.add
+      .text(row.posX, row.posY - ENEMY_R - 26, `Lv ${row.level}`, {
+        fontSize: '11px',
+        fontFamily: 'monospace',
+        color: '#ffffff',
+        stroke: '#000000',
+        strokeThickness: 3,
+      })
+      .setOrigin(0.5)
+      .setDepth(2);
     const castCircleGfx = this.add.graphics().setDepth(0.5).setVisible(false);
     const castBarGfx = this.add.graphics().setDepth(3).setVisible(false);
     const aggroIndicatorGfx = this.add.graphics().setDepth(2).setVisible(false);
 
     const data: EnemyGfx = {
       enemyId: row.enemyId,
+      level: row.level,
       x: row.posX,
       y: row.posY,
       serverX: row.posX,
@@ -757,6 +777,7 @@ export class GameScene extends Phaser.Scene {
       alive: row.alive,
       bodyGfx,
       hpBarGfx,
+      levelLabel,
       castCircleGfx,
       castBarGfx,
       aggroIndicatorGfx,
@@ -768,6 +789,7 @@ export class GameScene extends Phaser.Scene {
       castRadius: row.attackRangePx,
     };
     this._drawEnemyHpBar(data);
+    this._updateEnemyLevelLabel(data);
     this.dbEnemies.set(row.enemyId, data);
   }
 
@@ -827,7 +849,13 @@ export class GameScene extends Phaser.Scene {
     }
 
     if (!row.alive && old.alive) {
-      this._showFloatingXp(data.x, data.y - ENEMY_R - 20, row.xpReward);
+      // The row no longer carries the reward — it depends on who killed it, so
+      // the client recomputes it from the same curve the server used.
+      this._showFloatingXp(
+        data.x,
+        data.y - ENEMY_R - 20,
+        rewardForKill(data.level, this.localCharacter?.level ?? 1),
+      );
 
       // Death: cancel telegraph, flash white and fade
       data.castCircleGfx.clear().setVisible(false);
@@ -835,6 +863,7 @@ export class GameScene extends Phaser.Scene {
       data.aggroIndicatorGfx.clear().setVisible(false);
       data.aggroState = 'Idle';
       data.hpBarGfx.setVisible(false);
+      data.levelLabel.setVisible(false);
       data.bodyGfx.clear();
       data.bodyGfx.fillStyle(0xffffff, 1);
       data.bodyGfx.fillCircle(0, 0, ENEMY_R);
@@ -862,7 +891,10 @@ export class GameScene extends Phaser.Scene {
       data.bodyGfx.fillCircle(0, 0, ENEMY_R);
       data.bodyGfx.setPosition(row.posX, row.posY);
       data.hpBarGfx.setVisible(true);
+      data.level = row.level;
+      data.levelLabel.setVisible(true);
       this._drawEnemyHpBar(data);
+      this._updateEnemyLevelLabel(data);
     }
   }
 
@@ -871,6 +903,7 @@ export class GameScene extends Phaser.Scene {
     if (data) {
       data.bodyGfx.destroy();
       data.hpBarGfx.destroy();
+      data.levelLabel.destroy();
       data.castCircleGfx.destroy();
       data.castBarGfx.destroy();
       data.aggroIndicatorGfx.destroy();
@@ -900,6 +933,7 @@ export class GameScene extends Phaser.Scene {
 
       data.bodyGfx.setPosition(data.x, data.y);
       this._drawEnemyHpBar(data);
+      this._updateEnemyLevelLabel(data);
 
       data.aggroIndicatorGfx.clear();
       if (data.aggroState === 'Chasing') {
@@ -1211,6 +1245,25 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  /**
+   * Reposition and recolour the "Lv N" label above the HP bar. The colour is
+   * relative to the local character, so it is refreshed both as the enemy moves
+   * and when the player levels (; band logic in enemyLevelBand.ts).
+   */
+  private _updateEnemyLevelLabel(data: EnemyGfx) {
+    const playerLevel = this.localCharacter?.level ?? 1;
+    data.levelLabel.setPosition(data.x, data.y - ENEMY_R - 26);
+    data.levelLabel.setText(`Lv ${data.level}`);
+    data.levelLabel.setColor(enemyLevelColor(data.level, playerLevel));
+  }
+
+  /** Recolour every enemy label — called when the local character's level changes. */
+  private _refreshAllEnemyLevelLabels() {
+    for (const data of this.dbEnemies.values()) {
+      this._updateEnemyLevelLabel(data);
+    }
+  }
+
   // ── Combat ────────────────────────────────────────────────────────────────────
 
   private _fireBasicAttack(worldX: number, worldY: number) {
@@ -1405,12 +1458,17 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  /** Floating "+N XP" text over an enemy corpse — same style as damage numbers, yellow. */
-  private _showFloatingXp(x: number, y: number, amount: bigint) {
+  /**
+   * Floating "+N XP" text over an enemy corpse — same style as damage numbers,
+   * yellow. A zero reward reads grey "No XP" rather than "+0 XP": zero is a
+   * category ("this is beneath you"), not a quantity.
+   */
+  private _showFloatingXp(x: number, y: number, amount: number) {
+    const noXp = amount <= 0;
     const txt = this.add
-      .text(x, y, `+${amount} XP`, {
+      .text(x, y, noXp ? 'No XP' : `+${amount} XP`, {
         fontSize: '16px',
-        color: '#ffdd55',
+        color: noXp ? '#888888' : '#ffdd55',
         fontFamily: 'monospace',
         stroke: '#000000',
         strokeThickness: 2,

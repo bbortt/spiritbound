@@ -1,0 +1,44 @@
+{
+  "dropRates": {
+    "cards": {
+      "baseChance": 0.25,
+      "rarityWeights": {
+        "common": 0.6,
+        "uncommon": 0.25,
+        "rare": 0.12,
+        "epic": 0.03,
+        "legendary": 0.0
+      }
+    },
+    "gear": {
+      "baseChance": 0.2,
+      "rarityWeights": {
+        "common": 0.65,
+        "uncommon": 0.22,
+        "rare": 0.1,
+        "epic": 0.03,
+        "legendary": 0.0
+      }
+    }
+  },
+  "xp": {
+    "baseMonsterXp": 25,
+    "levelDiffPenalty": {
+      "fullXpWithinLevels": 2,
+      "zeroXpBeyondLevels": 8,
+      "higherLevelBonusCap": 1.5
+    }
+  },
+  "drops": {
+    "despawnSeconds": 60,
+    "pickupRangePx": 80
+  },
+  "enemies": {
+    "respawnSeconds": 15,
+    "aggroRangePx": 300,
+    "attackRangePx": 180,
+    "deaggroRangePx": 500,
+    "chaseSpeedPxPerSec": 110,
+    "resetSpeedPxPerSec": 80
+  }
+}

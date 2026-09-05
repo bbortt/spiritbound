@@ -122,6 +122,7 @@ export type DamageSchool = __Infer<typeof DamageSchool>;
 export const Enemy = __t.object('Enemy', {
   enemyId: __t.u64(),
   zoneId: __t.u32(),
+  level: __t.u32(),
   posX: __t.f32(),
   posY: __t.f32(),
   spawnX: __t.f32(),
@@ -144,7 +145,6 @@ export const Enemy = __t.object('Enemy', {
     return ShapeType;
   },
   castDamage: __t.i32(),
-  xpReward: __t.u64(),
 });
 export type Enemy = __Infer<typeof Enemy>;
 

@@ -14,6 +14,7 @@ import { ShapeType, AggroState } from './types';
 export default __t.row({
   enemyId: __t.u64().primaryKey().name('enemy_id'),
   zoneId: __t.u32().name('zone_id'),
+  level: __t.u32(),
   posX: __t.f32().name('pos_x'),
   posY: __t.f32().name('pos_y'),
   spawnX: __t.f32().name('spawn_x'),
@@ -36,5 +37,4 @@ export default __t.row({
     return ShapeType.name('cast_shape');
   },
   castDamage: __t.i32().name('cast_damage'),
-  xpReward: __t.u64().name('xp_reward'),
 });
