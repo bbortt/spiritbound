@@ -11,10 +11,10 @@
   },
   "dependencies": {
     "phaser": "^4.2.0",
-    "spacetimedb": "2.6.0"
+    "spacetimedb": "2.8.3"
   },
   "devDependencies": {
-    "typescript": "~6.0.2",
+    "typescript": "~7.0.2",
     "vite": "^8.0.12"
   }
 }
