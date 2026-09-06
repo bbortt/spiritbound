@@ -17,10 +17,10 @@
     "site:dev": "pnpm run site:sync-cards && cd site && bundle exec jekyll serve",
     "site:sync-cards": "node -e \"require('fs').copyFileSync('content/cards.json','site/_data/cards.json')\"",
     "spacetime:bundle": "esbuild spacetimedb/src/index.ts --bundle --platform=neutral --format=esm --external:spacetime:sys@2.0 --external:spacetime:sys@2.1 --external:node:fs --external:node:path --external:node:url --outfile=spacetimedb/dist/bundle.js",
-    "spacetime:generate": "pnpm spacetime:bundle && docker run --rm -v \"%cd%:/project\" clockworklabs/spacetime:latest generate --lang typescript -j /project/spacetimedb/dist/bundle.js -o /project/client/src/generated -y --include-private",
+    "spacetime:generate": "pnpm spacetime:bundle && docker run --rm -v \"./:/project\" clockworklabs/spacetime:latest generate --lang typescript -j /project/spacetimedb/dist/bundle.js -o /project/client/src/generated -y --include-private",
     "spacetime:login": "docker run --rm -it -v spiritbound-cli-config:/home/spacetime/.config/spacetime clockworklabs/spacetime:latest login",
-    "spacetime:publish": "pnpm spacetime:bundle && docker run --rm -v \"%cd%:/project\" -v spiritbound-cli-config:/home/spacetime/.config/spacetime clockworklabs/spacetime:latest publish --no-config -j /project/spacetimedb/dist/bundle.js --server maincloud spiritbound",
-    "spacetime:publish:local": "pnpm run db:restart && pnpm spacetime:bundle && docker run --rm -v \"%cd%:/project\" clockworklabs/spacetime:latest publish --anonymous --no-config -j /project/spacetimedb/dist/bundle.js --server http://host.docker.internal:3000 spiritbound --yes",
+    "spacetime:publish": "pnpm spacetime:bundle && docker run --rm -v \"./:/project\" -v spiritbound-cli-config:/home/spacetime/.config/spacetime clockworklabs/spacetime:latest publish --no-config -j /project/spacetimedb/dist/bundle.js --server maincloud spiritbound",
+    "spacetime:publish:local": "pnpm run db:restart && pnpm spacetime:bundle && docker run --rm -v \"./:/project\" clockworklabs/spacetime:latest publish --anonymous --no-config -j /project/spacetimedb/dist/bundle.js --server http://host.docker.internal:3000 spiritbound --yes",
     "ui:start": "pnpm -C client dev",
     "vitest": "vitest run",
     "vitest:integration": "vitest run -c vitest.integration.config.ts"
