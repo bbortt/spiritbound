@@ -18,5 +18,10 @@ export default defineConfig({
     // but keep it single-threaded to stay easy to reason about and avoid
     // hammering the dev instance with concurrent drop-farming loops.
     fileParallelism: false,
+    // Fails the run on any todo test — see vitest.noTodoTests.ts for why a
+    // green todo is the dangerous state. includeTaskLocation is what lets it
+    // report the offender as file:line instead of just the file.
+    reporters: ['default', './vitest.noTodoTests.ts'],
+    includeTaskLocation: true,
   },
 });
