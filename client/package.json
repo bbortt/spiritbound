@@ -10,11 +10,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "phaser": "^4.2.0",
-    "spacetimedb": "2.6.0"
+    "phaser": "4.2.0",
+    "spacetimedb": "2.8.3"
   },
   "devDependencies": {
-    "typescript": "~6.0.2",
-    "vite": "^8.0.12"
+    "typescript": "5.9.3",
+    "vite": "8.0.12"
   }
 }

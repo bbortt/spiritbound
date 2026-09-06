@@ -1,3 +1,4 @@
 .git/
 .husky/
 .idea/
+pnpm-lock.yaml
