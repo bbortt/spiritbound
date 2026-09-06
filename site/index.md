@@ -82,6 +82,6 @@ That's yours to find out.
 ---
 
 Curious how it plays?
-Start with **[Mechanics](/mechanics.html)** and
-**[Controls](/controls.html)**, or browse the growing **[Card](/cards/)**
+Start with **[Mechanics](mechanics.html)** and
+**[Controls](controls.html)**, or browse the growing **[Card](cards/)**
 collection.
