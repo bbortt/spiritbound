@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: CC-BY-NC-SA-4.0
+// Copyright (c) 2026 Timon Borter. See LICENSE at the repository root.
+
 /**
  * rules/combat.ts — hit resolution logic.
  * Pure functions: no SpacetimeDB imports, no side effects.

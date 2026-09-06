@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: CC-BY-NC-SA-4.0
+// Copyright (c) 2026 Timon Borter. See LICENSE at the repository root.
+
 /**
  * types.ts — pure TypeScript types shared by rules/ functions.
  * NO SpacetimeDB imports here; this keeps rules/ fully portable and unit-testable.

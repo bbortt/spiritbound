@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: CC-BY-NC-SA-4.0
+// Copyright (c) 2026 Timon Borter. See LICENSE at the repository root.
+
 /**
  * spacetimedb/integration/helpers.ts — test-setup helpers shared by the
  * integration suite. Each helper is a black-box sequence of real reducer

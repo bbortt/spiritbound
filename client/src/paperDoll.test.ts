@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: CC-BY-NC-SA-4.0
+// Copyright (c) 2026 Timon Borter. See LICENSE at the repository root.
+
 import { describe, it, expect } from 'vitest';
 import { BODY_SLOTS, findEquippedInSlot } from './paperDoll';
 import { SwTraceables, verifies } from '../../src/clew/traceables/clew';

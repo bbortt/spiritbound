@@ -2,8 +2,65 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="5b82f24a-a837-4858-bdad-b79b887f77ac" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.github/workflows/branches.yml" beforeDir="false" afterPath="$PROJECT_DIR$/.github/workflows/branches.yml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.github/workflows/pull-requests.yml" beforeDir="false" afterPath="$PROJECT_DIR$/.github/workflows/pull-requests.yml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/LICENSE" beforeDir="false" afterPath="$PROJECT_DIR$/LICENSE" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/client/package.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/db.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/db.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/effectiveStats.test.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/effectiveStats.test.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/effectiveStats.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/effectiveStats.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/enemyLevelBand.test.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/enemyLevelBand.test.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/enemyLevelBand.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/enemyLevelBand.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/equipDecision.test.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/equipDecision.test.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/equipDecision.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/equipDecision.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/handSlots.test.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/handSlots.test.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/handSlots.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/handSlots.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/levelCurve.test.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/levelCurve.test.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/levelCurve.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/levelCurve.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/main.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/main.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/paperDoll.test.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/paperDoll.test.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/paperDoll.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/paperDoll.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/scenes/GameScene.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/scenes/GameScene.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/ui/CharacterSheet.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/ui/CharacterSheet.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/ui/CollectionPanel.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/ui/CollectionPanel.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/ui/InventoryPanel.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/ui/InventoryPanel.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/xpReward.test.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/xpReward.test.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/client/src/xpReward.ts" beforeDir="false" afterPath="$PROJECT_DIR$/client/src/xpReward.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/content/cards.test.ts" beforeDir="false" afterPath="$PROJECT_DIR$/content/cards.test.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/content/config.test.ts" beforeDir="false" afterPath="$PROJECT_DIR$/content/config.test.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/content/configLoader.ts" beforeDir="false" afterPath="$PROJECT_DIR$/content/configLoader.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/content/equipment.test.ts" beforeDir="false" afterPath="$PROJECT_DIR$/content/equipment.test.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/content/equipmentLoader.ts" beforeDir="false" afterPath="$PROJECT_DIR$/content/equipmentLoader.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/content/loader.ts" beforeDir="false" afterPath="$PROJECT_DIR$/content/loader.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/content/validate.ts" beforeDir="false" afterPath="$PROJECT_DIR$/content/validate.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/content/validateConfig.ts" beforeDir="false" afterPath="$PROJECT_DIR$/content/validateConfig.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/content/validateEquipment.ts" beforeDir="false" afterPath="$PROJECT_DIR$/content/validateEquipment.ts" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/lint-staged.config.mjs" beforeDir="false" afterPath="$PROJECT_DIR$/lint-staged.config.mjs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/spacetimedb/integration/client.ts" beforeDir="false" afterPath="$PROJECT_DIR$/spacetimedb/integration/client.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/spacetimedb/integration/death.integration.test.ts" beforeDir="false" afterPath="$PROJECT_DIR$/spacetimedb/integration/death.integration.test.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/spacetimedb/integration/helpers.ts" beforeDir="false" afterPath="$PROJECT_DIR$/spacetimedb/integration/helpers.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/spacetimedb/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/spacetimedb/package.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/spacetimedb/src/index.ts" beforeDir="false" afterPath="$PROJECT_DIR$/spacetimedb/src/index.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/spacetimedb/src/rules/combat.test.ts" beforeDir="false" afterPath="$PROJECT_DIR$/spacetimedb/src/rules/combat.test.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/spacetimedb/src/rules/combat.ts" beforeDir="false" afterPath="$PROJECT_DIR$/spacetimedb/src/rules/combat.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/spacetimedb/src/rules/death.test.ts" beforeDir="false" afterPath="$PROJECT_DIR$/spacetimedb/src/rules/death.test.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/spacetimedb/src/rules/death.ts" beforeDir="false" afterPath="$PROJECT_DIR$/spacetimedb/src/rules/death.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/spacetimedb/src/rules/drops.test.ts" beforeDir="false" afterPath="$PROJECT_DIR$/spacetimedb/src/rules/drops.test.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/spacetimedb/src/rules/drops.ts" beforeDir="false" afterPath="$PROJECT_DIR$/spacetimedb/src/rules/drops.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/spacetimedb/src/rules/enemyAi.test.ts" beforeDir="false" afterPath="$PROJECT_DIR$/spacetimedb/src/rules/enemyAi.test.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/spacetimedb/src/rules/enemyAi.ts" beforeDir="false" afterPath="$PROJECT_DIR$/spacetimedb/src/rules/enemyAi.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/spacetimedb/src/rules/leveling.test.ts" beforeDir="false" afterPath="$PROJECT_DIR$/spacetimedb/src/rules/leveling.test.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/spacetimedb/src/rules/leveling.ts" beforeDir="false" afterPath="$PROJECT_DIR$/spacetimedb/src/rules/leveling.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/spacetimedb/src/rules/stats.test.ts" beforeDir="false" afterPath="$PROJECT_DIR$/spacetimedb/src/rules/stats.test.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/spacetimedb/src/rules/stats.ts" beforeDir="false" afterPath="$PROJECT_DIR$/spacetimedb/src/rules/stats.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/spacetimedb/src/types.ts" beforeDir="false" afterPath="$PROJECT_DIR$/spacetimedb/src/types.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/vitest.config.ts" beforeDir="false" afterPath="$PROJECT_DIR$/vitest.config.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/vitest.integration.config.ts" beforeDir="false" afterPath="$PROJECT_DIR$/vitest.integration.config.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/vitest.noTodoTests.test.ts" beforeDir="false" afterPath="$PROJECT_DIR$/vitest.noTodoTests.test.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/vitest.noTodoTests.ts" beforeDir="false" afterPath="$PROJECT_DIR$/vitest.noTodoTests.ts" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -27,38 +84,38 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.typescript.service.memoryLimit.init&quot;: &quot;true&quot;,
-    &quot;codeWithMe.voiceChat.enabledByDefault&quot;: &quot;false&quot;,
-    &quot;copilot.chat.legacySessionMetadata.migrated&quot;: &quot;true&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;main&quot;,
-    &quot;javascript.preferred.runtime.type.id&quot;: &quot;node&quot;,
-    &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
-    &quot;last_opened_file_path&quot;: &quot;D:/dev/workspaces/fun/eldoria&quot;,
-    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
-    &quot;node.js.detected.package.jshint&quot;: &quot;true&quot;,
-    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
-    &quot;node.js.selected.package.jshint&quot;: &quot;&quot;,
-    &quot;nodejs_package_manager_path&quot;: &quot;pnpm&quot;,
-    &quot;npm.db:start.executor&quot;: &quot;Run&quot;,
-    &quot;npm.dev.executor&quot;: &quot;Run&quot;,
-    &quot;npm.spacetime:publish:local.executor&quot;: &quot;Run&quot;,
-    &quot;npm.ui:dev.executor&quot;: &quot;Run&quot;,
-    &quot;npm.ui:start.executor&quot;: &quot;Run&quot;,
-    &quot;ts.external.directory.path&quot;: &quot;D:\\dev\\workspaces\\fun\\eldoria\\node_modules\\typescript\\lib&quot;,
-    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
+    "codeWithMe.voiceChat.enabledByDefault": "false",
+    "copilot.chat.legacySessionMetadata.migrated": "true",
+    "git-widget-placeholder": "feat/balance-config-rarity-ceiling-xp-scaling",
+    "javascript.preferred.runtime.type.id": "node",
+    "kotlin-language-version-configured": "true",
+    "last_opened_file_path": "D:/dev/workspaces/fun/eldoria",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.jshint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.jshint": "",
+    "nodejs_package_manager_path": "pnpm",
+    "npm.db:start.executor": "Run",
+    "npm.dev.executor": "Run",
+    "npm.spacetime:publish:local.executor": "Run",
+    "npm.ui:dev.executor": "Run",
+    "npm.ui:start.executor": "Run",
+    "ts.external.directory.path": "D:\\dev\\workspaces\\fun\\eldoria\\node_modules\\typescript\\lib",
+    "vue.rearranger.settings.migration": "true"
   },
-  &quot;keyToStringList&quot;: {
-    &quot;com.intellij.ide.scratch.ScratchImplUtil$2/New Scratch File&quot;: [
-      &quot;TEXT&quot;
+  "keyToStringList": {
+    "com.intellij.ide.scratch.ScratchImplUtil$2/New Scratch File": [
+      "TEXT"
     ]
   }
-}</component>
+}]]></component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
       <recent name="D:\dev\workspaces\fun\eldoria" />

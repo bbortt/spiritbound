@@ -38,6 +38,8 @@ jobs:
         run: pnpm run prettier:check
       - name: Check Markdown Formatting
         run: pnpm lint:markdown
+      - name: Check license headers
+        run: node scripts/ensure-license-header.mjs --check
   ci:
     name: Build and Test
     runs-on: ubuntu-latest
