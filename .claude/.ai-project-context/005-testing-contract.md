@@ -162,3 +162,37 @@ development, automated instead of re-typed by hand each time.
   path, the documented edge cases (empty pool, boundary level, zero/negative
   input), and any case a `BALANCE.md`/`GAME_DESIGN.md` note calls out as a
   deliberate design choice (e.g. "legendary weight is 0 by design").
+
+## 5. Anchoring: `verifies()` wraps the `it`, never the other way round
+
+The anchor is a wrapper _around_ the test declaration, not an argument _to_
+it:
+
+```ts
+verifies(SwTraceables.SW_036_XP_FALLS_OFF_LINEARLY_BETWEEN..., () => {
+  describe('computeXpReward', () => {
+    it('awards base XP at equal levels', () => {
+      expect(computeXpReward(BASE, 5, 5, CFG)).toBe(BASE);
+    });
+  });
+});
+```
+
+- **The trap:** `it(name, verifies(ids, () => { ... }))` looks right and is
+  caught by nothing in the normal loop.
+  Arguments evaluate before the call, so `verifies()` runs the block during
+  _collection_ and then hands `it` the `void` it returns.
+  vitest sees a test with no body, downgrades it to **todo**, prints it in
+  green, and counts it as not-failing.
+  The clew anchor still resolves, so `clew coverage` reports the spec as
+  verified by a test that never ran.
+- **The guard:** `vitest.noTodoTests.ts` is registered as a reporter in both
+  `vitest.config.ts` and `vitest.integration.config.ts` and fails any run that
+  collected a todo test, naming each offender by `file:line`.
+  It applies locally and in CI, across both suites — there is no supported way
+  to leave a green todo in this repo.
+- A genuinely unwritten test belongs in `docs/spec/` as a spec without a
+  `verifies` anchor, where `clew coverage` reports it, not as a placeholder in
+  the suite.
+  `it.skip` is deliberately _not_ flagged: skipping is an explicit, visible
+  choice, whereas todo is what a missing body looks like.
