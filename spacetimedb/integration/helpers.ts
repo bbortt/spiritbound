@@ -15,6 +15,17 @@ import {
 } from './client';
 
 /**
+ * The level farm-spawned enemies are given. `spawn_enemy` requires an explicit
+ * `level` — it is a real reducer argument, not an optional one — and the value
+ * matters: XP reward and drop eligibility are both computed from the ENEMY's
+ * level (see rules/leveling.ts and rules/drops.ts), so farming with an
+ * arbitrary level would silently change what these helpers can produce.
+ * Matching the zone-1 seed level (index.ts#ZONE_1_ENEMY_LEVEL) keeps a farmed
+ * kill equivalent to killing a naturally seeded enemy.
+ */
+const FARM_ENEMY_LEVEL = 2;
+
+/**
  * `seedCards` assigns `cardDefId = index + 1` over content/cards.json, stable
  * and 1-based (see spacetimedb/src/index.ts#_doSeedCards) — reading the same
  * file here maps a dropped card's def id back to its rarity without needing
@@ -144,6 +155,7 @@ export async function farmItemDrop(
       zoneId: 1,
       x: char.x,
       y: char.y,
+      level: FARM_ENEMY_LEVEL,
     });
     const enemy = latestBy(
       await sqlRows(
@@ -199,6 +211,7 @@ export async function farmCardOfRarity(
       zoneId: 1,
       x: char.x,
       y: char.y,
+      level: FARM_ENEMY_LEVEL,
     });
     const enemy = latestBy(
       await sqlRows(
