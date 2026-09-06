@@ -53,6 +53,9 @@
     "story": "docs/spec/schemas/story.schema.yaml",
     "spec": "docs/spec/schemas/spec.schema.yaml"
   },
+  "scan": {
+    "exclude": ["site/mechanics.html", "site/controls.html"]
+  },
   "waivers": [],
   "agent": {
     "type": "claude",
