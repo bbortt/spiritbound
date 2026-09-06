@@ -50,6 +50,11 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
+          # Sonar needs full history for blame and new-code detection. Fetch it
+          # here rather than with a later `git fetch --unshallow`, which cannot
+          # authenticate against a private repo once credentials are not
+          # persisted.
+          fetch-depth: 0
       - name: Install pnpm
         uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86
         with:
@@ -87,8 +92,6 @@ jobs:
       - name: Stop SpacetimeDB
         if: always()
         run: docker rm -f spiritbound-ci || true
-      - name: Fetch References
-        run: git fetch --unshallow origin
       - name: Cache SonarQube Packages
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         if: "!contains(github.actor, 'dependabot')"
