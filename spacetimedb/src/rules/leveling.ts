@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: CC-BY-NC-SA-4.0
+// Copyright (c) 2026 Timon Borter. See LICENSE at the repository root.
+
 /**
  * rules/leveling.ts — XP reward scaling by player-to-enemy level difference.
  * Pure functions: no SpacetimeDB imports, no side effects. The tuning comes in

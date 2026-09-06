@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: CC-BY-NC-SA-4.0
+// Copyright (c) 2026 Timon Borter. See LICENSE at the repository root.
+
 import { describe, expect, it } from 'vitest';
 
 import { findTodoTests, formatTodoTestFailure } from './vitest.noTodoTests.js';

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: CC-BY-NC-SA-4.0
+// Copyright (c) 2026 Timon Borter. See LICENSE at the repository root.
+
 /**
  * Black-box integration tests against a LIVE, published SpacetimeDB instance
  * (the same local dev loop `pnpm run db:start` + `pnpm run

@@ -51,6 +51,9 @@ jobs:
       - name: Install Dependencies
         if: github.ref == 'refs/heads/main' || steps.check.outputs.pr_found == 'false'
         run: pnpm install
+      - name: Check license headers
+        if: github.ref == 'refs/heads/main' || steps.check.outputs.pr_found == 'false'
+        run: node scripts/ensure-license-header.mjs --check
       - name: Unit tests
         if: github.ref == 'refs/heads/main' || steps.check.outputs.pr_found == 'false'
         run: pnpm run vitest

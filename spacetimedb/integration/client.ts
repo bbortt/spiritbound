@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: CC-BY-NC-SA-4.0
+// Copyright (c) 2026 Timon Borter. See LICENSE at the repository root.
+
 /**
  * spacetimedb/integration/client.ts — thin REST client for a LIVE SpacetimeDB
  * instance, used only by the integration test suite (spacetimedb/integration/

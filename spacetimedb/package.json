@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "",
   "keywords": [],
-  "license": "ISC",
+  "license": "CC-BY-NC-SA-4.0",
   "author": "",
   "scripts": {
     "build": "spacetime build",
