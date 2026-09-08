@@ -1,5 +1,5 @@
 **Title**
-A resetting enemy walks to spawn while healing, can re-aggro mid-walk, and a dead enemy respawns at full HP exactly 15s later
+A resetting enemy walks to spawn while healing and can re-aggro mid-walk
 
 **Lens**: SW
 
@@ -15,29 +15,44 @@ transitions to `chasing` targeting that character — reaching spawn first
 is not required.
 Once it reaches its exact spawn coordinates with no
 re-aggro, it transitions to `idle` at full HP.
-Separately, a dead enemy
-(`alive: false`) is restored to full HP at its exact spawn position and
-`idle` state by a one-shot scheduled reducer firing exactly 15 seconds
-after death, regardless of whether any character is nearby; the
-reducer is a no-op if the enemy is already alive by the time it fires.
+What happens to an enemy
+that actually died — whether it returns at all, and into which level band
+— is not this spec's concern; that outcome is `SW-048`'s.
 
 **Rationale**
 Remaining vulnerable to re-aggro while resetting means a player cannot
 safely "tag and back off" an enemy repeatedly for free, uncontested
 healing right next to it.
-The fixed 15-second death-respawn timer is a
-simple, predictable content-availability guarantee — enemies are always
-back within a bounded time — rather than a reward for camping the spawn
-point.
+Resetting is a retreat, not a death: the enemy
+never left play, so the population director has no say in it.
 
 **Verification Description**
 A unit test covers the walk-toward-spawn/heal-per-tick/arrive-at-idle
-sequence, a mid-reset re-aggro interrupting it, and the respawn reducer
-restoring exactly `maxHp`, spawn position, and `idle` state — and doing
-nothing when called against an already-alive enemy.
+sequence and a mid-reset re-aggro interrupting it.
 
 ## Relations
 
 **Realizes**
 
 - [SYS-003](SYS-003-enemies-aggro-chase-and-attack-under-server-authority.md)
+
+**Related**
+
+- [SW-048](SW-048-passive-respawn-retires-an-over-target-enemy-or-re-rolls-it-into-the-neediest-band.md) — owns the death-respawn outcome this spec previously also described
+
+## Changes
+
+- **2026-09-08** — Narrowed to the `resetting` state machine only, dropping
+  the death-respawn half ("a dead enemy is restored to full HP at its exact
+  spawn position ... regardless of whether any character is nearby, 15
+  seconds after death").
+  STR-013 makes that outcome conditional: `SW-048`'s
+  passive-respawn decision may retire the enemy instead of reviving it, and
+  may re-roll its level into a different band, so the unconditional
+  restore-at-spawn claim is no longer true and now belongs to `SW-048`.
+  The resetting behaviour itself is unchanged, and this narrowing brings the
+  spec back in line with its filename slug and with its only two anchors
+  (`decideResetting` in `rules/enemyAi.ts` and its test), neither of which
+  ever covered the respawn reducer.
+  The 15-second cadence itself is
+  untouched — only what the reducer does when it fires moves.

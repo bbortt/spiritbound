@@ -21,38 +21,38 @@ not drafts.
    every spec they realize) and skim the specs they link to.
 2. Run the `clew-promote` skill on all five stories together (they form
    one increment and cross-reference each other — e.g. Story 4 realizes
-   `ARCH-TMP-001` from Story 2).
-Promoting them together means the bound
+   `ARCH-012` from Story 2).
+   Promoting them together means the bound
    ids substitute consistently across all the cross-links in one pass.
 3. **Two active specs need explicit handling at promotion, already
    flagged in the drafts — do not silently skip these:**
    - `CON-008` (`first-reaching-level-ten-stamps-tutorial-completed...`)
-     is **superseded** by `CON-TMP-015` (Story 5). `CON-008`'s hardcoded
+     is **superseded** by `CON-033` (Story 5). `CON-008`'s hardcoded
      `character.level >= 10` becomes `character.level >= zone.maxLevel`,
      scoped to `tutorialZone: true`.
-Mark `CON-008` deprecated once
-     `CON-TMP-015` is promoted; do not leave both active with
+     Mark `CON-008` deprecated once
+     `CON-033` is promoted; do not leave both active with
      contradictory descriptions.
    - `SW-014` (`resetting-enemy-walks-to-spawn-healing-and-can-re-aggro`)
      is **partially superseded** — only its respawn-half claim ("a dead
      enemy is restored to full HP at its exact spawn position ...
      regardless of whether any character is nearby") is replaced by
-     `SW-TMP-010`'s passive-rebalance decision.
-Its resetting-state-machine
+     `SW-048`'s passive-rebalance decision.
+     Its resetting-state-machine
      half (walk to spawn, heal per tick, mid-walk re-aggro) is unaffected
      and must stay active as-is.
-At promotion, narrow `SW-014`'s
+     At promotion, narrow `SW-014`'s
      description to the resetting-state behavior only, and let the new
-     promoted spec (from `SW-TMP-010`) own the respawn-outcome claim.
+     promoted spec (from `SW-048`) own the respawn-outcome claim.
 4. **One tension is deliberately left unresolved by design, not by
    oversight** — confirm this reading survives promotion:
    `CON-004` ("legendary drop weight is fixed at zero") is _not_
    superseded.
-Story 2's rarity-tier-shift function is designed so a
+   Story 2's rarity-tier-shift function is designed so a
    zero-weight tier (legendary, today) can never become non-zero through
    the shift, specifically so `CON-004` keeps holding even once bosses
    exist.
-If a future story wants boss kills to unlock legendary loot, it
+   If a future story wants boss kills to unlock legendary loot, it
    must explicitly revisit `CON-004` — this increment does not.
 5. After promotion, delete `docs/spec/drafts/stories/STR-TMP-*.md`,
    `docs/spec/drafts/specs/*-TMP-*.md`, and this file (or move this file's
@@ -64,13 +64,13 @@ If a future story wants boss kills to unlock legendary loot, it
 Mirrors the dependency chain used while drafting — each story's specs
 name the fields/functions the next story depends on by name.
 
-### Story A — Zone content pipeline (was STR-TMP-001)
+### Story A — Zone content pipeline (was STR-010)
 
 **New files**, following `content/cards.json` + `content/validate.ts` +
 `content/loader.ts` + `content/cards.test.ts` exactly:
 
 - `content/zones.json` — one entry, `hollow-vale` (zoneId 1).
-Full shape
+  Full shape
   is in the story's Solution Approach section — copy it verbatim as the
   starting content, including `recommendedLevel: 1`, `boss.arenaX/arenaY`
   (pick an actual in-bounds coordinate for the zone map, not `0,0`), and
@@ -79,7 +79,7 @@ Full shape
   match whatever convention the promoted spec ids' anchors expect) — Zod
   schema + `crossCheck` implementing all 7 promoted CON specs from this
   story.
-Each hard-error path needs a test in `content/zones.test.ts`
+  Each hard-error path needs a test in `content/zones.test.ts`
   naming the values in the assertion message where the spec requires it
   (band-vs-max, e.g.).
 - `content/zonesLoader.ts` — Node-only `readFileSync`/`JSON.parse`, split
@@ -103,13 +103,13 @@ Each hard-error path needs a test in `content/zones.test.ts`
   (upsert by `slug`, `ctx.db.zone.zoneId.find(...)` — note `zoneId` is a
   plain `u32` PK, not autoinc, so the seeder sets it explicitly from the
   content file rather than leaving it `0n`).
-Call from `init`.
+  Call from `init`.
 
 **Test**: `content/zones.test.ts` — schema validity + one `it` per CON
 spec's rejection path (7 total), following `content/config.test.ts`'s
 style for naming both computed values in an error message assertion.
 
-### Story B — Enemy rarity and rarity-scaled stats/drops (was STR-TMP-002)
+### Story B — Enemy rarity and rarity-scaled stats/drops (was STR-011)
 
 **Modified**: `spacetimedb/src/index.ts`
 
@@ -135,9 +135,9 @@ style for naming both computed values in an error message assertion.
 
 - Add the drop-tier-shift pure function (name it e.g. `shiftRarityWeightsForMob(weights, mobRarity): RarityWeights`).
   Common mob → unchanged.
-Non-common → zero out `common`, redistribute
+  Non-common → zero out `common`, redistribute
   proportional to the other four tiers' existing relative weight.
-A tier
+  A tier
   already at 0 (legendary, today) stays 0 — verify this explicitly in the
   test, it's the load-bearing property that keeps `CON-004` intact.
 - `spacetimedb/src/rules/drops.test.ts` — add cases per the promoted SW
@@ -155,7 +155,7 @@ A tier
 - `content/config.test.ts` — add cases for the new key per the promoted
   CON spec.
 
-### Story C — Spawn-director pure rules (was STR-TMP-003)
+### Story C — Spawn-director pure rules (was STR-012)
 
 **New file**: `spacetimedb/src/rules/spawnDirector.ts` — four functions,
 all pure, tuning passed as parameters (the zone's `population`/`director`
@@ -170,7 +170,7 @@ config from `content/zones.json`):
 3. `planAdjustments(target, actual, cfg): { spawns: {band,count}[], despawns: {band,count}[] }`
 4. `pickRespawnBand(deadEnemyBand, targetByBand, actualByBand): 'retire' | { band: number }`
    (or similar signature — this is the passive-respawn decision function
-   `SW-TMP-010` describes).
+   `SW-048` describes).
 
 **Test**: `spacetimedb/src/rules/spawnDirector.test.ts` — this is the
 module the original brief calls out as "most worth testing hard." Include
@@ -187,7 +187,7 @@ budget, lone-outlier band gets its floor, empty-zone even rest, single
 occupied band capped + overflow, deadband boundary exact (`==` not just
 `<`), rate limits never exceeded, no negative counts anywhere.
 
-### Story D — Live spawn director and boss cycle (was STR-TMP-004)
+### Story D — Live spawn director and boss cycle (was STR-013)
 
 **Modified**: `spacetimedb/src/index.ts`
 
@@ -200,10 +200,10 @@ occupied band capped + overflow, deadband boundary exact (`==` not just
 - New scheduled table + reducer `spawnDirectorTick`: **one row per zone**,
   each inserted with `ScheduleAt.interval(zone.director.tickSeconds * 1_000_000n)`
   (microseconds) — not a single global tick.
-Insert these rows from
+  Insert these rows from
   `_doSeedZones` (Story A) or from `init` after zones are seeded, one per
   seeded zone.
-The reducer body:
+  The reducer body:
   1. Count alive characters per band (query `character` by `zoneId`,
      bucket by `levelBands`).
   2. Count alive non-boss enemies per band (query `enemy` by `zoneId`,
@@ -213,7 +213,7 @@ The reducer body:
      from every alive player in the zone (reuse/extend whatever spatial
      query `enemyAi.ts` already has for range checks); skip if none
      found.
-Roll level uniformly within the band, rarity from
+     Roll level uniformly within the band, rarity from
      `zone.spawnRarities` (uniform, or weighted — brief doesn't specify a
      weighting within `spawnRarities`, treat as uniform unless told
      otherwise).
@@ -231,7 +231,7 @@ Roll level uniformly within the band, rarity from
   respawn, only level/band).
 - New scheduled reducer `bossCycleTick`, single global interval (30s per
   the brief — this one is NOT per-zone).
-Per zone with a `boss` config:
+  Per zone with a `boss` config:
   spawn/despawn per the promoted CON specs (unconditional window close,
   excluded from all director accounting, cycle timer restarts uniformly
   on kill or timeout).
@@ -252,7 +252,7 @@ Per zone with a `boss` config:
   pattern (`GameScene.ts` ~line 1511) for "The Vale Warden stirs." on
   boss spawn.
 - HUD timer: new pure function (client-side, no Phaser import) formatting
-  `"Warden: M:SS remaining"` / `"Warden returns in M:SS"` per `SW-TMP-011`
+  `"Warden: M:SS remaining"` / `"Warden returns in M:SS"` per `SW-049`
   — extract it so it's unit-testable, then wire it into `_createHud`/
   `_updateHud` following the existing HP/MP/XP-bar field conventions
   (`.setScrollFactor(0)`, matching depth/origin conventions).
@@ -266,7 +266,7 @@ boss-excluded-from-accounting).
 Prefer adding `it`s to an existing
 `describe` over new files, per `005-testing-contract.md`.
 
-### Story E — Zone mastery cutoff and tutorial routing (was STR-TMP-005)
+### Story E — Zone mastery cutoff and tutorial routing (was STR-014)
 
 **Modified**: `spacetimedb/src/rules/leveling.ts` or the `damageEnemy`
 call site in `index.ts` — before calling `computeXpReward`, look up
@@ -300,7 +300,7 @@ entirely or just ignored — removing it is cleaner if nothing else calls
 
 - The client already computes `computeXpReward` client-side to decide
   `No XP` vs a number (`ARCH-011`).
-Add the same zone-cap check
+  Add the same zone-cap check
   (`character.level >= zone.maxLevel`, using the already-subscribed
   `zone` table row) _before_ falling back to the existing level-gap
   check, and show `Zone mastered` instead of `No XP` when the cap is the

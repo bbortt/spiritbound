@@ -1,9 +1,9 @@
 {
   "sequences": {
-    "ARCH": 11,
-    "CON": 18,
-    "SW": 38,
-    "SYS": 11,
-    "STR": 9
+    "ARCH": 13,
+    "CON": 33,
+    "SW": 53,
+    "SYS": 15,
+    "STR": 14
   }
 }
