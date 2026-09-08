@@ -3,7 +3,7 @@ A zone boss window must be shorter than its cycle
 
 **Lens**: CON
 
-**Status**: planned
+**Status**: active
 
 **Description**
 A zone's `boss.windowMinutes` must be strictly less than
@@ -31,3 +31,9 @@ story states.
 **Realizes**
 
 - [SYS-008](SYS-008-content-is-authored-as-json-validated-then-idempotently-seeded.md)
+
+## Changes
+
+- **2026-09-08** — Set active: implementation of STR-010 began.
+  The spec is authored and approved, so it now generates a traceable for the
+  code written in this increment to anchor against.

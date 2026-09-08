@@ -1,0 +1,47 @@
+[
+  {
+    "slug": "hollow-vale",
+    "zoneId": 1,
+    "name": "Hollow Vale",
+    "minLevel": 1,
+    "maxLevel": 10,
+    "recommendedLevel": 1,
+    "tutorialZone": true,
+    "spawnRarities": ["common"],
+    "levelBands": [
+      { "min": 1, "max": 2 },
+      { "min": 3, "max": 4 },
+      { "min": 5, "max": 6 },
+      { "min": 7, "max": 8 },
+      { "min": 9, "max": 10 }
+    ],
+    "population": {
+      "base": 20,
+      "perPlayer": 6,
+      "min": 20,
+      "max": 120,
+      "floorPerOccupiedBand": 6,
+      "maxBandSharePct": 0.5
+    },
+    "director": {
+      "tickSeconds": 10,
+      "deadband": 3,
+      "maxSpawnsPerTick": 4,
+      "maxDespawnsPerTick": 2,
+      "minSpawnDistFromPlayerPx": 600,
+      "despawnSafeDistPx": 900,
+      "sustainedDeviationTicks": 3
+    },
+    "boss": {
+      "slug": "vale-warden",
+      "rarity": "uncommon",
+      "level": 10,
+      "cycleMinutes": 10,
+      "windowMinutes": 5,
+      "arenaX": 2616,
+      "arenaY": 1368
+    },
+    "flavor": "Sunlight pools in the valley. Something under it does not.",
+    "masteredMessage": "Hollow Vale has nothing left to teach you."
+  }
+]

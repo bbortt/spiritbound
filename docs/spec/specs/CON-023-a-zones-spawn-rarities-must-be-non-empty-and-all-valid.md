@@ -3,7 +3,7 @@ A zone's spawn rarities must be non-empty and all valid
 
 **Lens**: CON
 
-**Status**: planned
+**Status**: active
 
 **Description**
 A zone's `spawnRarities` array must contain at least one entry, and every
@@ -32,3 +32,9 @@ an invalid string (e.g. `"mythic"`) are each rejected.
 **Realizes**
 
 - [SYS-008](SYS-008-content-is-authored-as-json-validated-then-idempotently-seeded.md)
+
+## Changes
+
+- **2026-09-08** — Set active: implementation of STR-010 began.
+  The spec is authored and approved, so it now generates a traceable for the
+  code written in this increment to anchor against.
