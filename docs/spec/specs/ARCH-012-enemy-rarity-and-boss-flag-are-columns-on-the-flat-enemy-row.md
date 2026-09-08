@@ -3,7 +3,7 @@ Enemy rarity and boss flag are columns on the flat enemy row, not a new EnemyDef
 
 **Lens**: ARCH
 
-**Status**: planned
+**Status**: active
 
 **Description**
 `enemy.rarity` and `enemy.isBoss` are added directly to the existing flat
@@ -42,3 +42,9 @@ content file or table introduces an enemy definition/instance split.
 **Related**
 
 - [STR-011](../stories/STR-011-enemy-rarity-scales-hp-damage-and-drop-tables.md) — the story this decision serves
+
+## Changes
+
+- **2026-09-08** — Set active: implementation of STR-011 began.
+  The spec is authored and approved, so it now generates a traceable for the
+  code written in this increment to anchor against.

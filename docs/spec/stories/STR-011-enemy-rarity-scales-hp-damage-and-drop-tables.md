@@ -1,7 +1,7 @@
 **Title**
 Enemy rarity scales HP, damage, and drop tables
 
-**Status**: planned
+**Status**: active
 
 **Business Value**
 Every enemy today is the same fight at a different number: `CON-007`
