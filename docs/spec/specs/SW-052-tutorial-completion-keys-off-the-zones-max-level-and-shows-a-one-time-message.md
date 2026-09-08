@@ -3,7 +3,7 @@ Reaching a tutorial zone's max level for the first time shows a one-time centere
 
 **Lens**: SW
 
-**Status**: planned
+**Status**: active
 
 **Description**
 When a level-up (from an XP grant) pushes a character's level from below
@@ -42,3 +42,9 @@ who starts a life already at or above that level.
 
 - [CON-033](CON-033-tutorial-completion-stamps-on-death-once-the-characters-zone-appropriate-max-level-was-reached.md) — the separate, death-gated account milestone this message does not depend on
 - [SW-050](SW-050-xp-grant-returns-zero-at-or-above-the-zones-max-level.md) — the same threshold this message's trigger reads
+
+## Changes
+
+- **2026-09-08** — Set active: implementation of STR-014 began.
+  The spec is authored and approved, so it now generates a traceable for the
+  code written in this increment to anchor against.

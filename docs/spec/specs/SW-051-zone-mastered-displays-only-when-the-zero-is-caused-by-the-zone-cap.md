@@ -3,7 +3,7 @@
 
 **Lens**: SW
 
-**Status**: planned
+**Status**: active
 
 **Description**
 On a kill that grants zero XP, the client independently evaluates whether
@@ -41,3 +41,9 @@ cap killing a far-below-level mob still shows the existing `No XP`.
 
 - [SW-038](SW-038-enemy-level-renders-coloured-by-relative-difficulty-and-zero-reads-no-xp.md) — the existing `No XP` display this must not be confused with
 - [ARCH-011](ARCH-011-the-client-duplicates-compute-xp-reward-to-render-the-floating-number.md) — the client-duplication pattern this follows
+
+## Changes
+
+- **2026-09-08** — Set active: implementation of STR-014 began.
+  The spec is authored and approved, so it now generates a traceable for the
+  code written in this increment to anchor against.

@@ -2,7 +2,11 @@
 // Copyright (c) 2026 Timon Borter. See LICENSE at the repository root.
 
 import { describe, it, expect } from 'vitest';
-import { computeXpReward, type LevelDiffTuning } from './leveling';
+import {
+  computeXpReward,
+  computeKillXpReward,
+  type LevelDiffTuning,
+} from './leveling';
 import {
   verifies,
   ConTraceables,
@@ -94,6 +98,50 @@ verifies(
         expect(computeXpReward(BASE, 30, 1, strict)).toBe(
           Math.round(BASE * 1.1),
         );
+      });
+    });
+  },
+);
+
+/** Hollow Vale's ceiling, as content/zones.json authors it. */
+const ZONE_MAX = 10;
+
+verifies(
+  SwTraceables.SW_050_XP_GRANT_RETURNS_ZERO_AT_OR_ABOVE_THE_ZONES_MAX_LEVEL,
+  () => {
+    describe('computeKillXpReward', () => {
+      it('grants nothing at the zone ceiling, or above it', () => {
+        // Both kills would pay full base XP on the level-gap curve alone —
+        // the zero here can only be the ceiling.
+        expect(computeXpReward(BASE, ZONE_MAX, ZONE_MAX, CFG)).toBe(BASE);
+        expect(
+          computeKillXpReward(BASE, ZONE_MAX, ZONE_MAX, ZONE_MAX, CFG),
+        ).toBe(0);
+        expect(
+          computeKillXpReward(BASE, ZONE_MAX, ZONE_MAX + 5, ZONE_MAX, CFG),
+        ).toBe(0);
+      });
+
+      it('leaves the reward untouched one level below the ceiling', () => {
+        const playerLevel = ZONE_MAX - 1;
+        for (const monsterLevel of [1, 5, 9, 12]) {
+          expect(
+            computeKillXpReward(BASE, monsterLevel, playerLevel, ZONE_MAX, CFG),
+          ).toBe(computeXpReward(BASE, monsterLevel, playerLevel, CFG));
+        }
+      });
+
+      it('applies no ceiling at all when the zone is unknown', () => {
+        expect(
+          computeKillXpReward(BASE, ZONE_MAX, ZONE_MAX + 5, undefined, CFG),
+        ).toBe(computeXpReward(BASE, ZONE_MAX, ZONE_MAX + 5, CFG));
+      });
+
+      it('keeps the two zeros separable — a below-cap zero is still the level gap', () => {
+        // Nine levels above a level-1 mob, but under a maxLevel-20 ceiling:
+        // zero because of the gap, with the ceiling never reached.
+        expect(computeKillXpReward(BASE, 1, 9, 20, CFG)).toBe(0);
+        expect(computeXpReward(BASE, 1, 9, CFG)).toBe(0);
       });
     });
   },

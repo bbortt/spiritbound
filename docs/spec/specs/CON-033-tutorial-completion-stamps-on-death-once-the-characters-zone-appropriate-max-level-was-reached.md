@@ -3,7 +3,7 @@ Tutorial completion stamps on death once the character's zone-appropriate max le
 
 **Lens**: CON
 
-**Status**: planned
+**Status**: active
 
 **Description**
 On death, if the dying character's zone (at time of death) has
@@ -40,3 +40,11 @@ no re-toggle, exactly as `CON-008` already verifies for its own case.
 
 - [STR-014](../stories/STR-014-zone-mastery-stops-xp-and-graduates-tutorial-accounts.md) — the story delivering this decision
 - [CON-008](CON-008-first-reaching-level-ten-stamps-tutorial-completed-exactly-once.md) — superseded by this spec and marked `deprecated` at promotion; its hardcoded `character.level >= 10` is the literal this spec replaces with `zone.maxLevel`
+
+## Changes
+
+- **2026-09-08** — Set active: implementation of STR-014 began.
+  The spec is authored and approved, so it now generates a traceable for the
+  code written in this increment to anchor against.
+  The `_handleDeath` anchor `CON-008` was kept alive to carry now points here
+  instead, so no live anchor names the deprecated spec any more.

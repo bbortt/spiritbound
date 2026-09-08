@@ -3,7 +3,7 @@ XP grant returns zero once the character is at or above the zone's max level
 
 **Lens**: SW
 
-**Status**: planned
+**Status**: active
 
 **Description**
 Before computing any XP reward for a kill, the character's current
@@ -37,3 +37,9 @@ this check.
 **Related**
 
 - [SW-036](SW-036-xp-falls-off-linearly-between-the-full-xp-band-and-the-zero-cutoff.md) — the level-gap zero case this zone-cap check is independent of
+
+## Changes
+
+- **2026-09-08** — Set active: implementation of STR-014 began.
+  The spec is authored and approved, so it now generates a traceable for the
+  code written in this increment to anchor against.

@@ -16,6 +16,7 @@ import type {
   ItemDrop,
   ItemInstance,
   EquippedItem,
+  Zone,
 } from '../db';
 import { CollectionPanel } from '../ui/CollectionPanel';
 import { InventoryPanel } from '../ui/InventoryPanel';
@@ -23,7 +24,11 @@ import { CharacterSheet } from '../ui/CharacterSheet';
 import { computeEffectiveStats } from '../effectiveStats';
 import { xpProgress } from '../levelCurve';
 import { enemyLevelColor } from '../enemyLevelBand';
-import { rewardForKill } from '../xpReward';
+import {
+  classifyKillXp,
+  crossedZoneMastery,
+  type KillXpDisplay,
+} from '../zoneMastery';
 
 // ── Tilemap constants ─────────────────────────────────────────────────────────
 const TILE_SIZE = 48;
@@ -327,6 +332,13 @@ export class GameScene extends Phaser.Scene {
   private deathOverlay!: Phaser.GameObjects.Graphics;
   private deathSummaryText: Phaser.GameObjects.Text | null = null;
 
+  // Zones — the local character's row carries the level ceiling the XP text
+  // and the mastery message both read. `masteredShownFor` is deliberately
+  // client-side and per-character: the crossing it guards can only happen
+  // once per character anyway, so nothing needs persisting.
+  private _zones = new Map<number, Zone>();
+  private masteredShownFor = new Set<bigint>();
+
   // Card lifecycle
   private collectionPanel!: CollectionPanel;
   private spiritPanel!: CollectionPanel;
@@ -429,10 +441,7 @@ export class GameScene extends Phaser.Scene {
     this.conn = connect(this._tokenStore(), (conn) => {
       if (!this.localCharacter) {
         callReducer('startLife', () =>
-          conn.reducers.startLife({
-            spiritName: 'your spirit',
-            startZoneId: 1,
-          }),
+          conn.reducers.startLife({ spiritName: 'your spirit' }),
         );
       }
     });
@@ -456,6 +465,10 @@ export class GameScene extends Phaser.Scene {
     );
     this.conn.db.cardDefinition.onUpdate?.((_ctx, _old, row) =>
       this._onCardDefRow(row),
+    );
+    this.conn.db.zone.onInsert((_ctx, row) => this._zones.set(row.zoneId, row));
+    this.conn.db.zone.onUpdate?.((_ctx, _old, row) =>
+      this._zones.set(row.zoneId, row),
     );
 
     this.conn.db.cardDrop.onInsert((_ctx, row) => this._onDropInsert(row));
@@ -676,7 +689,10 @@ export class GameScene extends Phaser.Scene {
         // lastLevelUpAt is the server's official level-up signal; comparing
         // level numbers directly is equivalent (the server always bumps both
         // together) and sidesteps Timestamp equality checks.
-        if (row.level > old.level) this._triggerLevelUp(old.level, row.level);
+        if (row.level > old.level) {
+          this._triggerLevelUp(old.level, row.level);
+          this._maybeShowZoneMastered(old.level, row);
+        }
       }
 
       // Enemy level colours are relative to the player, so they restate
@@ -853,11 +869,16 @@ export class GameScene extends Phaser.Scene {
 
     if (!row.alive && old.alive) {
       // The row no longer carries the reward — it depends on who killed it, so
-      // the client recomputes it from the same curve the server used.
+      // the client recomputes it from the same curve and the same zone ceiling
+      // the server granted through.
       this._showFloatingXp(
         data.x,
         data.y - ENEMY_R - 20,
-        rewardForKill(data.level, this.localCharacter?.level ?? 1),
+        classifyKillXp(
+          data.level,
+          this.localCharacter?.level ?? 1,
+          this._localZone(),
+        ),
       );
 
       // Death: cancel telegraph, flash white and fade
@@ -1462,16 +1483,35 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
-   * Floating "+N XP" text over an enemy corpse — same style as damage numbers,
-   * yellow. A zero reward reads grey "No XP" rather than "+0 XP": zero is a
-   * category ("this is beneath you"), not a quantity.
+   * The zone row the local character is standing in, if it has arrived.
+   *
+   * The server refuses a kill whose enemy is in another zone (see
+   * index.ts#damageEnemy), so this is also the zone every kill is scored
+   * against — the client does not need to track the corpse's zone separately.
    */
-  private _showFloatingXp(x: number, y: number, amount: number) {
-    const noXp = amount <= 0;
+  private _localZone(): Zone | undefined {
+    const zoneId = this.localCharacter?.zoneId;
+    return zoneId === undefined ? undefined : this._zones.get(zoneId);
+  }
+
+  /**
+   * Floating XP text over an enemy corpse — same style as damage numbers,
+   * yellow. Zero is a category rather than a quantity, so it reads as words
+   * instead of "+0 XP", and which words depends on why it is zero: grey
+   * "Zone mastered" when the killer has out-levelled the zone entirely, grey
+   * "No XP" when this one mob was simply beneath them.
+   */
+  private _showFloatingXp(x: number, y: number, display: KillXpDisplay) {
+    const label =
+      display.kind === 'granted'
+        ? `+${display.amount} XP`
+        : display.kind === 'zoneMastered'
+          ? 'Zone mastered'
+          : 'No XP';
     const txt = this.add
-      .text(x, y, noXp ? 'No XP' : `+${amount} XP`, {
+      .text(x, y, label, {
         fontSize: '16px',
-        color: noXp ? '#888888' : '#ffdd55',
+        color: display.kind === 'granted' ? '#ffdd55' : '#888888',
         fontFamily: 'monospace',
         stroke: '#000000',
         strokeThickness: 2,
@@ -1580,6 +1620,53 @@ export class GameScene extends Phaser.Scene {
 
       this._flashHandSlot(oldSlots.active); // 0-indexed: the newly unlocked slot
     }
+  }
+
+  /**
+   * The one-time "this zone has nothing left to teach you" message, shown on
+   * the level-up that first carries a character to a tutorial zone's ceiling.
+   *
+   * It rides the level-up rather than the death that stamps the account flag,
+   * so a player is told the moment it happens. The wording is the zone's, not
+   * the client's: a zone with no `masteredMessage` authored simply says
+   * nothing, the same as a zone whose row has not arrived.
+   */
+  private _maybeShowZoneMastered(oldLevel: number, row: Character) {
+    if (this.masteredShownFor.has(row.characterId)) return;
+    const zone = this._zones.get(row.zoneId);
+    if (!crossedZoneMastery(oldLevel, row.level, zone)) return;
+    const message = zone?.masteredMessage;
+    if (!message) return;
+    this.masteredShownFor.add(row.characterId);
+
+    // Sits below the "LEVEL N" flourish firing on the same update, so both
+    // read as one moment rather than overprinting each other.
+    const txt = this.add
+      .text(
+        this.cameras.main.width / 2,
+        this.cameras.main.height / 2 + 24,
+        message,
+        {
+          fontSize: '22px',
+          color: '#cbb9ff',
+          fontFamily: 'monospace',
+          stroke: '#000000',
+          strokeThickness: 4,
+          align: 'center',
+        },
+      )
+      .setOrigin(0.5)
+      .setScrollFactor(0)
+      .setDepth(30)
+      .setAlpha(0);
+    this.tweens.add({
+      targets: txt,
+      alpha: 1,
+      duration: 400,
+      yoyo: true,
+      hold: 2400,
+      onComplete: () => txt.destroy(),
+    });
   }
 
   /** Briefly flash the outline of one active-hand-slot rectangle (see _drawCardSlots). */
@@ -1715,10 +1802,7 @@ export class GameScene extends Phaser.Scene {
     this.returnBtn.on('pointerdown', () => {
       this.returnBtn.setVisible(false);
       callReducer('startLife', () =>
-        this.conn.reducers.startLife({
-          spiritName: 'your spirit',
-          startZoneId: 1,
-        }),
+        this.conn.reducers.startLife({ spiritName: 'your spirit' }),
       );
     });
   }

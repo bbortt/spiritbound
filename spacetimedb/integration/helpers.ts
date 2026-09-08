@@ -101,10 +101,7 @@ export async function createTestCharacter(
   spiritName = 'IntegrationTestSpirit',
 ): Promise<TestCharacter> {
   const identity = await mintIdentity();
-  await callReducer(identity.token, 'start_life', {
-    spiritName,
-    startZoneId: 1,
-  });
+  await callReducer(identity.token, 'start_life', { spiritName });
 
   const { x, y } = nextSector();
   await callReducer(identity.token, 'move', { x, y });
