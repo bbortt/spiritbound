@@ -1,7 +1,7 @@
 **Title**
 Population-driven spawn allocation is pure, testable rule logic
 
-**Status**: planned
+**Status**: active
 
 **Business Value**
 The map today has no notion of "enough" or "too many" enemies — mobs sit
