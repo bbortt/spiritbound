@@ -9,12 +9,16 @@ import {
   type AlgebraicTypeType as __AlgebraicTypeType,
   type Infer as __Infer,
 } from 'spacetimedb';
-import { ShapeType, AggroState } from './types';
+import { Rarity, ShapeType, AggroState } from './types';
 
 export default __t.row({
   enemyId: __t.u64().primaryKey().name('enemy_id'),
   zoneId: __t.u32().name('zone_id'),
   level: __t.u32(),
+  get rarity() {
+    return Rarity;
+  },
+  isBoss: __t.bool().name('is_boss'),
   posX: __t.f32().name('pos_x'),
   posY: __t.f32().name('pos_y'),
   spawnX: __t.f32().name('spawn_x'),

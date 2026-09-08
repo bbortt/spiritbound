@@ -17,4 +17,6 @@ export default __t.row({
   recommendedLevel: __t.u32().name('recommended_level'),
   maxLevel: __t.u32().name('max_level'),
   description: __t.string(),
+  tutorialZone: __t.bool().name('tutorial_zone'),
+  masteredMessage: __t.option(__t.string()).name('mastered_message'),
 });
