@@ -49,7 +49,7 @@ import {
   SACRIFICE_XP,
   type CardForRetention,
 } from './rules/death';
-import { computeXpReward } from './rules/leveling';
+import { computeKillXpReward } from './rules/leveling';
 
 import { resolveHit, resolveHeal } from './rules/combat';
 import { EMPTY_STAT_BLOCK, type StatBlock } from './types';
@@ -1041,9 +1041,15 @@ function _seedZone1Enemies(ctx: any): void {
 // REDUCERS — character lifecycle
 // ═══════════════════════════════════════════════════════════════════════════════
 
-export const startLife = db.reducer(
-  { spiritName: t.string(), startZoneId: t.u32() },
-  (ctx, { spiritName, startZoneId }) => {
+/** Hollow Vale — where an account that has not finished the tutorial belongs. */
+const TUTORIAL_ZONE_ID = 1;
+
+/** Where a graduated account belongs once that zone is authored and seeded. */
+const GRADUATE_ZONE_ID = 2;
+
+export const startLife = realizes(
+  SwTraceables.SW_053_STARTLIFE_COMPUTES_THE_START_ZONE_FROM_TUTORIAL_COMPLETION_NOT_CALLER_INPUT,
+  db.reducer({ spiritName: t.string() }, (ctx, { spiritName }) => {
     if (activeCharacter(ctx))
       throw new SenderError('Already has an active character');
 
@@ -1066,6 +1072,19 @@ export const startLife = db.reducer(
     }
 
     const startLevel = progress.tutorialCompleted ? 10 : 1;
+    // Which zone a life begins in is the server's decision, exactly as the
+    // starting level above it is — a graduated account moves on from the
+    // tutorial zone, a new one starts in it, and neither is the caller's to
+    // choose. The routing itself is already final: the fallback is keyed on
+    // whether the graduate zone is actually seeded, so it stops applying by
+    // itself rather than needing this code changed again.
+    // TODO: author zone 2's content — until it is seeded, a graduated account
+    // restarts in the tutorial zone at its ceiling and so earns no XP there.
+    const graduatedZone = ctx.db.zone.zoneId.find(GRADUATE_ZONE_ID);
+    const startZoneId =
+      progress.tutorialCompleted && graduatedZone
+        ? GRADUATE_ZONE_ID
+        : TUTORIAL_ZONE_ID;
     ctx.db.character.insert({
       characterId: 0n,
       accountIdentity: ctx.sender,
@@ -1113,7 +1132,7 @@ export const startLife = db.reducer(
         }
       }
     }
-  },
+  }),
 );
 
 export const move = db.reducer({ x: t.f32(), y: t.f32() }, (ctx, { x, y }) => {
@@ -1154,7 +1173,7 @@ const _handleDeath = concerns(
   realizes(
     [
       SwTraceables.SW_026_DEATH_ALWAYS_DESTROYS_GEAR_AND_A_SPIRITLESS_ACCOUNT_LOSES_EVERY_CARD,
-      ConTraceables.CON_008_FIRST_REACHING_LEVEL_TEN_STAMPS_TUTORIAL_COMPLETED_EXACTLY_ONCE,
+      ConTraceables.CON_033_TUTORIAL_COMPLETION_STAMPS_ON_DEATH_ONCE_THE_CHARACTERS_ZONE_APPROPRIATE_MAX_LEVEL_WAS_REACHED,
     ] as const,
     function _handleDeath(ctx: any, char: any): void {
       ctx.db.character.characterId.update({
@@ -1217,10 +1236,22 @@ const _handleDeath = concerns(
         ctx.db.cardInstance.cardInstanceId.delete(id);
       }
 
+      // Graduating the account is the tutorial zone's call, at whatever level
+      // that zone is authored to end at — not a literal repeated here. A death
+      // in any other zone, at any level, leaves the flag alone; the flip stays
+      // death-gated and still happens at most once, since it is guarded on the
+      // flag being false.
       const progress = ctx.db.accountProgress.accountIdentity.find(
         char.accountIdentity,
       );
-      if (progress && char.level >= 10 && !progress.tutorialCompleted) {
+      const deathZone = ctx.db.zone.zoneId.find(char.zoneId);
+      if (
+        progress &&
+        deathZone &&
+        deathZone.tutorialZone &&
+        char.level >= deathZone.maxLevel &&
+        !progress.tutorialCompleted
+      ) {
         ctx.db.accountProgress.accountIdentity.update({
           ...progress,
           tutorialCompleted: true,
@@ -1585,11 +1616,15 @@ export const damageEnemy = realizes(
             enemyId: e.enemyId,
           });
           // Reward scales with the gap between the killer and what they killed:
-          // trivial mobs pay nothing, above-level mobs pay a capped bonus.
-          const xp = computeXpReward(
+          // trivial mobs pay nothing, above-level mobs pay a capped bonus — and
+          // a killer who has out-levelled the enemy's whole zone earns nothing
+          // there at all, checked ahead of the curve rather than clamped after.
+          const killZone = ctx.db.zone.zoneId.find(e.zoneId);
+          const xp = computeKillXpReward(
             CONFIG.xp.baseMonsterXp,
             e.level,
             char.level,
+            killZone?.maxLevel,
             CONFIG.xp.levelDiffPenalty,
           );
           if (xp > 0) _grantXp(ctx, char, BigInt(xp));

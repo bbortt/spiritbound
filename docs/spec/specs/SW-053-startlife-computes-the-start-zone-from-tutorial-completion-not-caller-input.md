@@ -3,7 +3,7 @@ startLife computes the start zone from tutorial completion, not caller input
 
 **Lens**: SW
 
-**Status**: planned
+**Status**: active
 
 **Description**
 `startLife` computes the character's starting `zoneId` itself from
@@ -34,3 +34,9 @@ zone 2 doesn't exist), and does not throw or route to a missing zone.
 **Realizes**
 
 - [SYS-011](SYS-011-xp-and-drop-eligibility-scale-with-the-enemys-own-level.md)
+
+## Changes
+
+- **2026-09-08** — Set active: implementation of STR-014 began.
+  The spec is authored and approved, so it now generates a traceable for the
+  code written in this increment to anchor against.

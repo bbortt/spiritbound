@@ -12,5 +12,4 @@ import {
 
 export default {
   spiritName: __t.string(),
-  startZoneId: __t.u32(),
 };

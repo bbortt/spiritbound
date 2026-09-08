@@ -1,7 +1,7 @@
 **Title**
 Reaching a zone's max level stops its XP and graduates tutorial accounts onward
 
-**Status**: planned
+**Status**: active
 
 **Business Value**
 Without a ceiling, a player can keep farming a zone's mobs indefinitely
