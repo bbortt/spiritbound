@@ -3,7 +3,7 @@ Reaching level 10 stamps accountProgress.tutorialCompleted exactly once, on deat
 
 **Lens**: CON
 
-**Status**: active
+**Status**: deprecated
 
 **Description**
 On death, if the dying character's level was >= 10 and
@@ -30,3 +30,23 @@ double-counted.
 **Realizes**
 
 - [SYS-006](SYS-006-death-destroys-gear-and-un-attuned-cards-keeps-only-what-was-attuned.md)
+
+**Related**
+
+- [CON-033](CON-033-tutorial-completion-stamps-on-death-once-the-characters-zone-appropriate-max-level-was-reached.md) — supersedes this spec, keeping the mechanism and replacing the literal `10` with `zone.maxLevel`
+
+## Changes
+
+- **2026-09-08** — Deprecated by STR-014, superseded by `CON-033`.
+  The
+  death-gated, flips-at-most-once mechanism this spec pins is unchanged and
+  survives verbatim in `CON-033`; only its threshold moves.
+  The hardcoded
+  `character.level >= 10` duplicated a number that now has a single source
+  of truth (`hollow-vale.maxLevel` in `content/zones.json`), and the check
+  is additionally scoped to a `tutorialZone: true` zone so that reaching a
+  future high-level zone's cap does not graduate an account out of
+  new-player status.
+  Kept `deprecated` rather than removed so the existing
+  anchor in `spacetimedb/src/index.ts` keeps building until STR-014 re-points
+  it at `CON-033`; do not add new anchors to this spec.
