@@ -5,6 +5,7 @@ import { describe, it, expect } from 'vitest';
 import {
   pickWeightedRarity,
   pickLevelAndRarityGated,
+  shiftRarityWeightsForMob,
   RARITY_DROP_ORDER,
   type RarityWeights,
 } from './drops';
@@ -109,3 +110,98 @@ verifies(
     });
   },
 );
+
+/** Every mob rarity that is not the `common` baseline — all get the same shift. */
+const NON_COMMON: readonly Rarity[] = [
+  'uncommon',
+  'rare',
+  'epic',
+  'legendary',
+] as const;
+
+verifies(
+  SwTraceables.SW_040_A_NON_COMMON_MOB_SHIFTS_ITS_DROP_WEIGHTS_TOWARD_HIGHER_RARITY_TIERS,
+  () => {
+    describe('shiftRarityWeightsForMob', () => {
+      it('returns the table untouched for a common mob', () => {
+        expect(shiftRarityWeightsForMob(CARD_WEIGHTS, 'common')).toBe(
+          CARD_WEIGHTS,
+        );
+      });
+
+      it('zeroes common and still sums to 1.0 for every non-common mob', () => {
+        for (const mobRarity of NON_COMMON) {
+          const shifted = shiftRarityWeightsForMob(CARD_WEIGHTS, mobRarity);
+          expect(shifted.common).toBe(0);
+          const sum = RARITY_DROP_ORDER.reduce((acc, r) => acc + shifted[r], 0);
+          expect(sum).toBeCloseTo(1, 10);
+        }
+      });
+
+      it('keeps the surviving tiers in their original relative proportion', () => {
+        const shifted = shiftRarityWeightsForMob(CARD_WEIGHTS, 'rare');
+        // 0.25 : 0.12 : 0.03 before, so the same ratios after.
+        expect(shifted.uncommon / shifted.rare).toBeCloseTo(
+          CARD_WEIGHTS.uncommon / CARD_WEIGHTS.rare,
+          10,
+        );
+        expect(shifted.rare / shifted.epic).toBeCloseTo(
+          CARD_WEIGHTS.rare / CARD_WEIGHTS.epic,
+          10,
+        );
+      });
+
+      it('raises every surviving tier — the point of the shift', () => {
+        const shifted = shiftRarityWeightsForMob(CARD_WEIGHTS, 'uncommon');
+        for (const rarity of ['uncommon', 'rare', 'epic'] as const) {
+          expect(shifted[rarity]).toBeGreaterThan(CARD_WEIGHTS[rarity]);
+        }
+      });
+
+      it('leaves a tier that was already 0 at 0, for every mob rarity', () => {
+        for (const mobRarity of NON_COMMON) {
+          expect(
+            shiftRarityWeightsForMob(CARD_WEIGHTS, mobRarity).legendary,
+          ).toBe(0);
+        }
+      });
+
+      it('does not mutate the table it was handed', () => {
+        const before = { ...CARD_WEIGHTS };
+        shiftRarityWeightsForMob(CARD_WEIGHTS, 'epic');
+        expect(CARD_WEIGHTS).toEqual(before);
+      });
+
+      it('returns an all-common table unchanged rather than dividing by zero', () => {
+        const allCommon: RarityWeights = {
+          common: 1,
+          uncommon: 0,
+          rare: 0,
+          epic: 0,
+          legendary: 0,
+        };
+        expect(shiftRarityWeightsForMob(allCommon, 'epic')).toBe(allCommon);
+      });
+    });
+  },
+);
+
+/**
+ * The shift is a second code path into the drop roll, so the fixed-at-zero
+ * legendary guarantee has to be re-proved through it: the original sweep only
+ * ever saw the unshifted table. A shift that handed legendary any weight at all
+ * would make a boss kill a legendary source without the constraint that forbids
+ * it ever being revisited.
+ */
+verifies(ConTraceables.CON_004_LEGENDARY_DROP_WEIGHT_IS_ZERO, () => {
+  describe('CON-004 — legendary through the mob-rarity shift', () => {
+    it('never rolls legendary off a shifted table, at any mob rarity', () => {
+      for (const mobRarity of NON_COMMON) {
+        const shifted = shiftRarityWeightsForMob(CARD_WEIGHTS, mobRarity);
+        for (const roll of [0, 0.1, 0.5, 0.85, 0.97, 0.999, 0.9999999]) {
+          expect(pickWeightedRarity(roll, shifted)).not.toBe('legendary');
+        }
+      }
+    });
+  });
+});

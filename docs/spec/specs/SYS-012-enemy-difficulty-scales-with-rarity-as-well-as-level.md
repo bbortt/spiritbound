@@ -3,7 +3,7 @@ Enemy difficulty scales with rarity as well as level
 
 **Lens**: SYS
 
-**Status**: planned
+**Status**: active
 
 **Description**
 An enemy's combat stats (HP, damage) and the rarity floor of its drop
@@ -30,3 +30,9 @@ verifiable by unit test.
 
 - [STR-011](../stories/STR-011-enemy-rarity-scales-hp-damage-and-drop-tables.md) — the story delivering this capability
 - [SYS-011](SYS-011-xp-and-drop-eligibility-scale-with-the-enemys-own-level.md) — the sibling level-scaling capability this extends with a second axis
+
+## Changes
+
+- **2026-09-08** — Set active: implementation of STR-011 began.
+  The spec is authored and approved, so it now generates a traceable for the
+  code written in this increment to anchor against.

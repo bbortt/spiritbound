@@ -3,7 +3,7 @@ Rarity multipliers cover every rarity at or above one, increasing by tier
 
 **Lens**: CON
 
-**Status**: planned
+**Status**: active
 
 **Description**
 `content/config.json`'s `enemies.rarityMultipliers` must define an
@@ -36,3 +36,9 @@ earlier tier's, is rejected.
 **Realizes**
 
 - [SYS-012](SYS-012-enemy-difficulty-scales-with-rarity-as-well-as-level.md)
+
+## Changes
+
+- **2026-09-08** — Set active: implementation of STR-011 began.
+  The spec is authored and approved, so it now generates a traceable for the
+  code written in this increment to anchor against.

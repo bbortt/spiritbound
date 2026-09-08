@@ -3,7 +3,7 @@ A non-common mob shifts its drop weights toward higher rarity tiers
 
 **Lens**: SW
 
-**Status**: planned
+**Status**: active
 
 **Description**
 Given a base rarity-weight table and a mob's own rarity, a pure function
@@ -46,3 +46,9 @@ input; a table whose `legendary` weight is 0 before the shift still has
 - [CON-004](CON-004-legendary-drop-weight-is-zero.md) — unaffected by this shift, see Rationale
 - [CON-005](CON-005-empty-rarity-tier-falls-back-to-full-pool-empty-pool-drops-nothing.md) — the fallback that still applies to the shifted table
 - [SW-017](SW-017-a-rarity-tier-is-weight-picked-then-sampled-within-tier.md) — the roll this shifted table feeds into
+
+## Changes
+
+- **2026-09-08** — Set active: implementation of STR-011 began.
+  The spec is authored and approved, so it now generates a traceable for the
+  code written in this increment to anchor against.

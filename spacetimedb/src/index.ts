@@ -466,36 +466,50 @@ const itemDrop = table(
  * and resets back to its spawn point (healing as it goes) if it loses its target.
  * spawnX/spawnY stores the original position so the respawn/reset logic can reset.
  */
-const enemy = table(
-  {
-    name: 'enemy',
-    public: true,
-    indexes: [{ accessor: 'by_zone', algorithm: 'btree', columns: ['zoneId'] }],
-  },
-  {
-    enemyId: t.u64().primaryKey().autoInc(),
-    zoneId: t.u32(),
-    /** Set on spawn. Drives the XP reward and the drop-pool level gate. */
-    level: t.u32(),
-    posX: t.f32(),
-    posY: t.f32(),
-    spawnX: t.f32(),
-    spawnY: t.f32(),
-    currentHp: t.i32(),
-    maxHp: t.i32(),
-    alive: t.bool(),
-    damagePerHit: t.i32(),
-    attackRangePx: t.f32(),
-    attackCooldownSeconds: t.f32(),
-    lastAttackAt: t.option(t.timestamp()),
-    aggroState: TAggroState,
-    targetCharacterId: t.option(t.u64()),
-    lastSeenTargetAt: t.option(t.timestamp()),
-    castStartedAt: t.option(t.timestamp()),
-    castDurationSeconds: t.f32(),
-    castShape: TShape,
-    castDamage: t.i32(),
-  },
+const enemy = realizes(
+  ArchTraceables.ARCH_012_ENEMY_RARITY_AND_BOSS_FLAG_ARE_COLUMNS_ON_THE_FLAT_ENEMY_ROW,
+  table(
+    {
+      name: 'enemy',
+      public: true,
+      indexes: [
+        { accessor: 'by_zone', algorithm: 'btree', columns: ['zoneId'] },
+      ],
+    },
+    {
+      enemyId: t.u64().primaryKey().autoInc(),
+      zoneId: t.u32(),
+      /** Set on spawn. Drives the XP reward and the drop-pool level gate. */
+      level: t.u32(),
+      /**
+       * The second difficulty axis beside level: scales maxHp/damage through
+       * computeEnemyStats and raises the drop table's floor through
+       * shiftRarityWeightsForMob. Nothing rolls this at spawn time yet — every
+       * enemy is seeded `common` until the spawn director lands.
+       */
+      rarity: TRarity,
+      /** Zone-boss marker. No boss spawns yet; the boss cycle owns this. */
+      isBoss: t.bool(),
+      posX: t.f32(),
+      posY: t.f32(),
+      spawnX: t.f32(),
+      spawnY: t.f32(),
+      currentHp: t.i32(),
+      maxHp: t.i32(),
+      alive: t.bool(),
+      damagePerHit: t.i32(),
+      attackRangePx: t.f32(),
+      attackCooldownSeconds: t.f32(),
+      lastAttackAt: t.option(t.timestamp()),
+      aggroState: TAggroState,
+      targetCharacterId: t.option(t.u64()),
+      lastSeenTargetAt: t.option(t.timestamp()),
+      castStartedAt: t.option(t.timestamp()),
+      castDurationSeconds: t.f32(),
+      castShape: TShape,
+      castDamage: t.i32(),
+    },
+  ),
 );
 
 // Row schema for card-drop cleanup schedule
@@ -975,6 +989,17 @@ const ZONE_1_ENEMY_LEVEL = concerns(
   2,
 );
 
+/**
+ * Every enemy this module inserts today is a plain trash mob. Nothing rolls a
+ * rarity or promotes a boss yet — the spawn director and the boss cycle own
+ * that — so both insert sites seed the baseline explicitly rather than letting
+ * the two new columns drift apart.
+ */
+const SEEDED_ENEMY_RARITY = concerns(
+  SysTraceables.SYS_012_ENEMY_DIFFICULTY_SCALES_WITH_RARITY_AS_WELL_AS_LEVEL,
+  { tag: 'common' } as const,
+);
+
 function _seedZone1Enemies(ctx: any): void {
   const TILE = 48;
   const half = TILE / 2;
@@ -988,6 +1013,8 @@ function _seedZone1Enemies(ctx: any): void {
       enemyId: 0n,
       zoneId: 1,
       level: ZONE_1_ENEMY_LEVEL,
+      rarity: SEEDED_ENEMY_RARITY,
+      isBoss: false,
       posX: pos.x,
       posY: pos.y,
       spawnX: pos.x,
@@ -1459,6 +1486,8 @@ export const spawnEnemy = db.reducer(
       enemyId: 0n,
       zoneId,
       level: level > 0 ? level : ZONE_1_ENEMY_LEVEL,
+      rarity: SEEDED_ENEMY_RARITY,
+      isBoss: false,
       posX: x,
       posY: y,
       spawnX: x,

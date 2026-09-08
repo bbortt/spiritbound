@@ -3,7 +3,7 @@ computeEnemyStats scales HP and damage by level and a rarity multiplier
 
 **Lens**: SW
 
-**Status**: planned
+**Status**: active
 
 **Description**
 `computeEnemyStats(baseHp, baseDamage, level, rarity, multipliers)` is a
@@ -35,3 +35,9 @@ both HP and damage by the expected factor; scaling is linear in level
 **Realizes**
 
 - [SYS-012](SYS-012-enemy-difficulty-scales-with-rarity-as-well-as-level.md)
+
+## Changes
+
+- **2026-09-08** — Set active: implementation of STR-011 began.
+  The spec is authored and approved, so it now generates a traceable for the
+  code written in this increment to anchor against.

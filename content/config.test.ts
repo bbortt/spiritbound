@@ -211,3 +211,65 @@ verifies(
     });
   },
 );
+
+/**
+ * The multiplier table is what makes a rare or epic spawn a materially harder
+ * fight rather than a recoloured common one. Both bounds matter: below 1.0 a
+ * higher rarity would be *weaker* than common, and a flat step would make two
+ * rarities indistinguishable in play. Only the schema holds this — the values
+ * live in an operator-editable file, out of the compiler's reach.
+ */
+verifies(
+  ConTraceables.CON_026_RARITY_MULTIPLIERS_COVER_EVERY_RARITY_AT_OR_ABOVE_ONE_INCREASING_BY_TIER,
+  () => {
+    describe('CON-026 — enemy rarity multipliers', () => {
+      it('ships an at-or-above-1.0, strictly increasing table for all five rarities', () => {
+        const multipliers = config.enemies.rarityMultipliers;
+        expect(Object.keys(multipliers).sort()).toEqual([...RARITIES].sort());
+        expect(multipliers.common).toEqual({ hp: 1, damage: 1 });
+
+        for (const axis of ['hp', 'damage'] as const) {
+          for (let i = 0; i < RARITIES.length; i++) {
+            expect(multipliers[RARITIES[i]][axis]).toBeGreaterThanOrEqual(1);
+            if (i > 0) {
+              expect(multipliers[RARITIES[i]][axis]).toBeGreaterThan(
+                multipliers[RARITIES[i - 1]][axis],
+              );
+            }
+          }
+        }
+      });
+
+      it('rejects a multiplier below 1.0 on either axis', () => {
+        const weakHp = mutable();
+        weakHp.enemies.rarityMultipliers.common.hp = 0.9;
+        expect(validateConfig(weakHp).valid).toBe(false);
+
+        const weakDamage = mutable();
+        weakDamage.enemies.rarityMultipliers.common.damage = 0;
+        expect(validateConfig(weakDamage).valid).toBe(false);
+      });
+
+      it('rejects a tier that does not out-scale the tier below it', () => {
+        const equal = mutable();
+        equal.enemies.rarityMultipliers.rare.hp =
+          equal.enemies.rarityMultipliers.uncommon.hp;
+        const { valid, errors } = validateConfig(equal);
+        expect(valid).toBe(false);
+        expect(errors.join('\n')).toMatch(
+          /rare\.hp \(2\.5\) must be greater than uncommon\.hp \(2\.5\)/,
+        );
+
+        const inverted = mutable();
+        inverted.enemies.rarityMultipliers.legendary.damage = 1.1;
+        expect(validateConfig(inverted).valid).toBe(false);
+      });
+
+      it('rejects a table missing a rarity entirely', () => {
+        const incomplete = mutable();
+        delete incomplete.enemies.rarityMultipliers.epic;
+        expect(validateConfig(incomplete).valid).toBe(false);
+      });
+    });
+  },
+);
