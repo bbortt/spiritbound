@@ -48,6 +48,7 @@ import RespawnEnemyReducer from './respawn_enemy_reducer';
 import SacrificeCardReducer from './sacrifice_card_reducer';
 import SeedCardsReducer from './seed_cards_reducer';
 import SeedItemsReducer from './seed_items_reducer';
+import SeedZonesReducer from './seed_zones_reducer';
 import SpawnEnemyReducer from './spawn_enemy_reducer';
 import StartLifeReducer from './start_life_reducer';
 import ToggleAttuneReducer from './toggle_attune_reducer';
@@ -504,6 +505,7 @@ const reducersSchema = __reducers(
   __reducerSchema('sacrifice_card', SacrificeCardReducer),
   __reducerSchema('seed_cards', SeedCardsReducer),
   __reducerSchema('seed_items', SeedItemsReducer),
+  __reducerSchema('seed_zones', SeedZonesReducer),
   __reducerSchema('spawn_enemy', SpawnEnemyReducer),
   __reducerSchema('start_life', StartLifeReducer),
   __reducerSchema('toggle_attune', ToggleAttuneReducer),
