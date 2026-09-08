@@ -3,7 +3,7 @@ A zone's population floor across occupied bands can never exceed its max
 
 **Lens**: CON
 
-**Status**: planned
+**Status**: active
 
 **Description**
 A zone's `population` config must satisfy `population.min <= population.max`,
@@ -39,3 +39,9 @@ the configured max.
 **Related**
 
 - [CON-019](CON-019-zone-level-bands-partition-the-zones-level-range-with-no-gap-or-overlap.md) — the band count this check multiplies against
+
+## Changes
+
+- **2026-09-08** — Set active: implementation of STR-010 began.
+  The spec is authored and approved, so it now generates a traceable for the
+  code written in this increment to anchor against.

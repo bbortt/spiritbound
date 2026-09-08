@@ -34,6 +34,10 @@ import { parseEquipment } from '../../content/validateEquipment';
 import configJson from '../../content/config.json';
 import { parseConfig } from '../../content/validateConfig';
 
+// @ts-ignore — JSON import resolved by esbuild; zonesLoader.ts (node:fs) is tree-shaken from this bundle
+import zonesJson from '../../content/zones.json';
+import { parseZones } from '../../content/validateZones';
+
 import {
   computeSpiritLevel,
   computeAttunementSlots,
@@ -201,6 +205,11 @@ const zone = table(
     recommendedLevel: t.u32(),
     maxLevel: t.u32(),
     description: t.string(),
+    // The remaining zones.json fields (population/director/boss/levelBands/
+    // spawnRarities) stay server-side content; these two are here because the
+    // client reads them off the row it already subscribes to.
+    tutorialZone: t.bool(),
+    masteredMessage: t.option(t.string()),
   },
 );
 
@@ -559,6 +568,9 @@ const CARD_DEFS = parseCards(cardsJson as unknown[]);
 // Validate equipment data at module load — module refuses to start if equipment.json is invalid.
 const ITEM_DEFS = parseEquipment(equipmentJson as unknown[]);
 
+// Validate zone data at module load — module refuses to start if zones.json is invalid.
+const ZONE_DEFS = parseZones(zonesJson as unknown[]);
+
 // An item's `stats` in equipment.json is a partial StatBlock (only the fields it grants).
 // Missing fields default to 0 — these are additive MODIFIERS, not a character's base stats,
 // so (unlike a fresh character) an absent multiplier field means "no change", not "1.0".
@@ -608,10 +620,11 @@ export const onConnect = db.clientConnected((ctx) => {
   }
 });
 
-/** Runs once when the module is first published. Seeds cards/items + enemies and starts the damage ticker. */
+/** Runs once when the module is first published. Seeds cards/items/zones + enemies and starts the damage ticker. */
 export const init = db.init((ctx) => {
   _doSeedCards(ctx);
   _doSeedItems(ctx);
+  _doSeedZones(ctx);
   _seedZone1Enemies(ctx);
   ctx.db.enemyTickSchedule.insert({
     scheduledId: 0n,
@@ -731,6 +744,52 @@ const _doSeedItems = realizes(
  */
 export const seedItems = db.reducer({}, (ctx) => {
   _doSeedItems(ctx);
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// REDUCERS — zone seeding
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const _doSeedZones = realizes(
+  SwTraceables.SW_030_SEEDING_UPSERTS_CONTENT_BY_SLUG_RE_RUNNING_IS_ALWAYS_SAFE,
+  function _doSeedZones(ctx: any): void {
+    let inserted = 0;
+    let updated = 0;
+
+    for (const zone of ZONE_DEFS) {
+      // zoneId is a plain u32 primary key authored in the content file, not an
+      // autoInc column — it is the idempotency key, so it is set explicitly.
+      const rowData = {
+        zoneId: zone.zoneId,
+        name: zone.name,
+        minLevel: zone.minLevel,
+        recommendedLevel: zone.recommendedLevel ?? zone.minLevel,
+        maxLevel: zone.maxLevel,
+        description: zone.flavor,
+        tutorialZone: zone.tutorialZone,
+        masteredMessage: zone.masteredMessage ?? undefined,
+      };
+
+      const existing = ctx.db.zone.zoneId.find(zone.zoneId);
+      if (existing) {
+        ctx.db.zone.zoneId.update(rowData);
+        updated++;
+      } else {
+        ctx.db.zone.insert(rowData);
+        inserted++;
+      }
+    }
+
+    console.log(`[seedZones] ${inserted} inserted, ${updated} updated`);
+  },
+);
+
+/**
+ * seedZones — upserts all zones from content/zones.json into zone.
+ * TODO: restrict to module owner identity before shipping to production.
+ */
+export const seedZones = db.reducer({}, (ctx) => {
+  _doSeedZones(ctx);
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════

@@ -1,7 +1,7 @@
 **Title**
 Zones become authored content, seeded from a new zones.json file
 
-**Status**: planned
+**Status**: active
 
 **Business Value**
 The `zone` table already exists (`zoneId`/`name`/`minLevel`/

@@ -3,7 +3,7 @@ A tutorial zone's minLevel must be one
 
 **Lens**: CON
 
-**Status**: planned
+**Status**: active
 
 **Description**
 A zone with `tutorialZone: true` must have `minLevel === 1`.
@@ -30,3 +30,9 @@ level-1 character standing in a zone that doesn't expect them.
 **Realizes**
 
 - [SYS-008](SYS-008-content-is-authored-as-json-validated-then-idempotently-seeded.md)
+
+## Changes
+
+- **2026-09-08** — Set active: implementation of STR-010 began.
+  The spec is authored and approved, so it now generates a traceable for the
+  code written in this increment to anchor against.
