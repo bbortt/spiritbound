@@ -3,7 +3,7 @@ Population allocation decides target and adjustment counts, independent of execu
 
 **Lens**: SYS
 
-**Status**: planned
+**Status**: active
 
 **Description**
 The decision of how many enemies a zone should hold, how that target
@@ -32,3 +32,9 @@ unit test, including a property test over randomized demand vectors.
 
 - [STR-012](../stories/STR-012-population-driven-spawn-allocation-rules.md) — the story delivering this capability
 - [ARCH-004](ARCH-004-enemy-tick-is-one-scheduled-reducer-driving-a-five-state-machine.md) — the existing precedent for this exact shape: `enemyAi.ts`'s pure decision functions, with `enemyTick` as the thin reducer that calls them and persists the result
+
+## Changes
+
+- **2026-09-08** — Set active: implementation of STR-012 began.
+  The spec is authored and approved, so it now generates a traceable for the
+  code written in this increment to anchor against.

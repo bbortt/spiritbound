@@ -3,7 +3,7 @@ planAdjustments ignores in-deadband deltas and never emits a negative count
 
 **Lens**: SW
 
-**Status**: planned
+**Status**: active
 
 **Description**
 `planAdjustments(target, actual, cfg)` computes `delta = target - actual`
@@ -33,3 +33,9 @@ spawn or despawn count for any band.
 **Realizes**
 
 - [SYS-013](SYS-013-population-allocation-decides-target-and-adjustment-counts-independent-of-execution.md)
+
+## Changes
+
+- **2026-09-08** — Set active: implementation of STR-012 began.
+  The spec is authored and approved, so it now generates a traceable for the
+  code written in this increment to anchor against.

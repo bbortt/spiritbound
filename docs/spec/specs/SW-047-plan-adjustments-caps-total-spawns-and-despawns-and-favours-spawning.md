@@ -3,7 +3,7 @@ planAdjustments caps total spawns and despawns per tick and favours spawning whe
 
 **Lens**: SW
 
-**Status**: planned
+**Status**: active
 
 **Description**
 Across all bands in one call, `planAdjustments` caps the total spawn
@@ -37,3 +37,9 @@ despawns.
 **Realizes**
 
 - [SYS-013](SYS-013-population-allocation-decides-target-and-adjustment-counts-independent-of-execution.md)
+
+## Changes
+
+- **2026-09-08** — Set active: implementation of STR-012 began.
+  The spec is authored and approved, so it now generates a traceable for the
+  code written in this increment to anchor against.

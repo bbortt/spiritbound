@@ -3,7 +3,7 @@ Passive respawn retires an over-target enemy or re-rolls it into the neediest ba
 
 **Lens**: SW
 
-**Status**: planned
+**Status**: active
 
 **Description**
 A pure function decides what happens when a dead enemy's respawn timer
@@ -43,3 +43,9 @@ though no band is under target.
 
 - [SW-014](SW-014-resetting-enemy-walks-to-spawn-healing-and-can-re-aggro.md) — **partially superseded**: this spec's respawn half ("a dead enemy is restored to full HP at its exact spawn position... regardless of whether any character is nearby") is replaced by this function's decision; `SW-014`'s resetting-state-machine half (walk to spawn, heal per tick, mid-walk re-aggro) is unaffected and stays active as-is.
   At promotion `SW-014`'s description was narrowed to the resetting state only, and the respawn-outcome claim now belongs to this spec.
+
+## Changes
+
+- **2026-09-08** — Set active: implementation of STR-012 began.
+  The spec is authored and approved, so it now generates a traceable for the
+  code written in this increment to anchor against.

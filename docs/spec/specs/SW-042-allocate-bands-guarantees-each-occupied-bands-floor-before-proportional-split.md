@@ -3,7 +3,7 @@ allocateBands guarantees each occupied band's floor before splitting the remaind
 
 **Lens**: SW
 
-**Status**: planned
+**Status**: active
 
 **Description**
 `allocateBands(totalBudget, demand, bandCount, cfg)` first gives every
@@ -39,3 +39,9 @@ proportional to their 19:1 player share.
 **Related**
 
 - [SW-043](SW-043-allocate-bands-caps-a-band-at-its-share-and-redistributes-the-overflow.md) — the cap this floor-then-proportional split is then subject to
+
+## Changes
+
+- **2026-09-08** — Set active: implementation of STR-012 began.
+  The spec is authored and approved, so it now generates a traceable for the
+  code written in this increment to anchor against.

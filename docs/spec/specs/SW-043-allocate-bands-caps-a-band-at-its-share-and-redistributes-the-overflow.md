@@ -3,7 +3,7 @@ allocateBands caps a band at its configured share and redistributes the overflow
 
 **Lens**: SW
 
-**Status**: planned
+**Status**: active
 
 **Description**
 After the floor-then-proportional pass, any band whose allocation exceeds
@@ -38,3 +38,9 @@ on the two minor bands rather than being discarded.
 **Related**
 
 - [SW-042](SW-042-allocate-bands-guarantees-each-occupied-bands-floor-before-proportional-split.md) — the allocation this cap is applied on top of
+
+## Changes
+
+- **2026-09-08** — Set active: implementation of STR-012 began.
+  The spec is authored and approved, so it now generates a traceable for the
+  code written in this increment to anchor against.
