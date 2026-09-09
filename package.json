@@ -27,7 +27,7 @@
     "vitest:integration": "vitest run -c vitest.integration.config.ts"
   },
   "dependencies": {
-    "spacetimedb": "2.8.3",
+    "spacetimedb": "2.9.0",
     "zod": "4.5.4"
   },
   "devDependencies": {
