@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "phaser": "4.2.1",
-    "spacetimedb": "2.8.3"
+    "spacetimedb": "2.9.0"
   },
   "devDependencies": {
     "typescript": "5.9.3",
