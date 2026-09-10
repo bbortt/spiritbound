@@ -174,8 +174,9 @@ verifies(
 
         // A second death with the flag already true: the guard is on the flag
         // being false, so this must be an ordinary no-op, not an error and not
-        // a re-toggle. The new life starts at the ceiling by way of the
-        // existing graduated-account starting level, so it needs no levelling.
+        // a re-toggle. The new life starts below the ceiling, so it is a death
+        // at a lower level than the first — which is exactly the case the
+        // guard has to survive.
         const secondLife = await restartLife(char, 'GraduatingSpirit');
         await killLethally(secondLife);
         expect((await readCharacter(secondLife)).alive).toBe(false);
@@ -237,6 +238,37 @@ verifies(
           seeded,
           'the chosen start zone must be a seeded one',
         ).toBeTruthy();
+      }, 60_000);
+    });
+  },
+);
+
+verifies(
+  ConTraceables.CON_035_A_GRADUATED_ACCOUNT_STARTS_BELOW_ITS_START_ZONES_MAX_LEVEL,
+  () => {
+    describe('a graduated account starts with XP headroom', () => {
+      it('begins the next life below the max level of the zone it lands in', async () => {
+        const char = await createTestCharacter('HeadroomSpirit');
+        const zone = await tutorialZone(char.token);
+
+        await raiseToLevel(char, zone.maxLevel);
+        await killLethally(char);
+        expect((await readProgress(char)).tutorialCompleted).toBe(true);
+
+        // Both numbers are read from the live module, never restated here:
+        // the point is the relationship between the starting level and the
+        // ceiling of whatever zone the account was routed into, which has to
+        // survive both a retuned ceiling and zone 2's arrival.
+        const graduated = await restartLife(char, 'HeadroomSpirit');
+        const next = await readCharacter(graduated);
+        const [landed] = await sqlRows(
+          char.token,
+          `SELECT max_level FROM zone WHERE zone_id = ${next.zoneId}`,
+        );
+        expect(
+          next.level,
+          'a graduated life that starts at the ceiling can never earn XP (SW-050)',
+        ).toBeLessThan(landed.max_level);
       }, 60_000);
     });
   },

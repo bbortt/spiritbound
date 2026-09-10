@@ -60,8 +60,11 @@ branch falls back to zone 1 with a `// TODO` rather than breaking.
 
 **Acceptance Criteria**
 
-- A kill by a character at or above their current zone's `maxLevel`
-  grants exactly zero XP, and never reaches `computeXpReward`.
+- A kill by a character at or above the **killed enemy's** zone's
+  `maxLevel` grants exactly zero XP, and never reaches `computeXpReward`.
+  The gate keys on where the enemy lived, matching this story's solution
+  approach above and `STR-009`'s ruling for drop eligibility — not on
+  where the killer was standing.
 - The client shows `Zone mastered` (not `No XP`) specifically when the
   zero is caused by the zone cap, and still shows the existing `No XP`
   for an ordinary below-level-gap zero kill.
