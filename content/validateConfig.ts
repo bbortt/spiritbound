@@ -141,6 +141,23 @@ const RarityMultipliersSchema = realizes(
     }),
 );
 
+/**
+ * A cast that lands for less than an ordinary swing inverts the telegraph: the
+ * red circle on the ground is only worth dodging because standing in it costs
+ * more than trading hits. The bound sits on the ratio rather than on a second
+ * damage number so it survives any retune of `baseDamage`, and the message
+ * names the value because the reader is a server operator, not this schema's
+ * author.
+ */
+const CastDamageRatioSchema = realizes(
+  ConTraceables.CON_034_A_TELEGRAPHED_CAST_NEVER_HITS_SOFTER_THAN_A_MELEE_SWING,
+  z.number().min(1, {
+    message:
+      'castDamageRatio must be at least 1.0 — a cast that hits softer than ' +
+      'a melee swing makes the telegraph pointless',
+  }),
+);
+
 export const ConfigSchema = concerns(
   SysTraceables.SYS_009_SERVER_OPERATORS_TUNE_BALANCE_THROUGH_A_VALIDATED_CONFIG_FILE,
   z.object({
@@ -163,6 +180,14 @@ export const ConfigSchema = concerns(
       deaggroRangePx: positive,
       chaseSpeedPxPerSec: positive,
       resetSpeedPxPerSec: positive,
+      // The zone-1 archetype's base stats, level-1 and common-rarity, before
+      // rules/enemyScaling.ts applies level and rarity to them. They are dials
+      // here rather than authored content only until a real enemy-definition
+      // pipeline exists (content/enemies.json); at that point per-archetype
+      // values move there and these two become the fallback.
+      baseHp: positive,
+      baseDamage: positive,
+      castDamageRatio: CastDamageRatioSchema,
       rarityMultipliers: RarityMultipliersSchema,
     }),
   }),
@@ -172,6 +197,7 @@ export type ServerConfig = z.infer<typeof ConfigSchema>;
 export type RarityWeights = ServerConfig['dropRates']['cards']['rarityWeights'];
 export type LevelDiffPenalty = ServerConfig['xp']['levelDiffPenalty'];
 export type RarityMultipliers = ServerConfig['enemies']['rarityMultipliers'];
+export type EnemyConfig = ServerConfig['enemies'];
 
 export function validateConfig(raw: unknown): {
   valid: boolean;

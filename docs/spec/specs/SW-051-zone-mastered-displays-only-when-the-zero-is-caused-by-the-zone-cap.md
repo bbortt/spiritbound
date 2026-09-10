@@ -17,6 +17,12 @@ enemy is too far below their level), it still shows `No XP` exactly as
 before.
 Both are grey; only the wording differs.
 
+The client reads its own character's zone while the server (`SW-050`)
+reads the killed enemy's.
+They agree because a client only ever renders a corpse it can see, and it
+only subscribes to enemies in the zone its character is standing in — the
+two zones are the same row.
+
 **Rationale**
 The server's grant amount alone (zero) cannot distinguish the two causes,
 and conflating them would show a misleading `No XP` to a player who has
@@ -26,10 +32,13 @@ follows the same client-duplication approach `ARCH-011` already
 establishes for `computeXpReward` itself.
 
 **Verification Description**
-`client/src/enemyLevelBand.test.ts` (or its sibling covering the
-floating-XP-text decision) asserts a character at the zone cap killing
-any eligible mob shows `Zone mastered`, and a character below the zone
-cap killing a far-below-level mob still shows the existing `No XP`.
+`client/src/zoneMastery.test.ts` — the unit test beside
+`client/src/zoneMastery.ts#classifyKillXp`, which is where this decision
+lives — asserts a character at the zone cap killing any eligible mob shows
+`Zone mastered`, a character below the zone cap killing a far-below-level
+mob still shows the existing `No XP`, a paying kill reports its amount,
+the ceiling applies in a non-tutorial zone too, and an unknown zone row
+falls back to the plain reward curve.
 
 ## Relations
 
@@ -44,6 +53,12 @@ cap killing a far-below-level mob still shows the existing `No XP`.
 
 ## Changes
 
+- **2026-09-10** — Pointed the verification at `client/src/zoneMastery.test.ts`
+  and noted why the client's zone and the server's are the same row.
+  The named file, `client/src/enemyLevelBand.test.ts`, covers the level-band
+  colouring of `SW-038` and has nothing to do with this decision; a reader
+  checking coverage would have found the wrong tests and concluded the spec
+  was unverified.
 - **2026-09-08** — Set active: implementation of STR-014 began.
   The spec is authored and approved, so it now generates a traceable for the
   code written in this increment to anchor against.

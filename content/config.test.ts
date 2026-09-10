@@ -162,6 +162,8 @@ verifies(
           'enemies.resetSpeedPxPerSec',
           (c) => (c.enemies.resetSpeedPxPerSec = -80),
         ],
+        ['enemies.baseHp', (c) => (c.enemies.baseHp = 0)],
+        ['enemies.baseDamage', (c) => (c.enemies.baseDamage = -4)],
         ['xp.baseMonsterXp', (c) => (c.xp.baseMonsterXp = 0)],
       ];
 
@@ -269,6 +271,41 @@ verifies(
         const incomplete = mutable();
         delete incomplete.enemies.rarityMultipliers.epic;
         expect(validateConfig(incomplete).valid).toBe(false);
+      });
+    });
+  },
+);
+
+/**
+ * The cast is the enemy's telegraphed attack — it announces itself and gives
+ * the player its whole duration to step out of the shape. A ratio below 1.0
+ * makes the correct play "ignore the red circle", so the schema is what keeps
+ * that unrepresentable rather than merely discouraged; the value itself lives
+ * in an operator-editable file, out of the compiler's reach.
+ */
+verifies(
+  ConTraceables.CON_034_A_TELEGRAPHED_CAST_NEVER_HITS_SOFTER_THAN_A_MELEE_SWING,
+  () => {
+    describe('CON-034 — the cast-to-swing damage ratio', () => {
+      it('ships at or above 1.0, preserving the seeded 15-vs-8 differential', () => {
+        expect(config.enemies.castDamageRatio).toBeGreaterThanOrEqual(1);
+        expect(
+          Math.round(
+            config.enemies.baseDamage * 2 * config.enemies.castDamageRatio,
+          ),
+        ).toBe(15);
+      });
+
+      it('rejects a ratio below 1.0 and says why', () => {
+        const inverted = mutable();
+        inverted.enemies.castDamageRatio = 0.9;
+        const { valid, errors } = validateConfig(inverted);
+        expect(valid).toBe(false);
+        expect(errors.join('\n')).toMatch(/castDamageRatio must be at least 1/);
+
+        const zeroed = mutable();
+        zeroed.enemies.castDamageRatio = 0;
+        expect(validateConfig(zeroed).valid).toBe(false);
       });
     });
   },

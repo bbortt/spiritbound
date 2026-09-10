@@ -1047,8 +1047,27 @@ const TUTORIAL_ZONE_ID = 1;
 /** Where a graduated account belongs once that zone is authored and seeded. */
 const GRADUATE_ZONE_ID = 2;
 
+/**
+ * What level a graduated account's next life starts at — deliberately below
+ * the tutorial zone's ceiling, not at it.
+ *
+ * Starting at the ceiling composed two correct rules into a broken account: a
+ * kill grants zero XP once the killer is at or above the zone's `maxLevel`, and
+ * while zone 2 is unseeded the graduated branch below falls back to zone 1 — so
+ * a graduate could never earn XP again. Two levels of headroom is what the
+ * tutorial-skip promise asks for: past the floor, not comfortable
+ * (GAME_DESIGN.md). The value is a stopgap that returns to 10 when zone 2
+ * ships; what has to stay true either way is that the level is strictly below
+ * the ceiling of whatever zone the account actually lands in, which is the
+ * constraint the anchor on `startLife` below names.
+ */
+const GRADUATE_START_LEVEL = 8;
+
 export const startLife = realizes(
-  SwTraceables.SW_053_STARTLIFE_COMPUTES_THE_START_ZONE_FROM_TUTORIAL_COMPLETION_NOT_CALLER_INPUT,
+  [
+    SwTraceables.SW_053_STARTLIFE_COMPUTES_THE_START_ZONE_FROM_TUTORIAL_COMPLETION_NOT_CALLER_INPUT,
+    ConTraceables.CON_035_A_GRADUATED_ACCOUNT_STARTS_BELOW_ITS_START_ZONES_MAX_LEVEL,
+  ] as const,
   db.reducer({ spiritName: t.string() }, (ctx, { spiritName }) => {
     if (activeCharacter(ctx))
       throw new SenderError('Already has an active character');
@@ -1071,7 +1090,7 @@ export const startLife = realizes(
       });
     }
 
-    const startLevel = progress.tutorialCompleted ? 10 : 1;
+    const startLevel = progress.tutorialCompleted ? GRADUATE_START_LEVEL : 1;
     // Which zone a life begins in is the server's decision, exactly as the
     // starting level above it is — a graduated account moves on from the
     // tutorial zone, a new one starts in it, and neither is the caller's to
@@ -1079,7 +1098,8 @@ export const startLife = realizes(
     // whether the graduate zone is actually seeded, so it stops applying by
     // itself rather than needing this code changed again.
     // TODO: author zone 2's content — until it is seeded, a graduated account
-    // restarts in the tutorial zone at its ceiling and so earns no XP there.
+    // restarts in the tutorial zone, which is why GRADUATE_START_LEVEL sits
+    // below that zone's ceiling instead of at it.
     const graduatedZone = ctx.db.zone.zoneId.find(GRADUATE_ZONE_ID);
     const startZoneId =
       progress.tutorialCompleted && graduatedZone

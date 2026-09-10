@@ -3,10 +3,12 @@
 
 /**
  * rules/enemyScaling.ts — enemy combat stats from a base, a level and a rarity.
- * Pure functions: no SpacetimeDB imports, no side effects. The multiplier table
- * comes in as a parameter (from content/config.json's enemies.rarityMultipliers
- * via the reducer module) rather than being read or hardcoded here, so the rules
- * stay independent of the operator's config file and a test can fix the numbers.
+ * Pure functions: no SpacetimeDB imports, no side effects. The dials come in as
+ * a parameter (content/config.json's `enemies` block, threaded in by the reducer
+ * module) rather than being read or hardcoded here, so the rules stay
+ * independent of the operator's config file and a test can fix the numbers. The
+ * archetype's `baseHp`/`baseDamage` live in that same block today and arrive as
+ * the first two arguments; they move to a per-enemy definition once one exists.
  */
 
 import type { Rarity } from '../types';
@@ -26,6 +28,17 @@ export interface RarityMultiplier {
 /** The `enemies.rarityMultipliers` block of the server config. */
 export type RarityMultipliers = Record<Rarity, RarityMultiplier>;
 
+/**
+ * The scaling dials this module reads — the `enemies` block of the server
+ * config satisfies this structurally. It arrives as one parameter rather than
+ * one per dial so adding a dial never changes the function's arity, and so a
+ * caller cannot pass a multiplier table that belongs to a different config.
+ */
+export interface EnemyScaling {
+  castDamageRatio: number;
+  rarityMultipliers: RarityMultipliers;
+}
+
 /** What an enemy row's three combat-stat columns are set to on spawn. */
 export interface EnemyStats {
   maxHp: number;
@@ -44,9 +57,14 @@ export interface EnemyStats {
  * legendary in the shipped table) — a rare spawn should take much longer to
  * kill without one-shotting the player who found it.
  *
- * `castDamage` scales identically to `damagePerHit`: a telegraphed cast is just
- * another damage source from the same enemy, so it takes the same base and the
- * same factors.
+ * `castDamage` takes the same base and the same two factors, then one more:
+ * `castDamageRatio`. The cast is the enemy's *telegraphed* attack — it draws a
+ * shape on the ground and gives the player its whole duration to leave — so it
+ * has to hit harder than an ordinary swing or there is nothing to dodge. The
+ * differential is a single operator dial — the config schema bounds it at or
+ * above 1.0, so a cast that lands softer than a swing is unrepresentable —
+ * rather than a second authored damage number, so it survives a retune of the
+ * base and cannot drift per rarity.
  */
 export const computeEnemyStats = concerns(
   SysTraceables.SYS_012_ENEMY_DIFFICULTY_SCALES_WITH_RARITY_AS_WELL_AS_LEVEL,
@@ -57,14 +75,17 @@ export const computeEnemyStats = concerns(
       baseDamage: number,
       level: number,
       rarity: Rarity,
-      multipliers: RarityMultipliers,
+      scaling: EnemyScaling,
     ): EnemyStats {
-      const multiplier = multipliers[rarity];
-      const scaledDamage = Math.round(baseDamage * level * multiplier.damage);
+      const multiplier = scaling.rarityMultipliers[rarity];
+      const damage = baseDamage * level * multiplier.damage;
       return {
         maxHp: Math.round(baseHp * level * multiplier.hp),
-        damagePerHit: scaledDamage,
-        castDamage: scaledDamage,
+        damagePerHit: Math.round(damage),
+        // Rounded from the same unrounded product rather than from
+        // `damagePerHit`, so the ratio is applied once and a small base does
+        // not compound two roundings into a visibly wrong differential.
+        castDamage: Math.round(damage * scaling.castDamageRatio),
       };
     },
   ),

@@ -28,11 +28,24 @@ out of "new player" status the way finishing the actual tutorial zone
 does.
 
 **Verification Description**
-A unit test kills a character at `zone.maxLevel` in a `tutorialZone: true`
-zone with `tutorialCompleted` false and asserts it flips true; a death at
-the same level in a non-tutorial zone (once one exists) asserts no flip;
-a second death afterward with the flag already true asserts no error and
-no re-toggle, exactly as `CON-008` already verifies for its own case.
+An **integration** test against a live published module levels a character
+to the tutorial zone's authored `maxLevel` — read from the `zone` row, not
+written as a literal — and asserts: reaching that level while alive does
+**not** flip the flag (the stamp is death-gated); a lethal
+`apply_damage` at that level flips `accountProgress.tutorialCompleted` to
+true; a death one level below the ceiling leaves it false; and a second
+death on an already-graduated account is an ordinary no-op rather than an
+error or a re-toggle.
+A death at the same level in a non-tutorial zone asserts no flip once a
+second zone exists.
+
+This is verified end-to-end rather than by unit test deliberately.
+The flip reads the `zone` table, writes `account_progress`, and only ever
+fires from inside `_handleDeath`; there is no pure function here to call.
+Extracting one purely to satisfy a testing preference would be
+manufacturing a seam that the production path does not use, and the
+resulting test would prove the seam works rather than that the graduation
+does.
 
 ## Relations
 
@@ -43,6 +56,15 @@ no re-toggle, exactly as `CON-008` already verifies for its own case.
 
 ## Changes
 
+- **2026-09-10** — Replaced the unit-test requirement with an integration
+  assertion, and said why the seam does not exist.
+  The flip is only reachable through `_handleDeath` and touches two tables;
+  a unit test would have to mock all three of those dependencies and would
+  then be asserting the mock.
+  `spacetimedb/integration/tutorialCompletion.integration.test.ts` covers
+  it against a live module instead, reading the ceiling from the seeded
+  `zone` row so the test follows re-authored content rather than passing
+  against a stale literal.
 - **2026-09-08** — Set active: implementation of STR-014 began.
   The spec is authored and approved, so it now generates a traceable for the
   code written in this increment to anchor against.

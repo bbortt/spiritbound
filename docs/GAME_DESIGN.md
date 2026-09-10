@@ -360,6 +360,17 @@ Three arcs, each with a distinct feel:
   Skipping starts the character at level 10 with a curated starter kit
   (basic gear set, a couple of common cards, a weak personal spirit bond) —
   not comfortable, just past the tutorial floor.
+- **Implementation stopgap: graduates currently start at level 8, not 10.**
+  Zone 2 does not exist yet, so a graduated life is still routed back into
+  the tutorial zone, whose `maxLevel` is 10 — and a character sitting at its
+  zone's max level earns no XP at all (`SW-050`).
+  Starting at the ceiling would hand every graduate a permanently frozen
+  character.
+  Level 8 keeps the promise of the design (past the floor, two levels of
+  headroom, immediately earning) while zone 2 is missing.
+  **This returns to 10 when zone 2 ships**; `CON-035` pins the rule that
+  survives either way — a graduate starts strictly below the max level of
+  whatever zone it actually lands in.
 - Unlocks: 4 active / 2 passive hand slots, spirit bonding, first open zone.
 - Level 10 is a **soft account milestone**: the game remembers you did this.
 
