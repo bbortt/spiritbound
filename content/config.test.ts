@@ -162,6 +162,8 @@ verifies(
           'enemies.resetSpeedPxPerSec',
           (c) => (c.enemies.resetSpeedPxPerSec = -80),
         ],
+        ['enemies.baseHp', (c) => (c.enemies.baseHp = 0)],
+        ['enemies.baseDamage', (c) => (c.enemies.baseDamage = -4)],
         ['xp.baseMonsterXp', (c) => (c.xp.baseMonsterXp = 0)],
       ];
 
@@ -207,6 +209,103 @@ verifies(
       it('matches the shipped content/config.json xp block', () => {
         expect(XP_CONFIG.baseMonsterXp).toBe(config.xp.baseMonsterXp);
         expect(XP_CONFIG.levelDiff).toEqual(config.xp.levelDiffPenalty);
+      });
+    });
+  },
+);
+
+/**
+ * The multiplier table is what makes a rare or epic spawn a materially harder
+ * fight rather than a recoloured common one. Both bounds matter: below 1.0 a
+ * higher rarity would be *weaker* than common, and a flat step would make two
+ * rarities indistinguishable in play. Only the schema holds this — the values
+ * live in an operator-editable file, out of the compiler's reach.
+ */
+verifies(
+  ConTraceables.CON_026_RARITY_MULTIPLIERS_COVER_EVERY_RARITY_AT_OR_ABOVE_ONE_INCREASING_BY_TIER,
+  () => {
+    describe('CON-026 — enemy rarity multipliers', () => {
+      it('ships an at-or-above-1.0, strictly increasing table for all five rarities', () => {
+        const multipliers = config.enemies.rarityMultipliers;
+        expect(Object.keys(multipliers).sort()).toEqual([...RARITIES].sort());
+        expect(multipliers.common).toEqual({ hp: 1, damage: 1 });
+
+        for (const axis of ['hp', 'damage'] as const) {
+          for (let i = 0; i < RARITIES.length; i++) {
+            expect(multipliers[RARITIES[i]][axis]).toBeGreaterThanOrEqual(1);
+            if (i > 0) {
+              expect(multipliers[RARITIES[i]][axis]).toBeGreaterThan(
+                multipliers[RARITIES[i - 1]][axis],
+              );
+            }
+          }
+        }
+      });
+
+      it('rejects a multiplier below 1.0 on either axis', () => {
+        const weakHp = mutable();
+        weakHp.enemies.rarityMultipliers.common.hp = 0.9;
+        expect(validateConfig(weakHp).valid).toBe(false);
+
+        const weakDamage = mutable();
+        weakDamage.enemies.rarityMultipliers.common.damage = 0;
+        expect(validateConfig(weakDamage).valid).toBe(false);
+      });
+
+      it('rejects a tier that does not out-scale the tier below it', () => {
+        const equal = mutable();
+        equal.enemies.rarityMultipliers.rare.hp =
+          equal.enemies.rarityMultipliers.uncommon.hp;
+        const { valid, errors } = validateConfig(equal);
+        expect(valid).toBe(false);
+        expect(errors.join('\n')).toMatch(
+          /rare\.hp \(2\.5\) must be greater than uncommon\.hp \(2\.5\)/,
+        );
+
+        const inverted = mutable();
+        inverted.enemies.rarityMultipliers.legendary.damage = 1.1;
+        expect(validateConfig(inverted).valid).toBe(false);
+      });
+
+      it('rejects a table missing a rarity entirely', () => {
+        const incomplete = mutable();
+        delete incomplete.enemies.rarityMultipliers.epic;
+        expect(validateConfig(incomplete).valid).toBe(false);
+      });
+    });
+  },
+);
+
+/**
+ * The cast is the enemy's telegraphed attack — it announces itself and gives
+ * the player its whole duration to step out of the shape. A ratio below 1.0
+ * makes the correct play "ignore the red circle", so the schema is what keeps
+ * that unrepresentable rather than merely discouraged; the value itself lives
+ * in an operator-editable file, out of the compiler's reach.
+ */
+verifies(
+  ConTraceables.CON_034_A_TELEGRAPHED_CAST_NEVER_HITS_SOFTER_THAN_A_MELEE_SWING,
+  () => {
+    describe('CON-034 — the cast-to-swing damage ratio', () => {
+      it('ships at or above 1.0, preserving the seeded 15-vs-8 differential', () => {
+        expect(config.enemies.castDamageRatio).toBeGreaterThanOrEqual(1);
+        expect(
+          Math.round(
+            config.enemies.baseDamage * 2 * config.enemies.castDamageRatio,
+          ),
+        ).toBe(15);
+      });
+
+      it('rejects a ratio below 1.0 and says why', () => {
+        const inverted = mutable();
+        inverted.enemies.castDamageRatio = 0.9;
+        const { valid, errors } = validateConfig(inverted);
+        expect(valid).toBe(false);
+        expect(errors.join('\n')).toMatch(/castDamageRatio must be at least 1/);
+
+        const zeroed = mutable();
+        zeroed.enemies.castDamageRatio = 0;
+        expect(validateConfig(zeroed).valid).toBe(false);
       });
     });
   },

@@ -123,6 +123,10 @@ export const Enemy = __t.object('Enemy', {
   enemyId: __t.u64(),
   zoneId: __t.u32(),
   level: __t.u32(),
+  get rarity() {
+    return Rarity;
+  },
+  isBoss: __t.bool(),
   posX: __t.f32(),
   posY: __t.f32(),
   spawnX: __t.f32(),
@@ -332,5 +336,7 @@ export const Zone = __t.object('Zone', {
   recommendedLevel: __t.u32(),
   maxLevel: __t.u32(),
   description: __t.string(),
+  tutorialZone: __t.bool(),
+  masteredMessage: __t.option(__t.string()),
 });
 export type Zone = __Infer<typeof Zone>;

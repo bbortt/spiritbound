@@ -95,6 +95,69 @@ const LevelDiffPenaltySchema = concerns(
   ),
 );
 
+/**
+ * The per-rarity `{hp, damage}` pair an enemy's base stats are multiplied by.
+ * Deliberately NOT `RarityWeightsSchema`: that one is five 0..1 chances summing
+ * to 1.0, this one is five unbounded-above multipliers with no sum at all.
+ */
+const RarityMultiplierPairSchema = z.object({
+  hp: z.number().min(1),
+  damage: z.number().min(1),
+});
+
+/**
+ * A multiplier below 1.0 would make a higher-rarity enemy weaker than a common
+ * one, and a non-increasing step would make two rarities indistinguishable in a
+ * fight — both defeat the point of the rarity axis. The message names the two
+ * tiers and both values because the reader is a server operator retuning a
+ * table, not the author of this schema.
+ */
+const RarityMultipliersSchema = realizes(
+  ConTraceables.CON_026_RARITY_MULTIPLIERS_COVER_EVERY_RARITY_AT_OR_ABOVE_ONE_INCREASING_BY_TIER,
+  z
+    .object({
+      common: RarityMultiplierPairSchema,
+      uncommon: RarityMultiplierPairSchema,
+      rare: RarityMultiplierPairSchema,
+      epic: RarityMultiplierPairSchema,
+      legendary: RarityMultiplierPairSchema,
+    })
+    .superRefine((multipliers, ctx) => {
+      for (const axis of ['hp', 'damage'] as const) {
+        for (let i = 1; i < RARITY.length; i++) {
+          const lower = RARITY[i - 1];
+          const higher = RARITY[i];
+          if (multipliers[higher][axis] <= multipliers[lower][axis]) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: [higher, axis],
+              message:
+                `${higher}.${axis} (${multipliers[higher][axis]}) must be ` +
+                `greater than ${lower}.${axis} (${multipliers[lower][axis]})`,
+            });
+          }
+        }
+      }
+    }),
+);
+
+/**
+ * A cast that lands for less than an ordinary swing inverts the telegraph: the
+ * red circle on the ground is only worth dodging because standing in it costs
+ * more than trading hits. The bound sits on the ratio rather than on a second
+ * damage number so it survives any retune of `baseDamage`, and the message
+ * names the value because the reader is a server operator, not this schema's
+ * author.
+ */
+const CastDamageRatioSchema = realizes(
+  ConTraceables.CON_034_A_TELEGRAPHED_CAST_NEVER_HITS_SOFTER_THAN_A_MELEE_SWING,
+  z.number().min(1, {
+    message:
+      'castDamageRatio must be at least 1.0 — a cast that hits softer than ' +
+      'a melee swing makes the telegraph pointless',
+  }),
+);
+
 export const ConfigSchema = concerns(
   SysTraceables.SYS_009_SERVER_OPERATORS_TUNE_BALANCE_THROUGH_A_VALIDATED_CONFIG_FILE,
   z.object({
@@ -117,6 +180,15 @@ export const ConfigSchema = concerns(
       deaggroRangePx: positive,
       chaseSpeedPxPerSec: positive,
       resetSpeedPxPerSec: positive,
+      // The zone-1 archetype's base stats, level-1 and common-rarity, before
+      // rules/enemyScaling.ts applies level and rarity to them. They are dials
+      // here rather than authored content only until a real enemy-definition
+      // pipeline exists (content/enemies.json); at that point per-archetype
+      // values move there and these two become the fallback.
+      baseHp: positive,
+      baseDamage: positive,
+      castDamageRatio: CastDamageRatioSchema,
+      rarityMultipliers: RarityMultipliersSchema,
     }),
   }),
 );
@@ -124,6 +196,8 @@ export const ConfigSchema = concerns(
 export type ServerConfig = z.infer<typeof ConfigSchema>;
 export type RarityWeights = ServerConfig['dropRates']['cards']['rarityWeights'];
 export type LevelDiffPenalty = ServerConfig['xp']['levelDiffPenalty'];
+export type RarityMultipliers = ServerConfig['enemies']['rarityMultipliers'];
+export type EnemyConfig = ServerConfig['enemies'];
 
 export function validateConfig(raw: unknown): {
   valid: boolean;

@@ -15,6 +15,7 @@
 import type { Rarity } from '../types';
 import {
   realizes,
+  concerns,
   ConTraceables,
   SwTraceables,
   SysTraceables,
@@ -54,6 +55,52 @@ export const pickWeightedRarity = realizes(
     }
     return 'common'; // fallback for float rounding at the top of the range
   },
+);
+
+/**
+ * Raise the floor of a mob's drop table by its own rarity.
+ *
+ * A common mob is the baseline and gets its table back untouched. Any
+ * non-common mob drops the `common` tier entirely: that weight is redistributed
+ * across the other four tiers in proportion to the relative weight they already
+ * had, so a better mob is correspondingly likelier to drop something better
+ * without the shift ever inventing weight for a tier the base table
+ * deliberately excludes. Legendary ships at 0, and a zero share of any
+ * redistributed mass is still zero, so the fixed-at-zero legendary weight holds
+ * even for a boss kill — unlocking legendary drops is a decision its own
+ * constraint has to revisit, not something this shift should do behind its back.
+ *
+ * The output sums to whatever the input summed to, which the config schema pins
+ * at 1.0. A table that is 100% common has no relative weight to redistribute
+ * into; rather than divide by zero and hand `pickWeightedRarity` a table of
+ * NaNs, that degenerate case returns the input unchanged and the roll's own
+ * empty-tier fallback takes it from there.
+ */
+export const shiftRarityWeightsForMob = realizes(
+  SwTraceables.SW_040_A_NON_COMMON_MOB_SHIFTS_ITS_DROP_WEIGHTS_TOWARD_HIGHER_RARITY_TIERS,
+  concerns(
+    ConTraceables.CON_004_LEGENDARY_DROP_WEIGHT_IS_ZERO,
+    function shiftRarityWeightsForMob(
+      weights: RarityWeights,
+      mobRarity: Rarity,
+    ): RarityWeights {
+      if (mobRarity === 'common') return weights;
+
+      const above = RARITY_DROP_ORDER.filter((rarity) => rarity !== 'common');
+      const aboveTotal = above.reduce(
+        (total, rarity) => total + weights[rarity],
+        0,
+      );
+      if (aboveTotal <= 0) return weights;
+
+      const shifted = { ...weights, common: 0 };
+      for (const rarity of above) {
+        shifted[rarity] =
+          weights[rarity] + weights.common * (weights[rarity] / aboveTotal);
+      }
+      return shifted;
+    },
+  ),
 );
 
 /**

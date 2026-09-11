@@ -34,6 +34,10 @@ import { parseEquipment } from '../../content/validateEquipment';
 import configJson from '../../content/config.json';
 import { parseConfig } from '../../content/validateConfig';
 
+// @ts-ignore — JSON import resolved by esbuild; zonesLoader.ts (node:fs) is tree-shaken from this bundle
+import zonesJson from '../../content/zones.json';
+import { parseZones } from '../../content/validateZones';
+
 import {
   computeSpiritLevel,
   computeAttunementSlots,
@@ -45,7 +49,7 @@ import {
   SACRIFICE_XP,
   type CardForRetention,
 } from './rules/death';
-import { computeXpReward } from './rules/leveling';
+import { computeKillXpReward } from './rules/leveling';
 
 import { resolveHit, resolveHeal } from './rules/combat';
 import { EMPTY_STAT_BLOCK, type StatBlock } from './types';
@@ -201,6 +205,11 @@ const zone = table(
     recommendedLevel: t.u32(),
     maxLevel: t.u32(),
     description: t.string(),
+    // The remaining zones.json fields (population/director/boss/levelBands/
+    // spawnRarities) stay server-side content; these two are here because the
+    // client reads them off the row it already subscribes to.
+    tutorialZone: t.bool(),
+    masteredMessage: t.option(t.string()),
   },
 );
 
@@ -457,36 +466,50 @@ const itemDrop = table(
  * and resets back to its spawn point (healing as it goes) if it loses its target.
  * spawnX/spawnY stores the original position so the respawn/reset logic can reset.
  */
-const enemy = table(
-  {
-    name: 'enemy',
-    public: true,
-    indexes: [{ accessor: 'by_zone', algorithm: 'btree', columns: ['zoneId'] }],
-  },
-  {
-    enemyId: t.u64().primaryKey().autoInc(),
-    zoneId: t.u32(),
-    /** Set on spawn. Drives the XP reward and the drop-pool level gate. */
-    level: t.u32(),
-    posX: t.f32(),
-    posY: t.f32(),
-    spawnX: t.f32(),
-    spawnY: t.f32(),
-    currentHp: t.i32(),
-    maxHp: t.i32(),
-    alive: t.bool(),
-    damagePerHit: t.i32(),
-    attackRangePx: t.f32(),
-    attackCooldownSeconds: t.f32(),
-    lastAttackAt: t.option(t.timestamp()),
-    aggroState: TAggroState,
-    targetCharacterId: t.option(t.u64()),
-    lastSeenTargetAt: t.option(t.timestamp()),
-    castStartedAt: t.option(t.timestamp()),
-    castDurationSeconds: t.f32(),
-    castShape: TShape,
-    castDamage: t.i32(),
-  },
+const enemy = realizes(
+  ArchTraceables.ARCH_012_ENEMY_RARITY_AND_BOSS_FLAG_ARE_COLUMNS_ON_THE_FLAT_ENEMY_ROW,
+  table(
+    {
+      name: 'enemy',
+      public: true,
+      indexes: [
+        { accessor: 'by_zone', algorithm: 'btree', columns: ['zoneId'] },
+      ],
+    },
+    {
+      enemyId: t.u64().primaryKey().autoInc(),
+      zoneId: t.u32(),
+      /** Set on spawn. Drives the XP reward and the drop-pool level gate. */
+      level: t.u32(),
+      /**
+       * The second difficulty axis beside level: scales maxHp/damage through
+       * computeEnemyStats and raises the drop table's floor through
+       * shiftRarityWeightsForMob. Nothing rolls this at spawn time yet — every
+       * enemy is seeded `common` until the spawn director lands.
+       */
+      rarity: TRarity,
+      /** Zone-boss marker. No boss spawns yet; the boss cycle owns this. */
+      isBoss: t.bool(),
+      posX: t.f32(),
+      posY: t.f32(),
+      spawnX: t.f32(),
+      spawnY: t.f32(),
+      currentHp: t.i32(),
+      maxHp: t.i32(),
+      alive: t.bool(),
+      damagePerHit: t.i32(),
+      attackRangePx: t.f32(),
+      attackCooldownSeconds: t.f32(),
+      lastAttackAt: t.option(t.timestamp()),
+      aggroState: TAggroState,
+      targetCharacterId: t.option(t.u64()),
+      lastSeenTargetAt: t.option(t.timestamp()),
+      castStartedAt: t.option(t.timestamp()),
+      castDurationSeconds: t.f32(),
+      castShape: TShape,
+      castDamage: t.i32(),
+    },
+  ),
 );
 
 // Row schema for card-drop cleanup schedule
@@ -559,6 +582,9 @@ const CARD_DEFS = parseCards(cardsJson as unknown[]);
 // Validate equipment data at module load — module refuses to start if equipment.json is invalid.
 const ITEM_DEFS = parseEquipment(equipmentJson as unknown[]);
 
+// Validate zone data at module load — module refuses to start if zones.json is invalid.
+const ZONE_DEFS = parseZones(zonesJson as unknown[]);
+
 // An item's `stats` in equipment.json is a partial StatBlock (only the fields it grants).
 // Missing fields default to 0 — these are additive MODIFIERS, not a character's base stats,
 // so (unlike a fresh character) an absent multiplier field means "no change", not "1.0".
@@ -608,10 +634,11 @@ export const onConnect = db.clientConnected((ctx) => {
   }
 });
 
-/** Runs once when the module is first published. Seeds cards/items + enemies and starts the damage ticker. */
+/** Runs once when the module is first published. Seeds cards/items/zones + enemies and starts the damage ticker. */
 export const init = db.init((ctx) => {
   _doSeedCards(ctx);
   _doSeedItems(ctx);
+  _doSeedZones(ctx);
   _seedZone1Enemies(ctx);
   ctx.db.enemyTickSchedule.insert({
     scheduledId: 0n,
@@ -731,6 +758,52 @@ const _doSeedItems = realizes(
  */
 export const seedItems = db.reducer({}, (ctx) => {
   _doSeedItems(ctx);
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// REDUCERS — zone seeding
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const _doSeedZones = realizes(
+  SwTraceables.SW_030_SEEDING_UPSERTS_CONTENT_BY_SLUG_RE_RUNNING_IS_ALWAYS_SAFE,
+  function _doSeedZones(ctx: any): void {
+    let inserted = 0;
+    let updated = 0;
+
+    for (const zone of ZONE_DEFS) {
+      // zoneId is a plain u32 primary key authored in the content file, not an
+      // autoInc column — it is the idempotency key, so it is set explicitly.
+      const rowData = {
+        zoneId: zone.zoneId,
+        name: zone.name,
+        minLevel: zone.minLevel,
+        recommendedLevel: zone.recommendedLevel ?? zone.minLevel,
+        maxLevel: zone.maxLevel,
+        description: zone.flavor,
+        tutorialZone: zone.tutorialZone,
+        masteredMessage: zone.masteredMessage ?? undefined,
+      };
+
+      const existing = ctx.db.zone.zoneId.find(zone.zoneId);
+      if (existing) {
+        ctx.db.zone.zoneId.update(rowData);
+        updated++;
+      } else {
+        ctx.db.zone.insert(rowData);
+        inserted++;
+      }
+    }
+
+    console.log(`[seedZones] ${inserted} inserted, ${updated} updated`);
+  },
+);
+
+/**
+ * seedZones — upserts all zones from content/zones.json into zone.
+ * TODO: restrict to module owner identity before shipping to production.
+ */
+export const seedZones = db.reducer({}, (ctx) => {
+  _doSeedZones(ctx);
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -916,6 +989,17 @@ const ZONE_1_ENEMY_LEVEL = concerns(
   2,
 );
 
+/**
+ * Every enemy this module inserts today is a plain trash mob. Nothing rolls a
+ * rarity or promotes a boss yet — the spawn director and the boss cycle own
+ * that — so both insert sites seed the baseline explicitly rather than letting
+ * the two new columns drift apart.
+ */
+const SEEDED_ENEMY_RARITY = concerns(
+  SysTraceables.SYS_012_ENEMY_DIFFICULTY_SCALES_WITH_RARITY_AS_WELL_AS_LEVEL,
+  { tag: 'common' } as const,
+);
+
 function _seedZone1Enemies(ctx: any): void {
   const TILE = 48;
   const half = TILE / 2;
@@ -929,6 +1013,8 @@ function _seedZone1Enemies(ctx: any): void {
       enemyId: 0n,
       zoneId: 1,
       level: ZONE_1_ENEMY_LEVEL,
+      rarity: SEEDED_ENEMY_RARITY,
+      isBoss: false,
       posX: pos.x,
       posY: pos.y,
       spawnX: pos.x,
@@ -955,9 +1041,34 @@ function _seedZone1Enemies(ctx: any): void {
 // REDUCERS — character lifecycle
 // ═══════════════════════════════════════════════════════════════════════════════
 
-export const startLife = db.reducer(
-  { spiritName: t.string(), startZoneId: t.u32() },
-  (ctx, { spiritName, startZoneId }) => {
+/** Hollow Vale — where an account that has not finished the tutorial belongs. */
+const TUTORIAL_ZONE_ID = 1;
+
+/** Where a graduated account belongs once that zone is authored and seeded. */
+const GRADUATE_ZONE_ID = 2;
+
+/**
+ * What level a graduated account's next life starts at — deliberately below
+ * the tutorial zone's ceiling, not at it.
+ *
+ * Starting at the ceiling composed two correct rules into a broken account: a
+ * kill grants zero XP once the killer is at or above the zone's `maxLevel`, and
+ * while zone 2 is unseeded the graduated branch below falls back to zone 1 — so
+ * a graduate could never earn XP again. Two levels of headroom is what the
+ * tutorial-skip promise asks for: past the floor, not comfortable
+ * (GAME_DESIGN.md). The value is a stopgap that returns to 10 when zone 2
+ * ships; what has to stay true either way is that the level is strictly below
+ * the ceiling of whatever zone the account actually lands in, which is the
+ * constraint the anchor on `startLife` below names.
+ */
+const GRADUATE_START_LEVEL = 8;
+
+export const startLife = realizes(
+  [
+    SwTraceables.SW_053_STARTLIFE_COMPUTES_THE_START_ZONE_FROM_TUTORIAL_COMPLETION_NOT_CALLER_INPUT,
+    ConTraceables.CON_035_A_GRADUATED_ACCOUNT_STARTS_BELOW_ITS_START_ZONES_MAX_LEVEL,
+  ] as const,
+  db.reducer({ spiritName: t.string() }, (ctx, { spiritName }) => {
     if (activeCharacter(ctx))
       throw new SenderError('Already has an active character');
 
@@ -979,7 +1090,21 @@ export const startLife = db.reducer(
       });
     }
 
-    const startLevel = progress.tutorialCompleted ? 10 : 1;
+    const startLevel = progress.tutorialCompleted ? GRADUATE_START_LEVEL : 1;
+    // Which zone a life begins in is the server's decision, exactly as the
+    // starting level above it is — a graduated account moves on from the
+    // tutorial zone, a new one starts in it, and neither is the caller's to
+    // choose. The routing itself is already final: the fallback is keyed on
+    // whether the graduate zone is actually seeded, so it stops applying by
+    // itself rather than needing this code changed again.
+    // TODO: author zone 2's content — until it is seeded, a graduated account
+    // restarts in the tutorial zone, which is why GRADUATE_START_LEVEL sits
+    // below that zone's ceiling instead of at it.
+    const graduatedZone = ctx.db.zone.zoneId.find(GRADUATE_ZONE_ID);
+    const startZoneId =
+      progress.tutorialCompleted && graduatedZone
+        ? GRADUATE_ZONE_ID
+        : TUTORIAL_ZONE_ID;
     ctx.db.character.insert({
       characterId: 0n,
       accountIdentity: ctx.sender,
@@ -1027,7 +1152,7 @@ export const startLife = db.reducer(
         }
       }
     }
-  },
+  }),
 );
 
 export const move = db.reducer({ x: t.f32(), y: t.f32() }, (ctx, { x, y }) => {
@@ -1068,7 +1193,7 @@ const _handleDeath = concerns(
   realizes(
     [
       SwTraceables.SW_026_DEATH_ALWAYS_DESTROYS_GEAR_AND_A_SPIRITLESS_ACCOUNT_LOSES_EVERY_CARD,
-      ConTraceables.CON_008_FIRST_REACHING_LEVEL_TEN_STAMPS_TUTORIAL_COMPLETED_EXACTLY_ONCE,
+      ConTraceables.CON_033_TUTORIAL_COMPLETION_STAMPS_ON_DEATH_ONCE_THE_CHARACTERS_ZONE_APPROPRIATE_MAX_LEVEL_WAS_REACHED,
     ] as const,
     function _handleDeath(ctx: any, char: any): void {
       ctx.db.character.characterId.update({
@@ -1131,10 +1256,22 @@ const _handleDeath = concerns(
         ctx.db.cardInstance.cardInstanceId.delete(id);
       }
 
+      // Graduating the account is the tutorial zone's call, at whatever level
+      // that zone is authored to end at — not a literal repeated here. A death
+      // in any other zone, at any level, leaves the flag alone; the flip stays
+      // death-gated and still happens at most once, since it is guarded on the
+      // flag being false.
       const progress = ctx.db.accountProgress.accountIdentity.find(
         char.accountIdentity,
       );
-      if (progress && char.level >= 10 && !progress.tutorialCompleted) {
+      const deathZone = ctx.db.zone.zoneId.find(char.zoneId);
+      if (
+        progress &&
+        deathZone &&
+        deathZone.tutorialZone &&
+        char.level >= deathZone.maxLevel &&
+        !progress.tutorialCompleted
+      ) {
         ctx.db.accountProgress.accountIdentity.update({
           ...progress,
           tutorialCompleted: true,
@@ -1400,6 +1537,8 @@ export const spawnEnemy = db.reducer(
       enemyId: 0n,
       zoneId,
       level: level > 0 ? level : ZONE_1_ENEMY_LEVEL,
+      rarity: SEEDED_ENEMY_RARITY,
+      isBoss: false,
       posX: x,
       posY: y,
       spawnX: x,
@@ -1497,11 +1636,15 @@ export const damageEnemy = realizes(
             enemyId: e.enemyId,
           });
           // Reward scales with the gap between the killer and what they killed:
-          // trivial mobs pay nothing, above-level mobs pay a capped bonus.
-          const xp = computeXpReward(
+          // trivial mobs pay nothing, above-level mobs pay a capped bonus — and
+          // a killer who has out-levelled the enemy's whole zone earns nothing
+          // there at all, checked ahead of the curve rather than clamped after.
+          const killZone = ctx.db.zone.zoneId.find(e.zoneId);
+          const xp = computeKillXpReward(
             CONFIG.xp.baseMonsterXp,
             e.level,
             char.level,
+            killZone?.maxLevel,
             CONFIG.xp.levelDiffPenalty,
           );
           if (xp > 0) _grantXp(ctx, char, BigInt(xp));

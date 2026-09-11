@@ -152,8 +152,30 @@ Current seeded enemy stats (`_seedZone1Enemies` / `spawnEnemy`, zone 1):
 
 `level` drives both the XP reward and the drop-pool gate (see below).
 It is
-the only per-enemy difficulty signal so far — HP and damage are still flat
-across every enemy.
+the only per-enemy difficulty signal live in the world so far: `spawnEnemy`
+still writes the flat numbers above, and the level/rarity scaling in
+`rules/enemyScaling.ts` is not wired into the spawn path yet (`STR-013`).
+
+**The archetype the table above is derived from lives in
+`content/config.json`** under `enemies`, not here — same treatment as the
+drop rates below:
+
+| `config.json` key         | Value | Meaning                                                                            |
+| ------------------------- | ----: | ---------------------------------------------------------------------------------- |
+| `enemies.baseHp`          |    50 | Zone-1 archetype HP at level 1, common rarity, before level and rarity scaling.    |
+| `enemies.baseDamage`      |     4 | The same for one melee swing.                                                      |
+| `enemies.castDamageRatio` | 1.875 | How much harder a telegraphed cast lands than a swing — never below 1 (`CON-034`). |
+
+Scaled to the seeded level 2 at common rarity, those reproduce the shipped
+100 HP / 8 damage / 15 cast exactly.
+They are **zone-1 archetype defaults sitting in an operator dial only until
+a real enemy-definition pipeline exists**: when enemy types land they move to
+`content/enemies.json` per archetype, and these keys become the fallback.
+
+The cast differential is deliberate and is the telegraph mechanic itself —
+if a cast hit for the same as a swing, stepping out of the shape on the
+ground would cost the player nothing and gain them nothing.
+`CON-034` makes a sub-1.0 ratio unrepresentable rather than merely unwise.
 
 All of the above are first-pass placeholder values, not balanced against
 real player stats yet.
@@ -195,6 +217,17 @@ identical shape over `itemDefinition` rows filtered by
 If the picked tier has no eligible entries,
 selection falls back to the full eligible pool; if that is empty too, the
 enemy drops nothing rather than erroring.
+
+**An enemy's rarity does not currently move these odds.** Rarity scales an
+enemy's HP and damage (`enemies.rarityMultipliers`, above) and shifts which
+drop-table tier a kill is rolled against, but the per-tier weights in the
+table above are the same for a legendary enemy as for a common one — a rarer
+kill is harder and points higher up the table, not luckier within it.
+Whether rarity should also scale the weights is **deferred pending an economy
+model**: the weights and the base chances are the only levers on how fast
+inventory accumulates, and retuning them without knowing what a card is worth
+is guesswork.
+This is a known gap, not an oversight.
 
 **Eligibility is keyed to the ENEMY's level, not the killer's** (changed in
 `STR-009`, superseding `SW-016`).

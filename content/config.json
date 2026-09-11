@@ -39,6 +39,16 @@
     "attackRangePx": 180,
     "deaggroRangePx": 500,
     "chaseSpeedPxPerSec": 110,
-    "resetSpeedPxPerSec": 80
+    "resetSpeedPxPerSec": 80,
+    "baseHp": 50,
+    "baseDamage": 4,
+    "castDamageRatio": 1.875,
+    "rarityMultipliers": {
+      "common": { "hp": 1.0, "damage": 1.0 },
+      "uncommon": { "hp": 2.5, "damage": 1.4 },
+      "rare": { "hp": 6.0, "damage": 1.8 },
+      "epic": { "hp": 15.0, "damage": 2.4 },
+      "legendary": { "hp": 40.0, "damage": 3.2 }
+    }
   }
 }
