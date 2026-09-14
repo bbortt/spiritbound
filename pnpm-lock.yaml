@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       spacetimedb:
-        specifier: 2.9.0
-        version: 2.9.0
+        specifier: 2.10.0
+        version: 2.10.0
       zod:
         specifier: 4.5.4
         version: 4.5.4
@@ -34,8 +34,8 @@ importers:
         specifier: 9.1.7
         version: 9.1.7
       lint-staged:
-        specifier: 17.4.1
-        version: 17.4.1
+        specifier: 17.5.0
+        version: 17.5.0
       markdownlint-cli:
         specifier: 0.49.1
         version: 0.49.1
@@ -64,8 +64,8 @@ importers:
         specifier: 4.2.1
         version: 4.2.1
       spacetimedb:
-        specifier: 2.9.0
-        version: 2.9.0
+        specifier: 2.10.0
+        version: 2.10.0
     devDependencies:
       typescript:
         specifier: 5.9.3
@@ -77,8 +77,8 @@ importers:
   spacetimedb:
     dependencies:
       spacetimedb:
-        specifier: 2.9.*
-        version: 2.9.0
+        specifier: 2.10.*
+        version: 2.10.0
     devDependencies:
       typescript:
         specifier: 5.9.3
@@ -866,8 +866,8 @@ packages:
   linkify-it@5.0.2:
     resolution: {integrity: sha512-ONTm2jCMAVZjgQa/Fy1kScXsuOoF5NPTsoFBdE1KVIZ2vAh/r9+Bqo+0jINCBYnavTPQZz38QzFTme79ENoN3Q==}
 
-  lint-staged@17.4.1:
-    resolution: {integrity: sha512-FmJeudcalbSfg1du+JCfvi5vS6Qt08KgbfLWiHinbef+2JJwUZwAWVoaO1AcJVUTWPfk0t30PMQNwPAeCzYQ+Q==}
+  lint-staged@17.5.0:
+    resolution: {integrity: sha512-ah2qsNtvKP1+Ak4rAvEEIvcXDLjjbr/xmxCvlequxqEOFYk0qINcZcRxD3Ic8wRn7/oQ8+wC9s0DfDrdMVCRFg==}
     engines: {node: '>=22.22.1'}
     hasBin: true
 
@@ -1110,8 +1110,8 @@ packages:
     resolution: {integrity: sha512-UXWMKhLOwVKb728IUtQPXxfYU+usdybtUrK/8uGE8CQMvrhOpwvzDBwj0QhSL7MQc7vIsISBG8VQ8+IDQxpfQA==}
     engines: {node: '>=0.10.0'}
 
-  spacetimedb@2.9.0:
-    resolution: {integrity: sha512-Fsv90p8lrOmqeTn0UpN0cyY5L/vuu/5VMhjs5G/1QrU+nDZYH2wWv7sw81pt58jTofqu244r6b548Nxeb/1hCw==}
+  spacetimedb@2.10.0:
+    resolution: {integrity: sha512-M37qGhHA+eLJsjcom441WUqy1jdY9glCxZ98Dm48IH+K45CBsrXBuskLKMj4paWBGSHnIi8eTTo05prFqv18GQ==}
     peerDependencies:
       '@angular/core': '>=17.0.0'
       '@tanstack/react-query': ^5.0.0
@@ -1918,7 +1918,7 @@ snapshots:
     dependencies:
       uc.micro: 2.1.0
 
-  lint-staged@17.4.1:
+  lint-staged@17.5.0:
     dependencies:
       picomatch: 4.0.7
       string-argv: 0.3.2
@@ -2283,7 +2283,7 @@ snapshots:
 
   source-map-js@1.2.1: {}
 
-  spacetimedb@2.9.0:
+  spacetimedb@2.10.0:
     dependencies:
       base64-js: 1.5.1
       headers-polyfill: 4.0.3
