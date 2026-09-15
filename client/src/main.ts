@@ -6,6 +6,8 @@ import { GameScene } from './scenes/GameScene';
 
 new Phaser.Game({
   type: Phaser.AUTO,
+  // The tileset is 32 px pixel art scaled up in-world — keep it crisp.
+  pixelArt: true,
   width: 1280,
   height: 720,
   backgroundColor: '#1a1a2e',
