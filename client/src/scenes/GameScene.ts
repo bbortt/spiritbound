@@ -29,17 +29,20 @@ import {
   crossedZoneMastery,
   type KillXpDisplay,
 } from '../zoneMastery';
+import {
+  buildEntryZone,
+  isSolid,
+  MAP_W,
+  MAP_H,
+  SRC_TILE,
+  TILE_SIZE,
+  WORLD_W,
+  WORLD_H,
+} from '../entryZone';
 
 // ── Tilemap constants ─────────────────────────────────────────────────────────
-const TILE_SIZE = 48;
-const MAP_W = 60;
-const MAP_H = 60;
-const TILE_GRASS = 0;
-const TILE_DIRT = 1;
-const TILE_STONE = 2;
-
-const WORLD_W = MAP_W * TILE_SIZE; // 2880
-const WORLD_H = MAP_H * TILE_SIZE; // 2880
+// Map layout, terrain and tile indices live in ../entryZone; this scene only
+// renders them and reads terrain back for collision.
 
 const PLAYER_R = 20;
 const OTHER_R = 18;
@@ -92,55 +95,10 @@ const EMBER_MP_REGEN = 2;
 
 // ── Map layout ────────────────────────────────────────────────────────────────
 
-function buildMap(): number[][] {
-  const rows = Array.from({ length: MAP_H }, () =>
-    Array<number>(MAP_W).fill(TILE_GRASS),
-  );
-
-  for (let x = 0; x < MAP_W; x++) {
-    rows[0][x] = TILE_STONE;
-    rows[MAP_H - 1][x] = TILE_STONE;
-  }
-  for (let y = 0; y < MAP_H; y++) {
-    rows[y][0] = TILE_STONE;
-    rows[y][MAP_W - 1] = TILE_STONE;
-  }
-
-  const PATH = [
-    [1, 30],
-    [12, 25],
-    [20, 38],
-    [30, 30],
-    [38, 18],
-    [46, 34],
-    [54, 28],
-    [58, 30],
-  ];
-  for (let i = 0; i < PATH.length - 1; i++) {
-    const [x0, y0] = PATH[i];
-    const [x1, y1] = PATH[i + 1];
-    const steps = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)) * 2 + 1;
-    for (let s = 0; s <= steps; s++) {
-      const t = s / steps;
-      const cx = Math.round(x0 + (x1 - x0) * t);
-      const cy = Math.round(y0 + (y1 - y0) * t);
-      for (let dy = -1; dy <= 1; dy++) {
-        for (let dx = -1; dx <= 1; dx++) {
-          const nx = cx + dx;
-          const ny = cy + dy;
-          if (nx > 0 && nx < MAP_W - 1 && ny > 0 && ny < MAP_H - 1) {
-            rows[ny][nx] = TILE_DIRT;
-          }
-        }
-      }
-    }
-  }
-
-  return rows;
-}
-
-const MAP_DATA = buildMap();
-const TILE_TEX = 'tiles';
+const ZONE = buildEntryZone();
+const TILE_TEX = 'mountains';
+/** The tileset art is 32 px; the world runs on 48 px tiles. */
+const TILE_SCALE = TILE_SIZE / SRC_TILE;
 
 // ── Enemy graphics data (client side, mirrors DB row) ─────────────────────────
 
@@ -379,39 +337,16 @@ export class GameScene extends Phaser.Scene {
   }
 
   preload() {
-    const canvas = this.textures.createCanvas(
-      TILE_TEX,
-      TILE_SIZE * 3,
-      TILE_SIZE,
-    )!;
-    const ctx = canvas.getContext();
-
-    ctx.fillStyle = '#2d4a1e';
-    ctx.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
-
-    ctx.fillStyle = '#6b4c2a';
-    ctx.fillRect(TILE_SIZE, 0, TILE_SIZE, TILE_SIZE);
-
-    ctx.fillStyle = '#4a4a4a';
-    ctx.fillRect(TILE_SIZE * 2, 0, TILE_SIZE, TILE_SIZE);
-
-    canvas.refresh();
+    this.load.image(TILE_TEX, 'tiles/mountains-v6.png');
   }
 
   create() {
     // ── Tilemap ────────────────────────────────────────────────────────────────
-    const map = this.make.tilemap({
-      data: MAP_DATA,
-      tileWidth: TILE_SIZE,
-      tileHeight: TILE_SIZE,
-    });
-    const tileset = map.addTilesetImage(
-      TILE_TEX,
-      TILE_TEX,
-      TILE_SIZE,
-      TILE_SIZE,
-    )!;
-    map.createLayer(0, tileset, 0, 0)!.setDepth(-1);
+    // Two layers: an opaque ground layer, and an overlay for the pieces that
+    // need what is underneath to show through (the cliff's scree fringe, the
+    // trail's ragged edges, boulders).
+    this._createTileLayer(ZONE.ground, -3);
+    this._createTileLayer(ZONE.overlay, -2);
     this.cameras.main.setBounds(0, 0, WORLD_W, WORLD_H);
 
     // ── Local player circle ───────────────────────────────────────────────────
@@ -574,6 +509,24 @@ export class GameScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setDepth(3)
       .setVisible(false);
+  }
+
+  // ── Tilemap helpers ───────────────────────────────────────────────────────────
+
+  /** Render one grid of tileset indices (EMPTY leaves the cell blank). */
+  private _createTileLayer(data: number[][], depth: number) {
+    const map = this.make.tilemap({
+      data,
+      tileWidth: SRC_TILE,
+      tileHeight: SRC_TILE,
+    });
+    const tileset = map.addTilesetImage(
+      TILE_TEX,
+      TILE_TEX,
+      SRC_TILE,
+      SRC_TILE,
+    )!;
+    map.createLayer(0, tileset, 0, 0)!.setScale(TILE_SCALE).setDepth(depth);
   }
 
   update(_time: number, delta: number) {
@@ -1124,7 +1077,7 @@ export class GameScene extends Phaser.Scene {
     const tx = Math.floor(worldX / TILE_SIZE);
     const ty = Math.floor(worldY / TILE_SIZE);
     if (tx < 0 || ty < 0 || tx >= MAP_W || ty >= MAP_H) return true;
-    return MAP_DATA[ty][tx] === TILE_STONE;
+    return isSolid(ZONE.terrain[ty][tx]);
   }
 
   private _clampWalkable(tx: number, ty: number): { x: number; y: number } {
