@@ -11,6 +11,10 @@ site/.jekyll-cache/
 site/.jekyll-metadata
 site/vendor/
 
+# mapgen output: 17 MB of chunk JSON that `node tools/mapgen/index.ts` rebuilds
+# in about four seconds. The generator is the source; its exports are not.
+client/public/maps/
+
 # clew: regenerated tool output (state.json stays tracked)
 .clew/locations.json
 .clew/coverage.json
