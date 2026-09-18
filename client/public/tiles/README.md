@@ -1,46 +1,70 @@
 # Tilesets
 
-## `mountains-v6.png` — LPC Mountains
+Two sheets, both CC0, split by provenance rather than by content: everything Kenney's pack could supply comes from `kenney/roguelike-sheet.png`, and the one thing it could not comes from `cliff-cc0.png`, which is generated.
 
-Source: <https://opengameart.org/content/lpc-mountains>, downloaded unmodified from the submission's `mountains.zip`.
+Carrying two sheets in one map is what Tiled's `firstgid` is for: Kenney's sheet owns gids 1-1767 and the cliff takes over at 1768.
 
-32 px tiles, 64 x 80 of them.
-`client/src/entryZone.ts` indexes into it by `row * 64 + column`.
+## `kenney/roguelike-sheet.png` — Kenney Roguelike/RPG pack
 
-The entry zone uses the sandstone mesa (columns 1-4, rows 42-43 for the cliff face and its scree fringe; columns 14-18, rows 41-43 for the plateau surface), the flat grass at columns 1-2, rows 72-73, the cobbled trail at columns 24-26, rows 74-76, the grey stone at columns 2-3, rows 53-54, and the boulders at column 12, rows 72-73.
+Source: <https://opengameart.org/content/roguelike-rpg-pack>, downloaded unmodified.
+Kenney's own download page for this pack has moved; the OpenGameArt mirror is the same archive by the same author.
 
-### Licence: LPC Mountains
+16 px tiles, 57 x 31 of them, with a **1 px gutter between tiles and no margin**.
+The gutter is the thing to remember: `addTilesetImage` and the `.tmj` tileset both have to be told about it, or every tile draws a pixel off and the error grows as you go right and down.
 
-CC-BY-SA 3.0 / 4.0 with mandatory attribution.
-`CREDITS-mountains.txt` ships next to the image and lists every upstream author; it must stay with the file.
+What the map uses:
 
-Two caveats before this goes anywhere near a release:
+- grass at column 5, rows 0-1
+- sand, for the plateau, at column 8, rows 0-1
+- grey masonry at column 6, rows 2-3
+- beige flagstone, for the village square, at column 7, rows 2-3
+- the dirt trail as a 3 x 3 edge-matched patch at columns 7-9, rows 9-11
+- trees, 1 x 2 each, at columns 13, 15, 16 and 18, rows 10-11
+- house roofs, 3 x 3 each, at columns 17, 24 and 31, rows 21-23
+- boulders at columns 54-56, rows 21-22, and earth mounds at columns 54-55, rows 19-20
 
-1. The credits list a Mana World tileset under **GPL v2**, which does not combine with this repository's CC-BY-NC-SA-4.0 licence.
-   Whether any of that art survives into `mountains-v6.png` — and into the tiles listed above — is unverified.
-2. BY-SA forbids adding restrictions, so the image must stay unmodified and separately licensed.
-   Editing it would make the result BY-SA rather than NC.
+Two notes on picking from this sheet, both learned by rendering it rather than by reading coordinates:
 
-Both are reasons to treat this as proof-of-concept art, not a committed asset choice.
+1. Kenney's terrain sets are organic blobs, not a Wang grid.
+   One clean 3 x 3 does fall out of the dirt set at columns 7-9, rows 9-11, and the grey set repeats the arrangement at rows 15-17.
+2. Most of the building kit is drawn for a three-quarter view — the gabled roof pieces have a transparent notch cut in the bottom for a wall that is supposed to be under them.
+   Straight down, a house built from those renders as an arrowhead.
+   The flat roof blocks are complete on their own.
 
-## `base_out_atlas.png` — LPC Tile Atlas (outdoor base)
+### Licence: Kenney Roguelike/RPG pack
 
-Source: <https://opengameart.org/content/lpc-tile-atlas>, downloaded unmodified.
+CC0 1.0.
+No attribution required, no restrictions to propagate, and no conflict with whatever licence the repository settles on.
+`kenney/LICENSE-kenney.txt` ships next to the image anyway — Kenney asks for a credit as a courtesy, not as a condition.
 
-32 px tiles, 32 x 32 of them.
-`tools/mapgen/palette.ts` indexes into it by `row * 32 + column`.
+## `cliff-cc0.png` — generated
 
-It is here because the mountains sheet has no trees and no buildings, and this one has both, in the same LPC style at the same tile size.
-The map generator uses the broadleaf and pine trees at columns 24-29, rows 12-17, the house roofs and walls at columns 0-7, rows 9-15, the grey stone walls at columns 3-5, rows 12-13, and the haystack at columns 11-12, rows 21-22.
+Not downloaded. `tools/mapgen/cliffArt.ts` draws it; run `node tools/mapgen/cliffArt.ts` to regenerate.
 
-Carrying two sheets in one map is what Tiled's `firstgid` is for: the mountains sheet owns gids 1-5120 and this one takes over at 5121.
+16 px tiles, 8 x 3 of them, no gutter and no margin.
+Row 0 is the lip where the plateau breaks over, row 1 the face, row 2 the scree fringe at the foot — which is drawn on the overlay layer so the grass shows through its gaps.
 
-### Licence: LPC Tile Atlas
+**This exists because Kenney's pack has no elevation art of any kind.**
+No cliff face, no plateau edge, no mountain; its only vertical surfaces are building walls.
+The opening beat in `docs/GAME_DESIGN.md` is "it threw you off a cliff, you wake at the bottom with nothing", so the cliff has to be visible from the spawn point — and it is the one thing a CC0 swap cannot buy off the shelf.
 
-CC-BY-SA 3.0 **and** GPL 3, per the submission page — the same two problems as the mountains sheet, one of them worse.
+Colours are sampled from Kenney's grey boulders at (54, 21) so the seam between drawn and downloaded stone is not obvious.
+It is programmer art and looks it.
+It exists to prove the swap renders, not to be the cliff that ships.
 
-1. GPL 3 does not combine with this repository's CC-BY-NC-SA-4.0 licence, any more than the mountains sheet's GPL v2 does.
-2. BY-SA forbids adding restrictions, so the image must stay unmodified and separately licensed.
+### Licence: `cliff-cc0.png`
 
-This is spike art.
-Shipping it means either relicensing the project or swapping in something CC0, and the second is the cheaper answer: `tools/mapgen/palette.ts` is the only file that would have to change.
+Original work, so it carries whatever the repository decides — which is also why generating it sidesteps the licence question entirely rather than trading one encumbrance for another.
+
+## Previously here: the LPC sheets
+
+`mountains-v6.png` (LPC Mountains) and `base_out_atlas.png` (LPC Tile Atlas) are the art this pair replaces.
+They are still in the tree on the `spike/tiled-chunked-world` branch.
+
+They were dropped for licence reasons, not visual ones — they look better than what replaced them:
+
+1. Their credits include a Mana World tileset under **GPL v2**, and the atlas is CC-BY-SA 3.0 **and** GPL 3.
+   Neither combines with this repository's CC-BY-NC-SA-4.0.
+   Because both sheets are composites, the CC0 pixels inside them cannot be cherry-picked out.
+2. BY-SA forbids adding restrictions, and NonCommercial is one.
+   The "ship the PNG unmodified with credits alongside" stance is an aggregation argument, and it collapses the moment anyone edits a pixel of the art.

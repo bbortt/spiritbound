@@ -38,6 +38,10 @@ import {
   TILE_SIZE,
   WORLD_W,
   WORLD_H,
+  KENNEY_SPACING,
+  KENNEY_FIRST_GID,
+  CLIFF_SPACING,
+  CLIFF_FIRST_GID,
 } from '../entryZone';
 
 // ── Tilemap constants ─────────────────────────────────────────────────────────
@@ -96,8 +100,11 @@ const EMBER_MP_REGEN = 2;
 // ── Map layout ────────────────────────────────────────────────────────────────
 
 const ZONE = buildEntryZone();
-const TILE_TEX = 'mountains';
-/** The tileset art is 32 px; the world runs on 48 px tiles. */
+/** Kenney's CC0 Roguelike/RPG pack — everything except the elevation. */
+const KENNEY_TEX = 'kenney';
+/** The cliff, which Kenney's pack has none of; see `tools/mapgen/cliffArt.ts`. */
+const CLIFF_TEX = 'cliff';
+/** The tileset art is 16 px; the world runs on 48 px tiles. */
 const TILE_SCALE = TILE_SIZE / SRC_TILE;
 
 // ── Enemy graphics data (client side, mirrors DB row) ─────────────────────────
@@ -337,7 +344,11 @@ export class GameScene extends Phaser.Scene {
   }
 
   preload() {
-    this.load.image(TILE_TEX, 'tiles/mountains-v6.png');
+    // Plain images, not spritesheets: `addTilesetImage` takes the margin and
+    // spacing itself and slices the texture from those, so pre-cutting frames
+    // here would only be a second, redundant description of the same grid.
+    this.load.image(KENNEY_TEX, 'tiles/kenney/roguelike-sheet.png');
+    this.load.image(CLIFF_TEX, 'tiles/cliff-cc0.png');
   }
 
   create() {
@@ -513,20 +524,43 @@ export class GameScene extends Phaser.Scene {
 
   // ── Tilemap helpers ───────────────────────────────────────────────────────────
 
-  /** Render one grid of tileset indices (EMPTY leaves the cell blank). */
+  /**
+   * Render one grid of global tile ids (EMPTY leaves the cell blank).
+   *
+   * The grid spans two sheets, which is why the cells are gids rather than
+   * plain indices: each tileset is registered at the same first-gid the zone
+   * data was built against, and Phaser picks the right texture per tile from
+   * that. The trailing arguments to `addTilesetImage` are margin and spacing —
+   * Kenney's sheet has a 1 px gutter, and without it every tile draws a pixel
+   * off, drifting worse the further right and down you go.
+   */
   private _createTileLayer(data: number[][], depth: number) {
     const map = this.make.tilemap({
       data,
       tileWidth: SRC_TILE,
       tileHeight: SRC_TILE,
     });
-    const tileset = map.addTilesetImage(
-      TILE_TEX,
-      TILE_TEX,
-      SRC_TILE,
-      SRC_TILE,
-    )!;
-    map.createLayer(0, tileset, 0, 0)!.setScale(TILE_SCALE).setDepth(depth);
+    const tilesets = [
+      map.addTilesetImage(
+        KENNEY_TEX,
+        KENNEY_TEX,
+        SRC_TILE,
+        SRC_TILE,
+        0,
+        KENNEY_SPACING,
+        KENNEY_FIRST_GID,
+      )!,
+      map.addTilesetImage(
+        CLIFF_TEX,
+        CLIFF_TEX,
+        SRC_TILE,
+        SRC_TILE,
+        0,
+        CLIFF_SPACING,
+        CLIFF_FIRST_GID,
+      )!,
+    ];
+    map.createLayer(0, tilesets, 0, 0)!.setScale(TILE_SCALE).setDepth(depth);
   }
 
   update(_time: number, delta: number) {

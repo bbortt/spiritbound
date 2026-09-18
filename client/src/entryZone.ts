@@ -23,10 +23,29 @@ export const MAP_H = 60;
 export const WORLD_W = MAP_W * TILE_SIZE; // 2880
 export const WORLD_H = MAP_H * TILE_SIZE; // 2880
 
-/** Source tile size of the tileset image, before it is scaled to TILE_SIZE. */
-export const SRC_TILE = 32;
-/** Tiles per row in the tileset image (2048 px / 32 px). */
-const SHEET_COLS = 64;
+/** Source tile size of the tileset images, before they are scaled to TILE_SIZE. */
+export const SRC_TILE = 16;
+
+/**
+ * The zone draws from two sheets, so tiles are Tiled-style global ids rather
+ * than plain indices: Kenney's CC0 pack owns the first block, and the cliff
+ * sheet we draw ourselves takes over above it. `GameScene` hands both to
+ * `addTilesetImage` with these same gids, which is what makes one flat number
+ * grid address two textures.
+ *
+ * Kenney's sheet also carries a 1 px gutter between tiles — hence `SPACING`,
+ * which the scene passes to Phaser and without which every tile is drawn one
+ * pixel off, worsening as you go right and down.
+ */
+export const KENNEY_COLS = 57;
+export const KENNEY_ROWS = 31;
+export const KENNEY_SPACING = 1;
+export const KENNEY_FIRST_GID = 1;
+
+export const CLIFF_COLS = 8;
+export const CLIFF_ROWS_TOTAL = 3;
+export const CLIFF_SPACING = 0;
+export const CLIFF_FIRST_GID = KENNEY_FIRST_GID + KENNEY_COLS * KENNEY_ROWS;
 
 /** Empty cell in the overlay layer. */
 export const EMPTY = -1;
@@ -40,33 +59,49 @@ const CLIFF_ROWS = PLATEAU_ROWS + FACE_ROWS;
 /** First walkable row: the rubble fringe at the foot of the cliff. */
 const CLIFF_FOOT_ROW = CLIFF_ROWS;
 
-/** Tileset coordinates, as (column, row) in the source image. */
-const tile = (col: number, row: number): number => row * SHEET_COLS + col;
-
-const GRASS = [tile(1, 72), tile(2, 72), tile(1, 73), tile(2, 73)];
-const PLATEAU = [tile(17, 42), tile(18, 42), tile(17, 43), tile(18, 43)];
-const PLATEAU_ROCK = [
-  tile(14, 42),
-  tile(15, 42),
-  tile(16, 42),
-  tile(14, 43),
-  tile(15, 43),
-  tile(16, 43),
-];
-const CLIFF_FACE = [tile(1, 42), tile(2, 42), tile(3, 42), tile(4, 42)];
-/** Vegetation-and-scree fringe; drawn as an overlay so grass shows through. */
-const CLIFF_FOOT = [tile(1, 43), tile(2, 43), tile(3, 43), tile(4, 43)];
-const WALL = [tile(2, 53), tile(3, 53), tile(2, 54), tile(3, 54)];
-const BOULDER = [tile(12, 72), tile(12, 73)];
+/** Sheet coordinates, as (column, row), resolved to a global tile id. */
+const tile = (col: number, row: number): number =>
+  KENNEY_FIRST_GID + row * KENNEY_COLS + col;
+const cliff = (col: number, row: number): number =>
+  CLIFF_FIRST_GID + row * CLIFF_COLS + col;
 
 /**
- * Cobbled trail, as a 3x3 patch: column picks the west/centre/east piece and
- * row the north/centre/south one, so the trail gets a proper edge instead of
- * a hard tile seam. The tiles are partly transparent, so the grass underneath
- * shows through the gaps.
+ * Plain grass, in its two near-identical shades. Kenney's pale-blotched
+ * variant at (9, 1) is left out: scattered through a field at a 3x render
+ * scale it reads as lichen, or at a glance as snow.
  */
-const PATH_COL0 = 24;
-const PATH_ROW0 = 74;
+const GRASS = [tile(5, 0), tile(5, 1)];
+/**
+ * Sand, not grass, for the clifftop: a green plateau above a green vale floor
+ * reads as one flat field with a grey stripe across it rather than as height.
+ *
+ * Uniform, too. Kenney's ground tiles are flat fills with no edge blending, so
+ * mixing a stone tile in at random reads as a chequerboard rather than as
+ * rocky ground; the boulders on the overlay do that job instead.
+ */
+const PLATEAU = [tile(8, 0), tile(8, 1)];
+const cliffRow = (row: number): number[] =>
+  Array.from({ length: CLIFF_COLS }, (_, col) => cliff(col, row));
+
+/** The lip where the plateau surface breaks over into the drop. */
+const CLIFF_LIP = cliffRow(0);
+const CLIFF_FACE = cliffRow(1);
+/** Scree fringe; drawn as an overlay so the grass shows through it. */
+const CLIFF_FOOT = cliffRow(2);
+const WALL = [tile(6, 2), tile(6, 3)];
+const BOULDER = [tile(54, 21), tile(55, 21), tile(56, 21), tile(54, 22)];
+
+/**
+ * Dirt trail, as a 3x3 patch: column picks the west/centre/east piece and row
+ * the north/centre/south one, so the trail gets a proper edge instead of a
+ * hard tile seam. The tiles are partly transparent, so the grass underneath
+ * shows through the gaps.
+ *
+ * Kenney lays its terrain out as organic blobs rather than a Wang grid, but
+ * one clean 3x3 falls out of the dirt set here.
+ */
+const PATH_COL0 = 7;
+const PATH_ROW0 = 9;
 
 /** Waypoints of the trail through the vale, in tile coordinates. */
 const TRAIL: readonly (readonly [number, number])[] = [
@@ -170,7 +205,12 @@ export function buildEntryZone(): EntryZone {
 
       if (y < PLATEAU_ROWS) {
         terrainRow.push('plateau');
-        groundRow.push(pick(rnd() < 0.25 ? PLATEAU_ROCK : PLATEAU));
+        groundRow.push(pick(PLATEAU));
+      } else if (y === PLATEAU_ROWS) {
+        // The break itself: half plateau surface, half face, so the drop has
+        // an edge to it rather than starting flat against flat.
+        terrainRow.push('cliff');
+        groundRow.push(CLIFF_LIP[x % CLIFF_LIP.length]);
       } else if (y < CLIFF_ROWS) {
         terrainRow.push('cliff');
         groundRow.push(pick(CLIFF_FACE));

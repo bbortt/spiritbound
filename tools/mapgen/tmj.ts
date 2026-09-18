@@ -23,6 +23,7 @@
 import { type ChunkData } from './chunk.ts';
 import {
   SHEETS,
+  sheetPixels,
   SOLID_GIDS,
   SRC_TILE,
   type Sheet,
@@ -62,15 +63,16 @@ export interface TiledObject {
  */
 function tilesetJson(sheet: Sheet) {
   const total = tileCount(sheet);
+  const { width, height } = sheetPixels(sheet);
   return {
     columns: sheet.columns,
     firstgid: sheet.firstGid,
     image: `../../../tiles/${sheet.image}`,
-    imageheight: sheet.rows * SRC_TILE,
-    imagewidth: sheet.columns * SRC_TILE,
-    margin: 0,
+    imageheight: height,
+    imagewidth: width,
+    margin: sheet.margin,
     name: sheet.name,
-    spacing: 0,
+    spacing: sheet.spacing,
     tilecount: total,
     tileheight: SRC_TILE,
     tilewidth: SRC_TILE,
