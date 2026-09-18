@@ -9,6 +9,8 @@ import {
   MAP_W,
   MAP_H,
   TILE_SIZE,
+  KENNEY_FIRST_GID,
+  CLIFF_FIRST_GID,
 } from './entryZone';
 
 /** Where `spacetimedb/src/index.ts` drops a freshly created character. */
@@ -73,15 +75,22 @@ describe('buildEntryZone', () => {
     }
   });
 
-  it('indexes only tiles that exist in the tileset image', () => {
-    // mountains-v6.png is 2048x2560 at 32 px — 64 x 80 tiles.
-    const tileCount = 64 * 80;
+  it('indexes only tiles that exist in one of the two sheets', () => {
+    // The zone spans two sheets, so a tile is a global id: Kenney's block runs
+    // from its first gid for 57 x 31 tiles, and the cliff's follows for 8 x 3.
+    const kenney = { lo: KENNEY_FIRST_GID, hi: KENNEY_FIRST_GID + 57 * 31 };
+    const cliff = { lo: CLIFF_FIRST_GID, hi: CLIFF_FIRST_GID + 8 * 3 };
+    const onASheet = (g: number): boolean =>
+      (g >= kenney.lo && g < kenney.hi) || (g >= cliff.lo && g < cliff.hi);
+
+    // The two blocks must not overlap, or a gid would name two tiles at once.
+    expect(kenney.hi).toBeLessThanOrEqual(cliff.lo);
+
     for (let y = 0; y < MAP_H; y++) {
       for (let x = 0; x < MAP_W; x++) {
-        expect(zone.ground[y][x]).toBeGreaterThanOrEqual(0);
-        expect(zone.ground[y][x]).toBeLessThan(tileCount);
-        expect(zone.overlay[y][x]).toBeLessThan(tileCount);
-        expect(zone.overlay[y][x]).toBeGreaterThanOrEqual(EMPTY);
+        expect(onASheet(zone.ground[y][x])).toBe(true);
+        const over = zone.overlay[y][x];
+        expect(over === EMPTY || onASheet(over)).toBe(true);
       }
     }
   });

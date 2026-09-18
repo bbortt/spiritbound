@@ -52,7 +52,7 @@ function tmjFor(cx: number, cy: number, spawn = { x: -1, y: -1 }): unknown {
 describe('a chunk parses as a Phaser tilemap', () => {
   const map = parseAsPhaser(tmjFor(1, 1));
 
-  it('is a 64x64 orthogonal map of 32px tiles', () => {
+  it('is a 64x64 orthogonal map of 16px tiles', () => {
     expect(map.width).toBe(64);
     expect(map.height).toBe(64);
     expect(map.tileWidth).toBe(SRC_TILE);
