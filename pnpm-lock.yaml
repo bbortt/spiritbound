@@ -46,11 +46,11 @@ importers:
         specifier: 23.1.0
         version: 23.1.0
       prettier:
-        specifier: 3.9.7
-        version: 3.9.7
+        specifier: 3.9.8
+        version: 3.9.8
       prettier-plugin-packagejson:
         specifier: 3.0.2
-        version: 3.0.2(prettier@3.9.7)
+        version: 3.0.2(prettier@3.9.8)
       typescript:
         specifier: 5.9.3
         version: 5.9.3
@@ -1035,8 +1035,8 @@ packages:
       prettier:
         optional: true
 
-  prettier@3.9.7:
-    resolution: {integrity: sha512-T3mF5P7HFzZVLDQuCUNtJj6WK1pcpLMweMNUVwGb01bLNkH9AkKxtZvmInw8K6bnn2O3d6/5RHl6zSHiBAD0Og==}
+  prettier@3.9.8:
+    resolution: {integrity: sha512-WRFq3Wn3WId7LLROfMLdH7xaFr2jR62wU8nLO6rQUOLOxNZUviyJQs1M0iIhLexSFy+L+w0ch66wtoO2jRjG0A==}
     engines: {node: '>=14'}
     hasBin: true
 
@@ -2203,13 +2203,13 @@ snapshots:
       picocolors: 1.1.1
       source-map-js: 1.2.1
 
-  prettier-plugin-packagejson@3.0.2(prettier@3.9.7):
+  prettier-plugin-packagejson@3.0.2(prettier@3.9.8):
     dependencies:
       sort-package-json: 3.7.1
     optionalDependencies:
-      prettier: 3.9.7
+      prettier: 3.9.8
 
-  prettier@3.9.7: {}
+  prettier@3.9.8: {}
 
   proper-lockfile@4.1.2:
     dependencies:
@@ -2288,7 +2288,7 @@ snapshots:
       base64-js: 1.5.1
       headers-polyfill: 4.0.3
       object-inspect: 1.13.4
-      prettier: 3.9.7
+      prettier: 3.9.8
       pure-rand: 7.0.1
       safe-stable-stringify: 2.5.0
       statuses: 2.0.2
