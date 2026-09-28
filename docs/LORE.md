@@ -75,8 +75,8 @@ seed of the eventual reconciliation questline (win back the original purged card
 ## Enemy Taxonomy
 
 Every tier is a symptom of the same rot (devouring spirits), escalating from mundane
-→ tragic → alien → social → apex. Avoid generic fantasy monsters that don't connect
-to the cosmology.
+→ tragic → alien → social → apex.
+Avoid generic fantasy monsters that don't connect to the cosmology.
 
 1. **Feral Beasts** _(mundane)_ — natural animals turned aggressive by Hollowing
    leaking from tainted spirit-sites.
