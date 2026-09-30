@@ -40,17 +40,17 @@ importers:
         specifier: 0.49.1
         version: 0.49.1
       markdownlint-sentences-per-line:
-        specifier: 0.1.6
-        version: 0.1.6(markdownlint@0.41.1)
+        specifier: 0.1.7
+        version: 0.1.7(markdownlint@0.41.1)
       npm-check-updates:
         specifier: 23.1.0
         version: 23.1.0
       prettier:
-        specifier: 3.9.8
-        version: 3.9.8
+        specifier: 3.9.9
+        version: 3.9.9
       prettier-plugin-packagejson:
         specifier: 3.0.2
-        version: 3.0.2(prettier@3.9.8)
+        version: 3.0.2(prettier@3.9.9)
       typescript:
         specifier: 5.9.3
         version: 5.9.3
@@ -887,8 +887,8 @@ packages:
     resolution: {integrity: sha512-UgVL6v1CB+5ds7W2IBTU6yVDRDH1gSGoWWTRrwZmniU/4AKO8nz0d42gySOIVllfRxzaIMn7Gei4u65y6Rcs2A==}
     engines: {node: '>=22'}
 
-  markdownlint-sentences-per-line@0.1.6:
-    resolution: {integrity: sha512-6Ned5jdXuHvw14jndMAokytOPn5ct66VQ9NVcJSQf5civy7Nj4OU+min6HK21ZLKMTXqTFrb7f7LIzaM6IAaZg==}
+  markdownlint-sentences-per-line@0.1.7:
+    resolution: {integrity: sha512-Rwt3SNhx8CkhXzfa+hy2d2M4tTIzVmoPyjYMV5cODRnJzTa4iFZYhmh14e12JyrgVSPjH3bWEdL4X1UUTLZ8lQ==}
     peerDependencies:
       markdownlint: ^0.37.0 || ^0.39.0 || ^0.40.0 || ^0.41.0
 
@@ -1035,8 +1035,8 @@ packages:
       prettier:
         optional: true
 
-  prettier@3.9.8:
-    resolution: {integrity: sha512-WRFq3Wn3WId7LLROfMLdH7xaFr2jR62wU8nLO6rQUOLOxNZUviyJQs1M0iIhLexSFy+L+w0ch66wtoO2jRjG0A==}
+  prettier@3.9.9:
+    resolution: {integrity: sha512-Z/CJHIkdujO/OtN7nXUii0Rf3VT5SRuhjBA82Xvu2XhBUgX3nhP67T0LHceBdQLex7OOFGTox+Q5Yg8Jk2Qivg==}
     engines: {node: '>=14'}
     hasBin: true
 
@@ -1084,8 +1084,8 @@ packages:
     engines: {node: '>=10'}
     hasBin: true
 
-  sentences-per-line@0.5.5:
-    resolution: {integrity: sha512-QFLWAjwv0kND5mhYvbdy9fknyHiab/EfudRDiDWU6JiT0RvbcQ5Yvzsin926dA/VrEOBgKjk2m2apZcY/YXBCg==}
+  sentences-per-line@0.5.6:
+    resolution: {integrity: sha512-Nr8nl/K1oqxcSX5jle3/dDlQyej1DYzhoSTbWRMNECV/NTl5KTIjxhgElmn167PEAqgMEdaXMRQo7kaGbXUS5Q==}
     engines: {node: '>=22.14.0'}
 
   siginfo@2.0.0:
@@ -1958,11 +1958,11 @@ snapshots:
 
   markdownlint-rule-helpers@0.31.0: {}
 
-  markdownlint-sentences-per-line@0.1.6(markdownlint@0.41.1):
+  markdownlint-sentences-per-line@0.1.7(markdownlint@0.41.1):
     dependencies:
       markdownlint: 0.41.1
       markdownlint-rule-helpers: 0.31.0
-      sentences-per-line: 0.5.5
+      sentences-per-line: 0.5.6
 
   markdownlint@0.41.1:
     dependencies:
@@ -2203,13 +2203,13 @@ snapshots:
       picocolors: 1.1.1
       source-map-js: 1.2.1
 
-  prettier-plugin-packagejson@3.0.2(prettier@3.9.8):
+  prettier-plugin-packagejson@3.0.2(prettier@3.9.9):
     dependencies:
       sort-package-json: 3.7.1
     optionalDependencies:
-      prettier: 3.9.8
+      prettier: 3.9.9
 
-  prettier@3.9.8: {}
+  prettier@3.9.9: {}
 
   proper-lockfile@4.1.2:
     dependencies:
@@ -2261,7 +2261,7 @@ snapshots:
 
   semver@7.8.5: {}
 
-  sentences-per-line@0.5.5: {}
+  sentences-per-line@0.5.6: {}
 
   siginfo@2.0.0: {}
 
@@ -2288,7 +2288,7 @@ snapshots:
       base64-js: 1.5.1
       headers-polyfill: 4.0.3
       object-inspect: 1.13.4
-      prettier: 3.9.8
+      prettier: 3.9.9
       pure-rand: 7.0.1
       safe-stable-stringify: 2.5.0
       statuses: 2.0.2
