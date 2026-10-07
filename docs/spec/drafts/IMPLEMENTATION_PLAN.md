@@ -173,8 +173,8 @@ config from `content/zones.json`):
    `SW-048` describes).
 
 **Test**: `spacetimedb/src/rules/spawnDirector.test.ts` — this is the
-module the original brief calls out as "most worth testing hard." Include
-a property test (the repo has no existing property-test precedent to
+module the original brief calls out as "most worth testing hard."
+Include a property test (the repo has no existing property-test precedent to
 copy — check `004-technology-contract.md`/`package.json` for whether
 `fast-check` or similar is already a devDependency; if not, either add it
 (justify in the commit per `003-developer-guidelines.md`'s "no
