@@ -61,12 +61,12 @@ swapping in verified identities later shouldn't require reworking reducers.
 on the client, but trusting the client with damage numbers would make the
 server non-authoritative.
 **Decision:** The client determines _whether_ an attack geometrically
-connects (aim vs. shape vs. target position) and tells the server "this
-target was hit." The server (via `rules/combat.ts#resolveHit`) is the sole
+connects (aim vs. shape vs. target position) and tells the server "this target was hit."
+The server (via `rules/combat.ts#resolveHit`) is the sole
 authority on _how much_ damage that translates to — level scaling, defense,
 avoidance, crit — and is the only thing that writes to `currentHp`.
-**Consequences:** Matches the design pillar "hitting is skill, mitigation is
-stats." Client can never inflate its own damage.
+**Consequences:** Matches the design pillar "hitting is skill, mitigation is stats."
+Client can never inflate its own damage.
 Costs one extra round-trip
 per landed hit (client confirms geometry → server resolves damage) versus a
 fully client-authoritative model.

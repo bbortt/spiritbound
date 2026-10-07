@@ -18,7 +18,8 @@ Here's the shape of it.
 ## Combat
 
 Combat is **cursor-aimed** — abilities fire toward wherever your cursor is
-pointed, not automatically at "the nearest thing." That means:
+pointed, not automatically at "the nearest thing."
+That means:
 
 - **Aim matters.** A well-placed strike lands; a careless one whiffs past a
   target that simply wasn't there.
