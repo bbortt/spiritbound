@@ -33,7 +33,7 @@
   "devDependencies": {
     "@ariadne-thread/clew": "0.3.0",
     "@commitlint/config-conventional": "21.2.3",
-    "@types/node": "26.6.3",
+    "@types/node": "26.6.4",
     "commitlint": "21.2.3",
     "esbuild": "0.28.2",
     "husky": "9.1.7",
