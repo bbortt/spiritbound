@@ -17,7 +17,7 @@
     "site:build": "pnpm run site:sync-cards && cd site && bundle exec jekyll build",
     "site:dev": "pnpm run site:sync-cards && cd site && bundle exec jekyll serve",
     "site:sync-cards": "node -e \"require('fs').copyFileSync('content/cards.json','site/_data/cards.json')\"",
-    "spacetime:bundle": "esbuild spacetimedb/src/index.ts --bundle --platform=neutral --format=esm --external:spacetime:sys@2.0 --external:spacetime:sys@2.1 --external:node:fs --external:node:path --external:node:url --outfile=spacetimedb/dist/bundle.js",
+    "spacetime:bundle": "esbuild spacetimedb/src/index.ts --bundle --platform=neutral --format=esm \"--external:spacetime:sys@*\" --external:node:fs --external:node:path --external:node:url --outfile=spacetimedb/dist/bundle.js",
     "spacetime:generate": "pnpm spacetime:bundle && docker run --rm -v \"./:/project\" clockworklabs/spacetime:v2.11.0 generate --lang typescript -j /project/spacetimedb/dist/bundle.js -o /project/client/src/generated -y --include-private",
     "spacetime:login": "docker run --rm -it -v spiritbound-cli-config:/home/spacetime/.config/spacetime clockworklabs/spacetime:v2.11.0 login",
     "spacetime:publish": "pnpm spacetime:bundle && docker run --rm -v \"./:/project\" -v spiritbound-cli-config:/home/spacetime/.config/spacetime clockworklabs/spacetime:v2.11.0 publish --no-config -j /project/spacetimedb/dist/bundle.js --server maincloud spiritbound",
