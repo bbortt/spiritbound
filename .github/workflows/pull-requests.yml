@@ -71,7 +71,7 @@ jobs:
       - name: Unit tests
         run: pnpm run vitest
       - name: Start SpacetimeDB
-        run: docker run -d --name spiritbound-ci -p 3000:3000 clockworklabs/spacetime:latest start --in-memory
+        run: docker run -d --name spiritbound-ci -p 3000:3000 clockworklabs/spacetime:v2.11.0 start --in-memory
       - name: Wait for SpacetimeDB
         run: |
           for i in $(seq 1 30); do
@@ -86,7 +86,7 @@ jobs:
         run: |
           docker run --rm --network host \
             -v "${{ github.workspace }}:/project" \
-            clockworklabs/spacetime:latest publish --anonymous --no-config \
+            clockworklabs/spacetime:v2.11.0 publish --anonymous --no-config \
             -j /project/spacetimedb/dist/bundle.js \
             --server http://localhost:3000 spiritbound --yes
       - name: Integration tests
