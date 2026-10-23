@@ -27,8 +27,8 @@
     "vitest:integration": "vitest run -c vitest.integration.config.ts"
   },
   "dependencies": {
-    "spacetimedb": "2.11.0",
-    "zod": "4.6.6"
+    "spacetimedb": "2.12.0",
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@ariadne-thread/clew": "0.3.0",
@@ -44,7 +44,7 @@
     "prettier": "3.9.10",
     "prettier-plugin-packagejson": "3.0.2",
     "typescript": "5.9.3",
-    "vitest": "5.0.4"
+    "vitest": "5.0.5"
   },
   "packageManager": "pnpm@11.25.0"
 }
