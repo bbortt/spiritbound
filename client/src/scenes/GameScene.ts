@@ -18,6 +18,7 @@ import type {
   EquippedItem,
   Zone,
 } from '../db';
+import type { PrologueSceneData } from './PrologueScene';
 import { CollectionPanel } from '../ui/CollectionPanel';
 import { InventoryPanel } from '../ui/InventoryPanel';
 import { CharacterSheet } from '../ui/CharacterSheet';
@@ -374,11 +375,21 @@ export class GameScene extends Phaser.Scene {
 
     // ── SpacetimeDB ───────────────────────────────────────────────────────────
     this.conn = connect(this._tokenStore(), (conn) => {
-      if (!this.localCharacter) {
-        callReducer('startLife', () =>
-          conn.reducers.startLife({ spiritName: 'your spirit' }),
-        );
+      if (this.localCharacter) return;
+      if (this._prologueUnseen(conn)) {
+        // Launched instead of, not alongside, startLife: the recitation must
+        // not play over a live character standing in the tutorial zone.
+        this.scene.launch('Prologue', {
+          onDone: () => {
+            callReducer('markPrologueSeen', () =>
+              conn.reducers.markPrologueSeen({}),
+            );
+            this._startFirstLife(conn);
+          },
+        } satisfies PrologueSceneData);
+        return;
       }
+      this._startFirstLife(conn);
     });
 
     this.conn.db.character.onInsert((_ctx, row) => this._onCharInsert(row));
@@ -596,6 +607,26 @@ export class GameScene extends Phaser.Scene {
 
   private _isLocal(id: Identity): boolean {
     return !!this.conn.identity?.isEqual(id);
+  }
+
+  // ── Prologue gate ────────────────────────────────────────────────────────────
+
+  /**
+   * Missing identity or missing row both mean "don't show it": a prologue the
+   * server cannot be told about would replay on every connect.
+   */
+  private _prologueUnseen(conn: DbConnection): boolean {
+    const id = conn.identity;
+    if (!id) return false;
+    return (
+      conn.db.accountProgress.accountIdentity.find(id)?.prologueSeen === false
+    );
+  }
+
+  private _startFirstLife(conn: DbConnection): void {
+    callReducer('startLife', () =>
+      conn.reducers.startLife({ spiritName: 'your spirit' }),
+    );
   }
 
   // ── Effective stats (race base + equipped gear; see effectiveStats.ts) ────────
