@@ -3,6 +3,7 @@
 
 import Phaser from 'phaser';
 import { GameScene } from './scenes/GameScene';
+import { PrologueScene } from './scenes/PrologueScene';
 
 new Phaser.Game({
   type: Phaser.AUTO,
@@ -12,5 +13,6 @@ new Phaser.Game({
   height: 720,
   backgroundColor: '#1a1a2e',
   audio: { noAudio: true },
-  scene: [GameScene],
+  // GameScene first: it owns the connection, and launches Prologue on top.
+  scene: [GameScene, PrologueScene],
 });
