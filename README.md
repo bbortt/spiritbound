@@ -108,7 +108,22 @@ spacetime logs
 
 ## License
 
-Spiritbound is licensed under
-[CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/) — see
-[`LICENSE`](LICENSE).
-Non-commercial use only; adaptations must be shared under the same license.
+Spiritbound is source-available and noncommercial, under two licenses:
+
+- **Source code** —
+  [PolyForm Noncommercial 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0),
+  see [`LICENSE`](LICENSE).
+- **Assets and content** — art, audio, written content, and the specifications
+  and documentation under `docs/` —
+  [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/), see
+  [`LICENSE-ASSETS`](LICENSE-ASSETS).
+
+Read, fork, modify, and run your own private server for any noncommercial
+purpose — hobby, study, private entertainment. Commercial use of any kind is
+not granted, and that includes running a server a business profits from.
+Adaptations of the assets must be shared under the same license.
+
+For a commercial license, contact the copyright holder.
+
+Third-party assets keep their own licenses, recorded next to the files they
+cover (see `client/public/tiles/`).

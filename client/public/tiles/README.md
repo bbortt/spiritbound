@@ -16,7 +16,7 @@ CC-BY-SA 3.0 / 4.0 with mandatory attribution.
 
 Two caveats before this goes anywhere near a release:
 
-1. The credits list a Mana World tileset under **GPL v2**, which does not combine with this repository's CC-BY-NC-SA-4.0 licence.
+1. The credits list a Mana World tileset under **GPL v2**, which does not combine with this repository's CC BY-NC-SA 4.0 asset licence.
    Whether any of that art survives into `mountains-v6.png` — and into the tiles listed above — is unverified.
 2. BY-SA forbids adding restrictions, so the image must stay unmodified and separately licensed.
    Editing it would make the result BY-SA rather than NC.
