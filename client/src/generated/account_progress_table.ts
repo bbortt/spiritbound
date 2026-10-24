@@ -14,5 +14,6 @@ export default __t.row({
   accountIdentity: __t.identity().primaryKey().name('account_identity'),
   totalXpAllLives: __t.u64().name('total_xp_all_lives'),
   tutorialCompleted: __t.bool().name('tutorial_completed'),
+  prologueSeen: __t.bool().name('prologue_seen'),
   unlockedMilestoneIds: __t.array(__t.u32()).name('unlocked_milestone_ids'),
 });

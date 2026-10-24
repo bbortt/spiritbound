@@ -14,6 +14,7 @@ export const AccountProgress = __t.object('AccountProgress', {
   accountIdentity: __t.identity(),
   totalXpAllLives: __t.u64(),
   tutorialCompleted: __t.bool(),
+  prologueSeen: __t.bool(),
   unlockedMilestoneIds: __t.array(__t.u32()),
 });
 export type AccountProgress = __Infer<typeof AccountProgress>;

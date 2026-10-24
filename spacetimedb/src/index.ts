@@ -284,6 +284,7 @@ const accountProgress = table(
     accountIdentity: t.identity().primaryKey(),
     totalXpAllLives: t.u64(),
     tutorialCompleted: t.bool(),
+    prologueSeen: t.bool(),
     unlockedMilestoneIds: t.array(t.u32()),
   },
 );
@@ -629,6 +630,7 @@ export const onConnect = db.clientConnected((ctx) => {
       accountIdentity: ctx.sender,
       totalXpAllLives: 0n,
       tutorialCompleted: false,
+      prologueSeen: false,
       unlockedMilestoneIds: [],
     });
   }
@@ -1040,6 +1042,25 @@ function _seedZone1Enemies(ctx: any): void {
 // ═══════════════════════════════════════════════════════════════════════════════
 // REDUCERS — character lifecycle
 // ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * The prologue plays once per account, before the first life starts — so the
+ * flag lives here rather than in the browser, where a new device would replay
+ * it. Idempotent: the client fires this on both finish and skip, and a resumed
+ * account that somehow calls it twice is not an error.
+ */
+export const markPrologueSeen = db.reducer({}, (ctx) => {
+  const progress = ctx.db.accountProgress.accountIdentity.find(ctx.sender);
+  if (!progress)
+    throw new SenderError(
+      'Account not initialised — reconnect to trigger onConnect',
+    );
+  if (progress.prologueSeen) return;
+  ctx.db.accountProgress.accountIdentity.update({
+    ...progress,
+    prologueSeen: true,
+  });
+});
 
 /** Hollow Vale — where an account that has not finished the tutorial belongs. */
 const TUTORIAL_ZONE_ID = 1;
