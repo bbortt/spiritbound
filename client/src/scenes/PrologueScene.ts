@@ -37,6 +37,8 @@ export class PrologueScene extends Phaser.Scene {
   private verse!: Phaser.GameObjects.Text;
   private titleCard!: Phaser.GameObjects.Text;
   private finished = false;
+  /** The plate currently on the plane, so a held image is not redrawn. */
+  private plate: string | null = null;
 
   constructor() {
     super({ key: 'Prologue' });
@@ -48,6 +50,7 @@ export class PrologueScene extends Phaser.Scene {
     // first launch.
     this.index = 0;
     this.finished = false;
+    this.plate = null;
 
     const W = this.cameras.main.width;
     const H = this.cameras.main.height;
@@ -90,13 +93,13 @@ export class PrologueScene extends Phaser.Scene {
     this.input.keyboard?.on('keydown-ESC', () => this._finish());
     // Registering the Key is what makes the plugin drop browser auto-repeat for
     // the handler below (KeyboardPlugin.js:797 only computes `repeat` when a Key
-    // exists); without it a held SPACE walks all 24 beats in about a second and
+    // exists); without it a held SPACE walks all 30 beats in about a second and
     // burns the once-per-account flag.
     this.input.keyboard?.addKey('SPACE');
     this.input.keyboard?.on('keydown-SPACE', () => this._advance());
-    // `over` holds the interactive objects under the pointer: the Skip label
-    // has its own handler, and the scene fires first, so advancing here would
-    // flash the next beat on the way out.
+    // `over` holds the interactive objects under the pointer. The Skip label's
+    // own handler runs first, but this one still runs after it, so without the
+    // guard a Skip click would also advance a beat on its way out.
     this.input.on(
       'pointerdown',
       (_p: Phaser.Input.Pointer, over: unknown[]) => {
@@ -126,13 +129,21 @@ export class PrologueScene extends Phaser.Scene {
   private _show(beat: Beat) {
     const W = this.cameras.main.width;
 
-    // Without this the previous beat's scale tween keeps writing over the reset
+    // Without this the previous beat's tweens keep writing over the reset
     // below, and a clicked-through recitation accumulates one per beat.
-    this.tweens.killTweensOf([this.plane, this.verse, this.titleCard]);
+    this.tweens.killTweensOf([this.verse, this.titleCard]);
 
-    this.plane.removeAll(true);
-    this.plane.setScale(1).setAlpha(0);
-    if (beat.plate) this._drawPlate(beat.plate);
+    // Consecutive beats can name the same plate (IV.1 and VII.1 each carry two
+    // stanzas): hold the image and let its push-in run on, rather than cutting
+    // to black and snapping the scale back between them.
+    const newPlate = beat.plate !== this.plate;
+    this.plate = beat.plate;
+    if (newPlate) {
+      this.tweens.killTweensOf(this.plane);
+      this.plane.removeAll(true);
+      this.plane.setScale(1).setAlpha(0);
+      if (beat.plate) this._drawPlate(beat.plate);
+    }
 
     this.verse
       .setText(beat.lines.join('\n'))
@@ -143,19 +154,23 @@ export class PrologueScene extends Phaser.Scene {
     this.titleCard.setVisible(beat.titleCard === true).setAlpha(0);
 
     this.tweens.add({
-      targets: [this.plane, this.verse, this.titleCard],
+      targets: newPlate
+        ? [this.plane, this.verse, this.titleCard]
+        : [this.verse, this.titleCard],
       alpha: 1,
       duration: 900,
     });
 
     // The only use the placeholder art has for the parallax data: a slow push
     // in, scaled by the near plane. X.2's zeroes hold it perfectly still.
-    this.tweens.add({
-      targets: this.plane,
-      scale: 1 + beat.parallax[2] * 0.06,
-      duration: beat.holdMs,
-      ease: 'Sine.easeInOut',
-    });
+    if (newPlate) {
+      this.tweens.add({
+        targets: this.plane,
+        scale: 1 + beat.parallax[2] * 0.06,
+        duration: beat.holdMs,
+        ease: 'Sine.easeInOut',
+      });
+    }
 
     this.advanceTimer = this.time.delayedCall(beat.holdMs, () =>
       this._advance(),

@@ -385,10 +385,15 @@ export class GameScene extends Phaser.Scene {
       if (mine.length === 0 && this._prologueUnseen(conn)) {
         // Launched instead of, not alongside, startLife: the recitation must
         // not play over a live character standing in the tutorial zone.
+        // Both flags: KeyboardPlugin.isActive() never consults
+        // InputPlugin.enabled, so the panel keys (and the ESC that closes a
+        // panel, which would finish the recitation) stay live without this.
         this.input.enabled = false;
+        if (this.input.keyboard) this.input.keyboard.enabled = false;
         this.scene.launch('Prologue', {
           onDone: () => {
             this.input.enabled = true;
+            if (this.input.keyboard) this.input.keyboard.enabled = true;
             callReducer('markPrologueSeen', () =>
               conn.reducers.markPrologueSeen({}),
             );
