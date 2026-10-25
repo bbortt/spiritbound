@@ -85,7 +85,15 @@ export class PrologueScene extends Phaser.Scene {
 
     this.input.keyboard?.on('keydown-ESC', () => this._finish());
     this.input.keyboard?.on('keydown-SPACE', () => this._advance());
-    this.input.on('pointerdown', () => this._advance());
+    // `over` holds the interactive objects under the pointer: the Skip label
+    // has its own handler, and the scene fires first, so advancing here would
+    // flash the next beat on the way out.
+    this.input.on(
+      'pointerdown',
+      (_p: Phaser.Input.Pointer, over: unknown[]) => {
+        if (over.length === 0) this._advance();
+      },
+    );
 
     this._show(PROLOGUE_BEATS[0]);
   }
@@ -104,6 +112,10 @@ export class PrologueScene extends Phaser.Scene {
 
   private _show(beat: Beat) {
     const W = this.cameras.main.width;
+
+    // Without this the previous beat's scale tween keeps writing over the reset
+    // below, and a clicked-through recitation accumulates one per beat.
+    this.tweens.killTweensOf([this.plane, this.verse, this.titleCard]);
 
     this.plane.removeAll(true);
     this.plane.setScale(1).setAlpha(0);
