@@ -378,12 +378,17 @@ export class GameScene extends Phaser.Scene {
       // The row cache, not this.localCharacter: the SDK emits `applied` before
       // it dispatches the insert callbacks, so _onCharInsert has not run yet
       // and the field is still null even when this account has a live life.
-      if (this._hasLiveCharacter(conn)) return;
-      if (this._prologueUnseen(conn)) {
+      const mine = this._ownCharacters(conn);
+      if (mine.some((row) => row.alive)) return;
+      // "Before the first life" means no character has ever existed — a dead
+      // one means this account is reloading into a respawn, not a prologue.
+      if (mine.length === 0 && this._prologueUnseen(conn)) {
         // Launched instead of, not alongside, startLife: the recitation must
         // not play over a live character standing in the tutorial zone.
+        this.input.enabled = false;
         this.scene.launch('Prologue', {
           onDone: () => {
+            this.input.enabled = true;
             callReducer('markPrologueSeen', () =>
               conn.reducers.markPrologueSeen({}),
             );
@@ -626,13 +631,12 @@ export class GameScene extends Phaser.Scene {
     );
   }
 
-  private _hasLiveCharacter(conn: DbConnection): boolean {
+  private _ownCharacters(conn: DbConnection): Character[] {
     const id = conn.identity;
-    if (!id) return false;
-    for (const row of conn.db.character.iter()) {
-      if (row.alive && row.accountIdentity.isEqual(id)) return true;
-    }
-    return false;
+    if (!id) return [];
+    return [...conn.db.character.iter()].filter((row) =>
+      row.accountIdentity.isEqual(id),
+    );
   }
 
   private _startFirstLife(conn: DbConnection): void {
