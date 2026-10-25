@@ -13,6 +13,8 @@
  * stanzas on one image, and a null plate is a black card between them.
  */
 
+import { realizes, ArchTraceables } from '../../src/clew/traceables/clew';
+
 /** Extreme wide, wide, medium, close-up — the sequence zooms in as it goes. */
 export type Shot = 'XW' | 'W' | 'M' | 'CU';
 
@@ -30,7 +32,7 @@ export type Beat = {
   titleCard?: true;
 };
 
-export const PROLOGUE_BEATS: readonly Beat[] = [
+const BEATS: readonly Beat[] = [
   {
     plate: 'I.1',
     shot: 'XW',
@@ -404,3 +406,8 @@ export const PROLOGUE_BEATS: readonly Beat[] = [
     parallax: [0.05, 0.12, 0.25],
   },
 ];
+
+export const PROLOGUE_BEATS = realizes(
+  ArchTraceables.ARCH_014_THE_VERSE_LIVES_IN_THE_DOCUMENT_AND_THE_MANIFEST_IS_TESTED_AGAINST_IT,
+  BEATS,
+);
