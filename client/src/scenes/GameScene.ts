@@ -375,7 +375,10 @@ export class GameScene extends Phaser.Scene {
 
     // ── SpacetimeDB ───────────────────────────────────────────────────────────
     this.conn = connect(this._tokenStore(), (conn) => {
-      if (this.localCharacter) return;
+      // The row cache, not this.localCharacter: the SDK emits `applied` before
+      // it dispatches the insert callbacks, so _onCharInsert has not run yet
+      // and the field is still null even when this account has a live life.
+      if (this._hasLiveCharacter(conn)) return;
       if (this._prologueUnseen(conn)) {
         // Launched instead of, not alongside, startLife: the recitation must
         // not play over a live character standing in the tutorial zone.
@@ -621,6 +624,15 @@ export class GameScene extends Phaser.Scene {
     return (
       conn.db.accountProgress.accountIdentity.find(id)?.prologueSeen === false
     );
+  }
+
+  private _hasLiveCharacter(conn: DbConnection): boolean {
+    const id = conn.identity;
+    if (!id) return false;
+    for (const row of conn.db.character.iter()) {
+      if (row.alive && row.accountIdentity.isEqual(id)) return true;
+    }
+    return false;
   }
 
   private _startFirstLife(conn: DbConnection): void {
