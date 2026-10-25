@@ -44,6 +44,10 @@ export class PrologueScene extends Phaser.Scene {
 
   create(data: PrologueSceneData) {
     this.onDone = data.onDone;
+    // Phaser reuses the instance, so the field initialisers only hold for the
+    // first launch.
+    this.index = 0;
+    this.finished = false;
 
     const W = this.cameras.main.width;
     const H = this.cameras.main.height;
@@ -84,6 +88,11 @@ export class PrologueScene extends Phaser.Scene {
       .on('pointerdown', () => this._finish());
 
     this.input.keyboard?.on('keydown-ESC', () => this._finish());
+    // Registering the Key is what makes the plugin drop browser auto-repeat for
+    // the handler below (KeyboardPlugin.js:797 only computes `repeat` when a Key
+    // exists); without it a held SPACE walks all 24 beats in about a second and
+    // burns the once-per-account flag.
+    this.input.keyboard?.addKey('SPACE');
     this.input.keyboard?.on('keydown-SPACE', () => this._advance());
     // `over` holds the interactive objects under the pointer: the Skip label
     // has its own handler, and the scene fires first, so advancing here would
@@ -98,7 +107,11 @@ export class PrologueScene extends Phaser.Scene {
     this._show(PROLOGUE_BEATS[0]);
   }
 
-  /** Click and the hold timer share this, so a click cannot double-advance. */
+  /**
+   * Click, key and the hold timer all land here. `remove()` cannot un-deliver a
+   * dispatch already in flight, so a click in the same frame as the timer can
+   * still cost one stanza — cheap next to a double-advance on every click.
+   */
   private _advance() {
     if (this.finished) return;
     this.advanceTimer?.remove();
