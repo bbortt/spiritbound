@@ -1,5 +1,9 @@
 allowBuilds:
   esbuild: true
+overrides:
+  # markdownlint 0.42.0 pins re2js 2.8.6 exactly; 2.8.7 is the first release patched for
+  # GHSA-gg6h-894w-4m9c. Drop this once markdownlint ships a bump of its own.
+  re2js: 2.8.7
 packages:
   - 'client'
   - 'spacetimedb'
