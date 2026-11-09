@@ -27,7 +27,7 @@
     "vitest:integration": "vitest run -c vitest.integration.config.ts"
   },
   "dependencies": {
-    "spacetimedb": "2.13.0",
+    "spacetimedb": "2.14.0",
     "zod": "4.6.7"
   },
   "devDependencies": {
@@ -42,7 +42,7 @@
     "markdownlint-sentences-per-line": "0.1.7",
     "npm-check-updates": "23.1.1",
     "prettier": "3.9.10",
-    "prettier-plugin-packagejson": "3.0.3",
+    "prettier-plugin-packagejson": "3.1.0",
     "typescript": "5.9.3",
     "vitest": "5.0.5"
   },
