@@ -276,8 +276,7 @@ export class InventoryPanel {
   /**
    * The level the min-level gate is checked against; mirrors the server's.
    * Guarded because the character row updates on every move and every enemy
-   * tick, and a re-render mid-hover destroys the cell the tooltip is anchored
-   * to before its `mouseleave` fires.
+   * tick, and only a level change can alter what this panel renders.
    */
   setCharacterLevel(level: number) {
     if (level === this._characterLevel) return;
@@ -326,6 +325,11 @@ export class InventoryPanel {
   }
 
   private _render() {
+    // Every cell is rebuilt below, so a tooltip opened on one of them is
+    // anchored to an element that is about to be detached and will never fire
+    // its `mouseleave`. Any table callback can land mid-hover.
+    this._hideTooltip();
+
     const equippedIds = this._equippedInstanceIds();
     const allItems = [...this._instances.values()];
     const items = this._slotFilter
