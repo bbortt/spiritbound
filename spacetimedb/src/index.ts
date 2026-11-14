@@ -1488,6 +1488,7 @@ export const equipItem = concerns(
     [
       SwTraceables.SW_001_EQUIP_REQUIRES_OWNERSHIP_AND_MATCHING_SLOT,
       SwTraceables.SW_002_EQUIP_AUTO_REPLACES_SAME_SLOT_ORDINAL_OCCUPANT,
+      SwTraceables.SW_055_EQUIP_ENFORCES_THE_ITEMS_MIN_LEVEL,
     ] as const,
     db.reducer(
       { itemInstanceId: t.u64(), slot: TEquipSlot, slotOrdinal: t.u32() },
@@ -1504,6 +1505,14 @@ export const equipItem = concerns(
         if (def.slot.tag !== slot.tag)
           throw new SenderError(
             `Item belongs in ${def.slot.tag}, not ${slot.tag}`,
+          );
+
+        // Drops are gated on the ENEMY's level, and a low-level character can
+        // loot a high-band corpse — so minLevel has to be enforced here, as
+        // equipCard already does for cards.
+        if (def.minLevel > char.level)
+          throw new SenderError(
+            `Requires character level ${def.minLevel} (you are ${char.level})`,
           );
 
         _withProportionalResourceUpdate(ctx, char, () => {

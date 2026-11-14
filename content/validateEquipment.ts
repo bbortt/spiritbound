@@ -12,7 +12,7 @@ import {
 export { loadEquipment } from './equipmentLoader';
 
 const CATEGORY = ['equipment', 'consumable', 'material', 'quest'] as const;
-const SLOT = [
+export const SLOT = [
   'head',
   'chest',
   'hands',
