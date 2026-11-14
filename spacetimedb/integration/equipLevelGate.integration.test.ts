@@ -20,6 +20,7 @@ import { callReducer, sqlRows, isServerUp } from './client';
 import {
   characterLevel,
   createTestCharacter,
+  latestBy,
   raiseToLevel,
   type TestCharacter,
 } from './helpers';
@@ -49,11 +50,11 @@ const FARM_OFFSET_X_PX = 1500;
 const FARM_OFFSET_Y_PX = -50_000;
 
 /**
- * equipment.json declares slots snake_case (`main_hand`); the module's
- * generated `EquipSlot` variants are camelCase (`mainHand`). Sending the
- * content spelling is accepted for every single-word slot and rejected only
- * for the two compound ones, which is exactly the kind of bug that hides
- * behind a probabilistic drop.
+ * equipment.json declares slots snake_case (`main_hand`), but the wire format
+ * takes the module's camelCase variant aliases: sending `main_hand` is
+ * rejected with "unknown variant `main_hand`, expected one of ... `mainHand`,
+ * `offHand` ...". Single-word slots are identical under both spellings, so
+ * only the two compound ones can expose this — behind a probabilistic drop.
  */
 function wireSlot(slot: string): string {
   return slot.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase());
@@ -85,13 +86,12 @@ async function farmUnequippableItem(char: TestCharacter, rounds = 40) {
     // Killed enemies respawn, so the alive set at this position grows every
     // round: take the newest rather than an arbitrary one, or the loop keeps
     // re-killing whichever row the server happens to return first.
-    const alive = await sqlRows(
-      char.token,
-      `SELECT enemy_id FROM enemy WHERE pos_x = ${x} AND pos_y = ${y} AND alive = true`,
-    );
-    const enemy = alive.reduce<(typeof alive)[number] | undefined>(
-      (best, row) => (!best || row.enemy_id > best.enemy_id ? row : best),
-      undefined,
+    const enemy = latestBy(
+      await sqlRows(
+        char.token,
+        `SELECT enemy_id FROM enemy WHERE pos_x = ${x} AND pos_y = ${y} AND alive = true`,
+      ),
+      'enemy_id',
     );
     if (!enemy) continue;
 

@@ -75,7 +75,7 @@ function nextSector(): { x: number; y: number } {
  * fetches the plain WHERE-filtered set and picks the max id client-side
  * instead.
  */
-function latestBy<T extends Record<string, any>>(
+export function latestBy<T extends Record<string, any>>(
   rows: T[],
   idField: string,
 ): T | undefined {

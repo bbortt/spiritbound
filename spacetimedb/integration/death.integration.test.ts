@@ -177,9 +177,15 @@ verifies(
         await callReducer(char.token, 'pickup_item', {
           dropId: drop.itemDropId,
         });
+        // Scoped to this character: the database outlives the run, so any
+        // other suite that picks up the same definition and does not die
+        // leaves a row this would otherwise pick up and then expect to be
+        // destroyed by *this* character's death.
         const [beforeDeath] = await sqlRows(
           char.token,
-          `SELECT item_instance_id FROM item_instance WHERE item_def_id = ${drop.itemDefId}`,
+          `SELECT item_instance_id FROM item_instance
+             WHERE item_def_id = ${drop.itemDefId}
+               AND owner_character_id = ${char.characterId}`,
         );
         expect(
           beforeDeath,

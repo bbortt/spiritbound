@@ -43,10 +43,12 @@ rather than from a silent failure, and carries no authority of its own.
 **Verification Description**
 A test calls `equipItem` for an item whose definition's `minLevel` exceeds the
 character's level and asserts a thrown `SenderError` naming the required level,
-with no `equippedItem` row inserted and any existing occupant of that slot
-still equipped.
-A second test equips the same definition at exactly its `minLevel` and asserts
-it succeeds, fixing the boundary as inclusive.
+with no `equippedItem` row written for that character.
+The same call then runs at exactly the item's `minLevel` and asserts it
+succeeds, fixing the boundary as inclusive.
+That a rejection also leaves an existing occupant of the targeted slot equipped
+is not asserted separately: the gate throws ahead of the block performing every
+write, so no mutation is reachable once it fires.
 The client mirror is verified at its decision, not through the DOM: a unit test
 asserts the inventory click resolves to no action for an under-level item,
 naming the level it requires, and that the same item still resolves to an
