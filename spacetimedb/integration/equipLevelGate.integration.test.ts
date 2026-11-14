@@ -45,9 +45,17 @@ const FARM_ENEMY_LEVEL = 8;
  * standing here after this test finishes: the offset is off the 1000px sector
  * diagonal `helpers.nextSector` walks, and far enough from every sector on it
  * that no later test's character can be aggroed by this test's leftovers.
+ *
+ * Each round steps one stride further along x so respawns cannot pile up on
+ * the coordinate the character later walks onto to pick the drop up: at
+ * `maxHp` 100 and 8 damage a tick, a dozen accumulated level-8 enemies kill it
+ * mid-pickup, and permadeath destroys the instance — which would surface as
+ * the wholly misleading "pickup must create an item_instance row".
+ * 40 rounds of stride stay inside the 50_000px gap to the sector diagonal.
  */
 const FARM_OFFSET_X_PX = 1500;
 const FARM_OFFSET_Y_PX = -50_000;
+const FARM_STRIDE_PX = 250;
 
 /**
  * equipment.json declares slots snake_case (`main_hand`), but the wire format
@@ -73,19 +81,21 @@ function wireSlot(slot: string): string {
  * equipment.json by slug rather than from the (Option<Sum>) column.
  */
 async function farmUnequippableItem(char: TestCharacter, rounds = 40) {
-  const x = char.x + FARM_OFFSET_X_PX;
   const y = char.y + FARM_OFFSET_Y_PX;
+  let unkilled = 0;
 
   for (let round = 0; round < rounds; round++) {
+    const x = char.x + FARM_OFFSET_X_PX + round * FARM_STRIDE_PX;
+
     await callReducer(char.token, 'spawn_enemy', {
       zoneId: 1,
       x,
       y,
       level: FARM_ENEMY_LEVEL,
     });
-    // Killed enemies respawn, so the alive set at this position grows every
-    // round: take the newest rather than an arbitrary one, or the loop keeps
-    // re-killing whichever row the server happens to return first.
+    // A killed enemy respawns on a timer, so even this round's own coordinate
+    // can hold more than one row: take the newest rather than an arbitrary
+    // one, or the loop re-kills whichever row the server returns first.
     const enemy = latestBy(
       await sqlRows(
         char.token,
@@ -98,6 +108,7 @@ async function farmUnequippableItem(char: TestCharacter, rounds = 40) {
     // `spawnEnemy` hardcodes 100 maxHp and ignores its `level` argument for
     // combat stats — level only drives XP and drop eligibility — so this is
     // the same handful of casts the level-2 farm in helpers.ts needs.
+    let killed = false;
     for (let hit = 0; hit < 8; hit++) {
       await callReducer(char.token, 'damage_enemy', {
         enemyId: enemy.enemy_id,
@@ -107,7 +118,17 @@ async function farmUnequippableItem(char: TestCharacter, rounds = 40) {
         char.token,
         `SELECT alive FROM enemy WHERE enemy_id = ${enemy.enemy_id}`,
       );
-      if (!check || !check.alive) break;
+      if (!check || !check.alive) {
+        killed = true;
+        break;
+      }
+    }
+    // Only a kill rolls for a drop, so a survivor means the round was wasted
+    // and the hit budget no longer matches the enemy's health — counted so the
+    // give-up message below can say so instead of blaming the drop roll.
+    if (!killed) {
+      unkilled++;
+      continue;
     }
 
     const drops = await sqlRows(
@@ -128,14 +149,27 @@ async function farmUnequippableItem(char: TestCharacter, rounds = 40) {
         throw new Error(`no slot for ${def.slug} in equipment.json`);
 
       // Pickup is range-checked (config.drops.pickupRangePx), so close the
-      // distance the kill did not need — then retreat, because the enemies
-      // killed here respawn on a timer and would otherwise spend the rest of
-      // the test attacking a character standing on their spawn point.
+      // distance the kill did not need — then retreat, because the enemy
+      // killed here respawns on a timer and would otherwise spend the rest of
+      // the test attacking a character standing on its spawn point.
       await callReducer(char.token, 'move', { x, y });
       await callReducer(char.token, 'pickup_item', {
         dropId: drop.item_drop_id,
       });
       await callReducer(char.token, 'move', { x: char.x, y: char.y });
+
+      // Walking into the respawn's range is the one point this farm can get
+      // the character killed, and permadeath destroys the instance — fail on
+      // that here rather than three assertions later as a missing row.
+      const [alive] = await sqlRows(
+        char.token,
+        `SELECT alive FROM character WHERE character_id = ${char.characterId}`,
+      );
+      if (!alive?.alive)
+        throw new Error(
+          `farmUnequippableItem: the character died collecting ${def.slug} — ` +
+            'a respawn at the pickup coordinate out-damaged its 100 maxHp',
+        );
 
       return {
         minLevel: def.min_level as number,
@@ -146,8 +180,10 @@ async function farmUnequippableItem(char: TestCharacter, rounds = 40) {
   }
   throw new Error(
     `farmUnequippableItem: no drop above the character's level in ${rounds} ` +
-      'rounds — equipment.json spreads minLevel across 1..10, so either the ' +
-      'drop roll or the level curve has regressed',
+      `rounds (${unkilled} of them left the enemy alive) — with kills ` +
+      'landing, equipment.json spreads minLevel across 1..10, so either the ' +
+      'drop roll or the level curve has regressed; with kills failing, the ' +
+      "8-hit budget no longer matches spawnEnemy's maxHp",
   );
 }
 
