@@ -25,23 +25,32 @@ verifies(
   () => {
     describe('decideEquipAction', () => {
       it('equips a dual-slot type into ordinal 0 when both are empty', () => {
-        const d = decideEquipAction(99n, 'Ring', true, []);
+        const d = decideEquipAction(99n, 'Ring', true, [], 10, 1);
         expect(d).toEqual({ kind: 'equip', slot: 'Ring', slotOrdinal: 0 });
       });
 
       it('equips a dual-slot type into ordinal 1 when only ordinal 0 is occupied', () => {
-        const d = decideEquipAction(99n, 'Ring', true, [
-          equipped('Ring', 0, 1n),
-        ]);
+        const d = decideEquipAction(
+          99n,
+          'Ring',
+          true,
+          [equipped('Ring', 0, 1n)],
+          10,
+          1,
+        );
         expect(d).toEqual({ kind: 'equip', slot: 'Ring', slotOrdinal: 1 });
       });
 
       it('decides to replace ordinal 0 when both dual-slot ordinals are occupied', () => {
         const occ0 = equipped('Ring', 0, 1n);
-        const d = decideEquipAction(99n, 'Ring', true, [
-          occ0,
-          equipped('Ring', 1, 2n),
-        ]);
+        const d = decideEquipAction(
+          99n,
+          'Ring',
+          true,
+          [occ0, equipped('Ring', 1, 2n)],
+          10,
+          1,
+        );
         expect(d.kind).toBe('replace');
         if (d.kind === 'replace') {
           expect(d.occupant).toBe(occ0);
@@ -50,13 +59,13 @@ verifies(
       });
 
       it('equips a single slot into ordinal 0 when empty', () => {
-        const d = decideEquipAction(99n, 'MainHand', false, []);
+        const d = decideEquipAction(99n, 'MainHand', false, [], 10, 1);
         expect(d).toEqual({ kind: 'equip', slot: 'MainHand', slotOrdinal: 0 });
       });
 
       it('decides to replace a single slot when occupied', () => {
         const occ = equipped('MainHand', 0, 1n);
-        const d = decideEquipAction(99n, 'MainHand', false, [occ]);
+        const d = decideEquipAction(99n, 'MainHand', false, [occ], 10, 1);
         expect(d.kind).toBe('replace');
         if (d.kind === 'replace') {
           expect(d.occupant).toBe(occ);
@@ -64,11 +73,48 @@ verifies(
       });
 
       it('decides to unequip when the clicked instance is already equipped, regardless of slot type', () => {
-        const d = decideEquipAction(5n, 'Ring', true, [
-          equipped('Ring', 0, 5n),
-        ]);
+        const d = decideEquipAction(
+          5n,
+          'Ring',
+          true,
+          [equipped('Ring', 0, 5n)],
+          10,
+          1,
+        );
         expect(d).toEqual({ kind: 'unequip', equippedItemId: 5n });
       });
     });
   },
 );
+
+verifies(SwTraceables.SW_055_EQUIP_ENFORCES_THE_ITEMS_MIN_LEVEL, () => {
+  describe('decideEquipAction — min-level gate', () => {
+    it('blocks an item whose minLevel is above the character level, naming the requirement', () => {
+      const d = decideEquipAction(99n, 'Chest', false, [], 4, 5);
+      expect(d).toEqual({ kind: 'blocked', requiredLevel: 5 });
+    });
+
+    it('equips at exactly minLevel — the boundary is inclusive', () => {
+      const d = decideEquipAction(99n, 'Chest', false, [], 5, 5);
+      expect(d).toEqual({ kind: 'equip', slot: 'Chest', slotOrdinal: 0 });
+    });
+
+    it('blocks instead of replacing, so an under-level click never evicts the occupant', () => {
+      const occ = equipped('Chest', 0, 1n);
+      const d = decideEquipAction(99n, 'Chest', false, [occ], 4, 5);
+      expect(d).toEqual({ kind: 'blocked', requiredLevel: 5 });
+    });
+
+    it('still unequips an already-equipped item that is above the character level', () => {
+      const d = decideEquipAction(
+        5n,
+        'Chest',
+        false,
+        [equipped('Chest', 0, 5n)],
+        4,
+        5,
+      );
+      expect(d).toEqual({ kind: 'unequip', equippedItemId: 5n });
+    });
+  });
+});

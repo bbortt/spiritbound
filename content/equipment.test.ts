@@ -5,6 +5,7 @@ import { describe, it, expect } from 'vitest';
 import {
   validateEquipment,
   loadEquipment,
+  SLOT,
   type ItemDef,
 } from './validateEquipment';
 import { verifies, ConTraceables } from '../src/clew/traceables/clew';
@@ -161,6 +162,43 @@ describe('equipment — balance rules', () => {
         maxStat,
         `${item.slug}: legendary item must have at least one stat >= 40`,
       ).toBeGreaterThanOrEqual(40);
+    }
+  });
+});
+
+describe('equipment — intro-tier coverage (levels 1-10)', () => {
+  const INTRO_MAX_LEVEL = 10;
+  const intro = items.filter((i) => i.minLevel <= INTRO_MAX_LEVEL);
+
+  it('every slot has at least two pieces reachable by level 10', () => {
+    for (const slot of SLOT) {
+      const forSlot = intro.filter((i) => i.slot === slot);
+      expect(
+        forSlot.length,
+        `slot ${slot} has ${forSlot.length} piece(s) at level <= ${INTRO_MAX_LEVEL}; the intro tier owes a full set`,
+      ).toBeGreaterThanOrEqual(2);
+    }
+  });
+
+  it('each weapon school has two main_hand options in the intro tier', () => {
+    for (const school of ['physical', 'magical'] as const) {
+      const weapons = intro.filter(
+        (i) => i.slot === 'main_hand' && i.weaponSchool === school,
+      );
+      expect(
+        weapons.length,
+        `${school} builds have ${weapons.length} weapon(s) by level ${INTRO_MAX_LEVEL}; a weapon the build cannot equip is not an option`,
+      ).toBeGreaterThanOrEqual(2);
+    }
+  });
+
+  it('the intro tier spans level 1 to level 10 with no empty level', () => {
+    for (let level = 1; level <= INTRO_MAX_LEVEL; level++) {
+      const unlocked = items.filter((i) => i.minLevel === level);
+      expect(
+        unlocked.length,
+        `no item unlocks at level ${level}; progression stalls there`,
+      ).toBeGreaterThan(0);
     }
   });
 });
