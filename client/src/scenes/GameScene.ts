@@ -28,6 +28,7 @@ import { enemyLevelColor } from '../enemyLevelBand';
 import {
   classifyKillXp,
   crossedZoneMastery,
+  killXpLabel,
   type KillXpDisplay,
 } from '../zoneMastery';
 import {
@@ -1507,12 +1508,7 @@ export class GameScene extends Phaser.Scene {
    * "No XP" when this one mob was simply beneath them.
    */
   private _showFloatingXp(x: number, y: number, display: KillXpDisplay) {
-    const label =
-      display.kind === 'granted'
-        ? `+${display.amount} XP`
-        : display.kind === 'zoneMastered'
-          ? 'Zone mastered'
-          : 'No XP';
+    const label = killXpLabel(display);
     const txt = this.add
       .text(x, y, label, {
         fontSize: '16px',

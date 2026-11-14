@@ -37,14 +37,14 @@ export const CardSchema = z
   .superRefine((card, ctx) => {
     if (card.type === 'passive' && card.passiveKind === undefined) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         path: ['passiveKind'],
         message: 'passiveKind is required for passive cards',
       });
     }
     if (card.type === 'active' && card.passiveKind !== undefined) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         path: ['passiveKind'],
         message: 'passiveKind must not be set for active cards',
       });
