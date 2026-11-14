@@ -177,7 +177,6 @@ const CSS = `
   background: #ffcc0033; color: #ffcc00; border: 1px solid #ffcc0088;
 }
 .sb-item-cell.locked { opacity: 0.45; cursor: not-allowed; }
-.sb-item-cell.locked:hover { border-color: #cc5555; }
 .sb-locked-badge {
   position: absolute; bottom: 2px; right: 2px;
   font-size: 7px; padding: 1px 3px; border-radius: 2px;
@@ -328,6 +327,10 @@ export class InventoryPanel {
     // Every cell is rebuilt below, so a tooltip opened on one of them is
     // anchored to an element that is about to be detached and will never fire
     // its `mouseleave`. Any table callback can land mid-hover.
+    // shortcut: a re-render under a still cursor blanks the tooltip until the
+    // pointer leaves and re-enters, because the replacement cell fires no
+    // `mouseenter`. Recoverable, unlike the tooltip it would otherwise pin
+    // open forever; re-anchor by remembered item id if that ever grates.
     this._hideTooltip();
 
     const equippedIds = this._equippedInstanceIds();
