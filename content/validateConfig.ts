@@ -58,7 +58,7 @@ const DropCategorySchema = realizes(
       );
       if (Math.abs(sum - 1) > SUM_EPSILON) {
         ctx.addIssue({
-          code: z.ZodIssueCode.custom,
+          code: 'custom',
           path: ['rarityWeights'],
           message: `rarity weights must sum to 1.0 (got ${sum})`,
         });
@@ -84,7 +84,7 @@ const LevelDiffPenaltySchema = concerns(
       .superRefine((penalty, ctx) => {
         if (penalty.fullXpWithinLevels >= penalty.zeroXpBeyondLevels) {
           ctx.addIssue({
-            code: z.ZodIssueCode.custom,
+            code: 'custom',
             path: ['fullXpWithinLevels'],
             message:
               `fullXpWithinLevels (${penalty.fullXpWithinLevels}) must be less ` +
@@ -129,7 +129,7 @@ const RarityMultipliersSchema = realizes(
           const higher = RARITY[i];
           if (multipliers[higher][axis] <= multipliers[lower][axis]) {
             ctx.addIssue({
-              code: z.ZodIssueCode.custom,
+              code: 'custom',
               path: [higher, axis],
               message:
                 `${higher}.${axis} (${multipliers[higher][axis]}) must be ` +

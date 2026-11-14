@@ -50,6 +50,22 @@ export const classifyKillXp = realizes(
 );
 
 /**
+ * What the floating text reads for a classified kill. Lives next to the
+ * decision rather than in the scene so it can be asserted directly: zero XP
+ * has two causes and they must not collapse into one wording.
+ */
+export function killXpLabel(display: KillXpDisplay): string {
+  switch (display.kind) {
+    case 'granted':
+      return `+${display.amount} XP`;
+    case 'zoneMastered':
+      return 'Zone mastered';
+    case 'noXp':
+      return 'No XP';
+  }
+}
+
+/**
  * Whether this level-up is the one that finished a tutorial zone.
  *
  * A character's level only ever rises, so the below-to-at-or-above crossing

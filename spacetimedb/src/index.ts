@@ -54,7 +54,7 @@ import { computeKillXpReward } from './rules/leveling';
 import { resolveHit, resolveHeal } from './rules/combat';
 import { EMPTY_STAT_BLOCK, type StatBlock } from './types';
 import { computeEffectiveStats, computeRaceBase } from './rules/stats';
-import { pickWeightedRarity, pickLevelAndRarityGated } from './rules/drops';
+import { pickLevelAndRarityGated } from './rules/drops';
 import {
   distSq,
   findClosestInRange,
@@ -1291,8 +1291,7 @@ const _handleDeath = concerns(
       const deathZone = ctx.db.zone.zoneId.find(char.zoneId);
       if (
         progress &&
-        deathZone &&
-        deathZone.tutorialZone &&
+        deathZone?.tutorialZone &&
         char.level >= deathZone.maxLevel &&
         !progress.tutorialCompleted
       ) {

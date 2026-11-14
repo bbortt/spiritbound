@@ -5,6 +5,7 @@ import { describe, it, expect } from 'vitest';
 import {
   classifyKillXp,
   crossedZoneMastery,
+  killXpLabel,
   type ZoneMasteryInfo,
 } from './zoneMastery';
 import { verifies, SwTraceables } from '../../src/clew/traceables/clew';
@@ -93,3 +94,25 @@ verifies(
     });
   },
 );
+
+describe('killXpLabel', () => {
+  it('reads the granted amount as a quantity', () => {
+    expect(killXpLabel({ kind: 'granted', amount: 25 })).toBe('+25 XP');
+  });
+
+  it('keeps the two causes of zero apart', () => {
+    // The whole point of KillXpDisplay: a mastered zone and a beneath-you kill
+    // both grant nothing, and must not read the same.
+    expect(killXpLabel({ kind: 'zoneMastered' })).toBe('Zone mastered');
+    expect(killXpLabel({ kind: 'noXp' })).toBe('No XP');
+    expect(killXpLabel({ kind: 'zoneMastered' })).not.toBe(
+      killXpLabel({ kind: 'noXp' }),
+    );
+  });
+
+  it('words a zero grant as a category rather than "+0 XP"', () => {
+    expect(killXpLabel({ kind: 'granted', amount: 0 })).toBe('+0 XP');
+    // ...which is why classifyKillXp never returns a zero `granted`.
+    expect(classifyKillXp(1, 9, TUTORIAL_ZONE)).toEqual({ kind: 'noXp' });
+  });
+});

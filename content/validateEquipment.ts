@@ -89,28 +89,28 @@ export const ItemSchema = realizes(
       if (isMainHand) {
         if (item.weaponSchool === null) {
           ctx.addIssue({
-            code: z.ZodIssueCode.custom,
+            code: 'custom',
             path: ['weaponSchool'],
             message: 'weaponSchool is required for main_hand items',
           });
         }
         if (item.geometryShape === null) {
           ctx.addIssue({
-            code: z.ZodIssueCode.custom,
+            code: 'custom',
             path: ['geometryShape'],
             message: 'geometryShape is required for main_hand items',
           });
         }
         if (item.geometryWidth === null) {
           ctx.addIssue({
-            code: z.ZodIssueCode.custom,
+            code: 'custom',
             path: ['geometryWidth'],
             message: 'geometryWidth is required for main_hand items',
           });
         }
         if (item.geometryRange === null) {
           ctx.addIssue({
-            code: z.ZodIssueCode.custom,
+            code: 'custom',
             path: ['geometryRange'],
             message: 'geometryRange is required for main_hand items',
           });
@@ -118,7 +118,7 @@ export const ItemSchema = realizes(
       } else {
         if (item.weaponSchool !== null) {
           ctx.addIssue({
-            code: z.ZodIssueCode.custom,
+            code: 'custom',
             path: ['weaponSchool'],
             message: 'weaponSchool must be null unless slot is main_hand',
           });
@@ -129,7 +129,7 @@ export const ItemSchema = realizes(
           item.geometryRange !== null
         ) {
           ctx.addIssue({
-            code: z.ZodIssueCode.custom,
+            code: 'custom',
             path: ['geometryShape'],
             message: 'geometry fields must be null unless slot is main_hand',
           });
