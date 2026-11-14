@@ -69,7 +69,9 @@ jobs:
       - name: Install Dependencies
         run: pnpm install
       - name: Unit tests
-        run: pnpm run vitest
+        # Writes coverage/lcov.info for the Sonar step below
+        # (sonar.javascript.lcov.reportPaths).
+        run: pnpm run vitest:coverage
       - name: Start SpacetimeDB
         run: docker run -d --name spiritbound-ci -p 3000:3000 clockworklabs/spacetime:v2.11.0 start --in-memory
       - name: Wait for SpacetimeDB
