@@ -25,7 +25,11 @@
 
 import { describe, it, expect, beforeAll } from 'vitest';
 import { callReducer, sqlRows, isServerUp } from './client';
-import { createTestCharacter, type TestCharacter } from './helpers';
+import {
+  createTestCharacter,
+  raiseToLevel,
+  type TestCharacter,
+} from './helpers';
 import {
   verifies,
   ConTraceables,
@@ -112,29 +116,6 @@ async function restartLife(
   if (!row)
     throw new Error('restartLife: no living character after start_life');
   return { ...char, characterId: row.character_id };
-}
-
-/**
- * Walk a character up to exactly `target` level using the `grant_xp` reducer,
- * reading the level back between grants instead of duplicating the XP curve
- * here. Coarse steps do the distance and fine steps close the last level, so
- * the walk lands ON the target rather than sailing past it — which matters,
- * since "one below the ceiling" is half of what these tests assert.
- */
-async function raiseToLevel(
-  char: TestCharacter,
-  target: number,
-): Promise<void> {
-  const COARSE = 500;
-  const FINE = 50;
-  for (let step = 0; step < 200; step++) {
-    const { level } = await readCharacter(char);
-    if (level >= target) return;
-    await callReducer(char.token, 'grant_xp', {
-      amount: level < target - 1 ? COARSE : FINE,
-    });
-  }
-  throw new Error(`raiseToLevel: character never reached level ${target}`);
 }
 
 async function killLethally(char: TestCharacter): Promise<void> {

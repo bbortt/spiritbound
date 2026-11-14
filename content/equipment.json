@@ -109,5 +109,304 @@
       "maxMp": 25
     },
     "flavor": "A polished orb that pulses in time with your spirit's breath."
+  },
+  {
+    "slug": "vale-wraps",
+    "name": "Vale Wraps",
+    "category": "equipment",
+    "slot": "hands",
+    "rarity": "common",
+    "minLevel": 2,
+    "armorWeight": "cloth",
+    "weaponSchool": null,
+    "geometryShape": null,
+    "geometryWidth": null,
+    "geometryRange": null,
+    "stats": {
+      "physicalDef": 5,
+      "agility": 2
+    },
+    "flavor": "Strips of cured hide, wound tight. They keep the cold out of your knuckles."
+  },
+  {
+    "slug": "copper-band",
+    "name": "Copper Band",
+    "category": "equipment",
+    "slot": "ring",
+    "rarity": "common",
+    "minLevel": 2,
+    "armorWeight": null,
+    "weaponSchool": null,
+    "geometryShape": null,
+    "geometryWidth": null,
+    "geometryRange": null,
+    "stats": {
+      "maxHp": 12,
+      "health": 1
+    },
+    "flavor": "Green at the edges. Someone wore it long enough to shape it."
+  },
+  {
+    "slug": "padded-breeches",
+    "name": "Padded Breeches",
+    "category": "equipment",
+    "slot": "legs",
+    "rarity": "common",
+    "minLevel": 3,
+    "armorWeight": "cloth",
+    "weaponSchool": null,
+    "geometryShape": null,
+    "geometryWidth": null,
+    "geometryRange": null,
+    "stats": {
+      "physicalDef": 9,
+      "magicDef": 4
+    },
+    "flavor": "Quilted against the cold, and incidentally against teeth."
+  },
+  {
+    "slug": "pine-cord",
+    "name": "Pine Cord",
+    "category": "equipment",
+    "slot": "necklace",
+    "rarity": "common",
+    "minLevel": 3,
+    "armorWeight": null,
+    "weaponSchool": null,
+    "geometryShape": null,
+    "geometryWidth": null,
+    "geometryRange": null,
+    "stats": {
+      "maxMp": 18,
+      "will": 1
+    },
+    "flavor": "A knot of resin on a leather thong. It smells like the vale before dark."
+  },
+  {
+    "slug": "chipped-stud",
+    "name": "Chipped Stud",
+    "category": "equipment",
+    "slot": "earring",
+    "rarity": "common",
+    "minLevel": 4,
+    "armorWeight": null,
+    "weaponSchool": null,
+    "geometryShape": null,
+    "geometryWidth": null,
+    "geometryRange": null,
+    "stats": {
+      "precision": 2,
+      "accuracy": 3
+    },
+    "flavor": "Small, plain, and missing a corner. You stopped noticing it years ago."
+  },
+  {
+    "slug": "hunters-hood",
+    "name": "Hunter's Hood",
+    "category": "equipment",
+    "slot": "head",
+    "rarity": "common",
+    "minLevel": 4,
+    "armorWeight": "chain",
+    "weaponSchool": null,
+    "geometryShape": null,
+    "geometryWidth": null,
+    "geometryRange": null,
+    "stats": {
+      "physicalDef": 12,
+      "magicDef": 6,
+      "evasion": 0.04
+    },
+    "flavor": "Ring-sewn under the lining. It muffles everything but your own breathing."
+  },
+  {
+    "slug": "chainmail-vest",
+    "name": "Chainmail Vest",
+    "category": "equipment",
+    "slot": "chest",
+    "rarity": "uncommon",
+    "minLevel": 5,
+    "armorWeight": "chain",
+    "weaponSchool": null,
+    "geometryShape": null,
+    "geometryWidth": null,
+    "geometryRange": null,
+    "stats": {
+      "physicalDef": 24,
+      "magicDef": 10,
+      "maxHp": 40
+    },
+    "flavor": "Lighter than plate and louder than sense. A fair trade on open ground."
+  },
+  {
+    "slug": "vale-striders",
+    "name": "Vale Striders",
+    "category": "equipment",
+    "slot": "boots",
+    "rarity": "uncommon",
+    "minLevel": 5,
+    "armorWeight": "cloth",
+    "weaponSchool": null,
+    "geometryShape": null,
+    "geometryWidth": null,
+    "geometryRange": null,
+    "stats": {
+      "moveSpeed": 0.12,
+      "evasion": 0.05,
+      "agility": 3
+    },
+    "flavor": "The vale's mud never seems to hold them."
+  },
+  {
+    "slug": "notched-falchion",
+    "name": "Notched Falchion",
+    "category": "equipment",
+    "slot": "main_hand",
+    "rarity": "uncommon",
+    "minLevel": 6,
+    "armorWeight": null,
+    "weaponSchool": "physical",
+    "geometryShape": "arc",
+    "geometryWidth": 0.5,
+    "geometryRange": 140,
+    "stats": {
+      "weaponDamage": 26,
+      "physicalAttack": 16,
+      "attackSpeed": 1.2
+    },
+    "flavor": "Every notch in the blade is something that got closer than it should have."
+  },
+  {
+    "slug": "oak-buckler",
+    "name": "Oak Buckler",
+    "category": "equipment",
+    "slot": "off_hand",
+    "rarity": "uncommon",
+    "minLevel": 6,
+    "armorWeight": null,
+    "weaponSchool": null,
+    "geometryShape": null,
+    "geometryWidth": null,
+    "geometryRange": null,
+    "stats": {
+      "physicalDef": 16,
+      "parry": 0.08,
+      "maxHp": 20
+    },
+    "flavor": "Banded oak, scarred white. It has been hit far more often than it has hit."
+  },
+  {
+    "slug": "whisperwood-wand",
+    "name": "Whisperwood Wand",
+    "category": "equipment",
+    "slot": "main_hand",
+    "rarity": "uncommon",
+    "minLevel": 7,
+    "armorWeight": null,
+    "weaponSchool": "magical",
+    "geometryShape": "line",
+    "geometryWidth": 0.6,
+    "geometryRange": 320,
+    "stats": {
+      "weaponDamage": 12,
+      "magicAttack": 30,
+      "castingSpeed": 1.15
+    },
+    "flavor": "Cut from a branch that was already dead. It has not stopped talking since."
+  },
+  {
+    "slug": "ironknuckle-gauntlets",
+    "name": "Ironknuckle Gauntlets",
+    "category": "equipment",
+    "slot": "hands",
+    "rarity": "uncommon",
+    "minLevel": 7,
+    "armorWeight": "plate",
+    "weaponSchool": null,
+    "geometryShape": null,
+    "geometryWidth": null,
+    "geometryRange": null,
+    "stats": {
+      "physicalDef": 18,
+      "power": 3
+    },
+    "flavor": "Heavier than they need to be. That is the point."
+  },
+  {
+    "slug": "wardens-greaves",
+    "name": "Warden's Greaves",
+    "category": "equipment",
+    "slot": "legs",
+    "rarity": "uncommon",
+    "minLevel": 8,
+    "armorWeight": "plate",
+    "weaponSchool": null,
+    "geometryShape": null,
+    "geometryWidth": null,
+    "geometryRange": null,
+    "stats": {
+      "physicalDef": 26,
+      "magicDef": 12,
+      "maxHp": 35
+    },
+    "flavor": "Taken off the vale's old watch. They still fit someone."
+  },
+  {
+    "slug": "spiritbound-ring",
+    "name": "Spiritbound Ring",
+    "category": "equipment",
+    "slot": "ring",
+    "rarity": "uncommon",
+    "minLevel": 8,
+    "armorWeight": null,
+    "weaponSchool": null,
+    "geometryShape": null,
+    "geometryWidth": null,
+    "geometryRange": null,
+    "stats": {
+      "maxMp": 35,
+      "mpRegen": 2,
+      "knowledge": 3
+    },
+    "flavor": "Warm, always, whatever the weather. You have learned not to ask why."
+  },
+  {
+    "slug": "hollow-pendant",
+    "name": "Hollow Pendant",
+    "category": "equipment",
+    "slot": "necklace",
+    "rarity": "uncommon",
+    "minLevel": 9,
+    "armorWeight": null,
+    "weaponSchool": null,
+    "geometryShape": null,
+    "geometryWidth": null,
+    "geometryRange": null,
+    "stats": {
+      "maxHp": 45,
+      "magicResist": 0.06,
+      "will": 3
+    },
+    "flavor": "The stone has a hole straight through it. The vale is full of them."
+  },
+  {
+    "slug": "wardens-drop",
+    "name": "Warden's Drop",
+    "category": "equipment",
+    "slot": "earring",
+    "rarity": "rare",
+    "minLevel": 10,
+    "armorWeight": null,
+    "weaponSchool": null,
+    "geometryShape": null,
+    "geometryWidth": null,
+    "geometryRange": null,
+    "stats": {
+      "precision": 5,
+      "accuracy": 6,
+      "physicalCrit": 0.05,
+      "magicCrit": 0.05
+    },
+    "flavor": "Cut from the Warden's own ear. It hears the vale the way the Warden did."
   }
 ]

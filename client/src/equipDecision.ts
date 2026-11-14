@@ -13,7 +13,8 @@ export type EquipDecision =
       occupant: EquippedItem;
       slot: string;
       slotOrdinal: number;
-    };
+    }
+  | { kind: 'blocked'; requiredLevel: number };
 
 /**
  * Decides what clicking an inventory item should do, given the character's
@@ -21,16 +22,27 @@ export type EquipDecision =
  * any confirmation dialog and the actual equip/unequip reducer call.
  */
 export const decideEquipAction = realizes(
-  SwTraceables.SW_006_INVENTORY_CLICK_PICKS_FIRST_EMPTY_DUAL_SLOT_ORDINAL,
+  [
+    SwTraceables.SW_006_INVENTORY_CLICK_PICKS_FIRST_EMPTY_DUAL_SLOT_ORDINAL,
+    SwTraceables.SW_055_EQUIP_ENFORCES_THE_ITEMS_MIN_LEVEL,
+  ] as const,
   function decideEquipAction(
     itemInstanceId: bigint,
     slotTag: string,
     isDual: boolean,
     equipped: EquippedItem[],
+    characterLevel: number,
+    minLevel: number,
   ): EquipDecision {
     const myEquip = equipped.find((e) => e.itemInstanceId === itemInstanceId);
     if (myEquip) {
       return { kind: 'unequip', equippedItemId: myEquip.equippedItemId };
+    }
+
+    // Mirrors the server's equipItem gate. It sits after the unequip branch
+    // because taking gear off is never level-gated.
+    if (minLevel > characterLevel) {
+      return { kind: 'blocked', requiredLevel: minLevel };
     }
 
     if (isDual) {

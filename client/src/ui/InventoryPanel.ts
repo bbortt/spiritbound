@@ -176,6 +176,13 @@ const CSS = `
   font-size: 7px; padding: 1px 3px; border-radius: 2px;
   background: #ffcc0033; color: #ffcc00; border: 1px solid #ffcc0088;
 }
+.sb-item-cell.locked { opacity: 0.45; cursor: not-allowed; }
+.sb-item-cell.locked:hover { border-color: #cc5555; }
+.sb-locked-badge {
+  position: absolute; bottom: 2px; right: 2px;
+  font-size: 7px; padding: 1px 3px; border-radius: 2px;
+  background: #cc555533; color: #cc8888; border: 1px solid #cc555588;
+}
 .sb-hover-tooltip {
   position: fixed; z-index: 1100; max-width: 240px;
   padding: 8px 10px; border-radius: 4px;
@@ -205,6 +212,7 @@ export class InventoryPanel {
   private _defs = new Map<bigint, ItemDefinition>();
   private _instances = new Map<bigint, ItemInstance>();
   private _equipped = new Map<bigint, EquippedItem>(); // key = equippedItemId
+  private _characterLevel = 1;
 
   constructor() {
     if (!document.getElementById('sb-panel-css')) {
@@ -263,6 +271,18 @@ export class InventoryPanel {
 
   isOpen() {
     return this._open;
+  }
+
+  /**
+   * The level the min-level gate is checked against; mirrors the server's.
+   * Guarded because the character row updates on every move and every enemy
+   * tick, and a re-render mid-hover destroys the cell the tooltip is anchored
+   * to before its `mouseleave` fires.
+   */
+  setCharacterLevel(level: number) {
+    if (level === this._characterLevel) return;
+    this._characterLevel = level;
+    this._render();
   }
 
   // ── Table callbacks ────────────────────────────────────────────────────────
@@ -366,7 +386,11 @@ export class InventoryPanel {
       ? `${fmtStat(preview[0], preview[1])} ${STAT_LABEL[preview[0]].toLowerCase()}`
       : '';
 
-    return `<div class="sb-item-cell${isEquip ? ' equipped' : ''}"
+    // Asking the same decision the click will ask, so a locked cell and a
+    // refused click can never disagree.
+    const locked = this._decide(inst.itemInstanceId, def)?.kind === 'blocked';
+
+    return `<div class="sb-item-cell${isEquip ? ' equipped' : ''}${locked ? ' locked' : ''}"
                  data-iid="${inst.itemInstanceId}"
                  style="border-color:${color}88;background:${color}11">
       ${armor ? `<div class="sb-armor-badge" style="background:${ARMOR_TINT[armor] ?? '#666'}"></div>` : ''}
@@ -374,6 +398,7 @@ export class InventoryPanel {
       <div class="sb-item-name" style="color:${color}">${def.name}</div>
       <div class="sb-item-stat">${previewText}</div>
       ${isEquip ? `<div class="sb-equipped-badge">Equipped</div>` : ''}
+      ${locked ? `<div class="sb-locked-badge">🔒 Lv ${def.minLevel}</div>` : ''}
     </div>`;
   }
 
@@ -387,7 +412,7 @@ export class InventoryPanel {
     const stats = nonZeroStats(def.statModifiers);
     return `
       <div class="sb-tooltip-title" style="color:${color}">${def.name}</div>
-      <div>${rarity}${slotTag ? ` · ${slotTag}` : ''}${armor ? ` · ${armor}` : ''}</div>
+      <div>${rarity}${slotTag ? ` · ${slotTag}` : ''}${armor ? ` · ${armor}` : ''}${def.minLevel > 1 ? ` · Min Lv: ${def.minLevel}` : ''}</div>
       ${stats.map(([k, v]) => `<div>${STAT_LABEL[k]}: ${fmtStat(k, v)}</div>`).join('')}
       <div class="sb-tooltip-flavor">${def.flavor}</div>
       <div class="sb-tooltip-death">Lost on death</div>
@@ -418,17 +443,29 @@ export class InventoryPanel {
     });
   }
 
+  /** Null when the definition has no slot, i.e. the item is not equippable. */
+  private _decide(itemInstanceId: bigint, def: ItemDefinition) {
+    if (!def.slot) return null;
+    const slotTag = rarityTag(def.slot);
+    return decideEquipAction(
+      itemInstanceId,
+      slotTag,
+      slotTag === 'Ring' || slotTag === 'Earring',
+      [...this._equipped.values()],
+      this._characterLevel,
+      def.minLevel,
+    );
+  }
+
   private _handleClick(itemInstanceId: bigint) {
     const inst = this._instances.get(itemInstanceId);
     const def = inst ? this._defs.get(inst.itemDefId) : null;
-    if (!inst || !def || !def.slot) return;
-    const slotTag = rarityTag(def.slot);
-    const isDual = slotTag === 'Ring' || slotTag === 'Earring';
-
-    const decision = decideEquipAction(itemInstanceId, slotTag, isDual, [
-      ...this._equipped.values(),
-    ]);
+    if (!inst || !def) return;
+    const decision = this._decide(itemInstanceId, def);
+    if (!decision) return;
     switch (decision.kind) {
+      case 'blocked':
+        return;
       case 'unequip':
         if (confirm(`Unequip ${def.name}?`)) {
           this._emit('unequipItem', {

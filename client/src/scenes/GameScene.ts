@@ -678,6 +678,7 @@ export class GameScene extends Phaser.Scene {
       if (this.isDead) this._hideDeathOverlay();
       this._updateHud();
       this.characterSheet?.setCharacter(row);
+      this.inventoryPanel?.setCharacterLevel(row.level);
     } else if (row.zoneId === (this.localCharacter?.zoneId ?? 1)) {
       this._addOtherPlayer(row);
     }
@@ -725,6 +726,7 @@ export class GameScene extends Phaser.Scene {
       }
       this._updateHud();
       this.characterSheet?.setCharacter(row);
+      this.inventoryPanel?.setCharacterLevel(row.level);
     } else {
       this.otherCircles.get(row.characterId)?.setPosition(row.posX, row.posY);
     }

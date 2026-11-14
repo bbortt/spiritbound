@@ -122,6 +122,39 @@ export async function createTestCharacter(
   return { ...identity, characterId: char.character_id, x, y };
 }
 
+/** A character's current level, read straight off the row. */
+export async function characterLevel(char: TestCharacter): Promise<number> {
+  const [row] = await sqlRows(
+    char.token,
+    `SELECT level FROM character WHERE character_id = ${char.characterId}`,
+  );
+  if (!row) throw new Error(`characterLevel: no character ${char.characterId}`);
+  return row.level as number;
+}
+
+/**
+ * Walk a character up to exactly `target` level using the `grant_xp` reducer,
+ * reading the level back between grants instead of duplicating the XP curve
+ * here. Coarse steps do the distance and fine steps close the last level, so
+ * the walk lands ON the target rather than sailing past it — which matters
+ * wherever "one below the threshold" is half of what a test asserts.
+ */
+export async function raiseToLevel(
+  char: TestCharacter,
+  target: number,
+): Promise<void> {
+  const COARSE = 500;
+  const FINE = 50;
+  for (let step = 0; step < 200; step++) {
+    const level = await characterLevel(char);
+    if (level >= target) return;
+    await callReducer(char.token, 'grant_xp', {
+      amount: level < target - 1 ? COARSE : FINE,
+    });
+  }
+  throw new Error(`raiseToLevel: character never reached level ${target}`);
+}
+
 /** The card_instance_id of a character's single equipped active-slot card. */
 export async function findEquippedCardInstanceId(
   token: string,
