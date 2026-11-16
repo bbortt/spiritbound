@@ -16,19 +16,6 @@ const VOICE_COLOR: Record<Beat['voice'], string> = {
   'other-hand': '#9ab0c8',
 };
 
-/**
- * Placeholder plate art.
- *
- * shortcut: a flat colour derived from the plate id, until the generated
- * images from `docs/PROLOGUE_SHOTLIST.md` land; replace `_drawPlate` with an
- * image load keyed by the same id.
- */
-function plateColor(plate: string): number {
-  let h = 0;
-  for (const ch of plate) h = (h * 31 + ch.charCodeAt(0)) & 0xffff;
-  return Phaser.Display.Color.HSVToRGB((h % 360) / 360, 0.35, 0.3).color;
-}
-
 export class PrologueScene extends Phaser.Scene {
   private onDone!: () => void;
   private index = 0;
@@ -42,6 +29,12 @@ export class PrologueScene extends Phaser.Scene {
 
   constructor() {
     super({ key: 'Prologue' });
+  }
+
+  preload() {
+    // A Set, because consecutive beats can share a plate.
+    for (const id of new Set(PROLOGUE_BEATS.map((b) => b.plate)))
+      if (id) this.load.image(`plate:${id}`, `prologue/${id}.png`);
   }
 
   create(data: PrologueSceneData) {
@@ -133,8 +126,8 @@ export class PrologueScene extends Phaser.Scene {
     // below, and a clicked-through recitation accumulates one per beat.
     this.tweens.killTweensOf([this.verse, this.titleCard]);
 
-    // Consecutive beats can name the same plate (IV.1 and VII.1 each carry two
-    // stanzas): hold the image and let its push-in run on, rather than cutting
+    // Consecutive beats can name the same plate (two stanzas on one image):
+    // hold the image and let its push-in run on, rather than cutting
     // to black and snapping the scale back between them.
     const newPlate = beat.plate !== this.plate;
     this.plate = beat.plate;
@@ -161,7 +154,7 @@ export class PrologueScene extends Phaser.Scene {
       duration: 900,
     });
 
-    // The only use the placeholder art has for the parallax data: a slow push
+    // The only use the single-plane art has for the parallax data: a slow push
     // in, scaled by the near plane. X.2's zeroes hold it perfectly still.
     if (newPlate) {
       this.tweens.add({
@@ -180,18 +173,10 @@ export class PrologueScene extends Phaser.Scene {
   private _drawPlate(plate: string) {
     const W = this.cameras.main.width;
     const H = this.cameras.main.height;
-    this.plane.add(
-      this.add.rectangle(0, 0, W, H * 0.62, plateColor(plate)).setOrigin(0.5),
-    );
-    this.plane.add(
-      this.add
-        .text(0, 0, plate, {
-          fontSize: '28px',
-          color: '#00000066',
-          fontFamily: 'monospace',
-        })
-        .setOrigin(0.5),
-    );
+    const img = this.add.image(0, 0, `plate:${plate}`);
+    // Cover the screen; the push-in tween scales the plane past it anyway.
+    img.setScale(Math.max(W / img.width, H / img.height));
+    this.plane.add(img);
   }
 
   private _finish() {
