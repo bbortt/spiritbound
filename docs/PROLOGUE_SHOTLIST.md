@@ -67,6 +67,9 @@ Don't cut it — it's what makes the gift in IV feel earned.
 **IV.1 · XW · vertical composition**
 `a great silent presence of radiant light high above, threads of shimmering magic descending like rain onto drifting motes of light below, the motes brightening where the threads touch, cosmic awe, gold and violet`
 
+**IV.2 · XW**
+The motes, now wielding the gift: shaping a green world out of light, the dreamt creatures made solid around it.
+
 ### V — The World Made
 
 **V.R · W · ⭐ MOTIF C — REFRAIN PLATE (base)**
@@ -97,6 +100,9 @@ Nothing else in this shot matters.
 → Composition note: frame this so the **empty version** works.
 XIV.2 is this shot with the light gone.
 Same crop, same hands, same angle.
+
+**VII.2 · CU**
+The light keeps hold when the body is done: a soul rising from a sleeper and passed on, down a line of the living, to a newborn.
 
 ### VIII — The Law
 

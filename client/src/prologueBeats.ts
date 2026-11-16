@@ -112,7 +112,7 @@ const BEATS: readonly Beat[] = [
     parallax: [0.15, 0.35, 0.7],
   },
   {
-    plate: 'IV.1',
+    plate: 'IV.2',
     shot: 'XW',
     lines: [
       'And the thoughts knew their power then, learned how to wield,',
@@ -189,7 +189,7 @@ const BEATS: readonly Beat[] = [
     titleCard: true,
   },
   {
-    plate: 'VII.1',
+    plate: 'VII.2',
     shot: 'CU',
     lines: [
       'For thought is the soul, and the soul is a flame',
