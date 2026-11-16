@@ -1,0 +1,2 @@
+# Generated art is large and regenerated wholesale; keep it out of clone history.
+client/public/prologue/** filter=lfs diff=lfs merge=lfs -text
