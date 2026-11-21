@@ -181,11 +181,21 @@ verifies(
         // other suite that picks up the same definition and does not die
         // leaves a row this would otherwise pick up and then expect to be
         // destroyed by *this* character's death.
-        const [beforeDeath] = await sqlRows(
+        //
+        // Newest of them, because the character can already own this very
+        // definition: `startLife` grants the starter weapon, which the farm
+        // can also drop. Taking an arbitrary row would let the starter grant
+        // satisfy the assertion below while `pickup_item` did nothing.
+        const owned = await sqlRows(
           char.token,
           `SELECT item_instance_id FROM item_instance
              WHERE item_def_id = ${drop.itemDefId}
                AND owner_character_id = ${char.characterId}`,
+        );
+        const beforeDeath = owned.reduce<(typeof owned)[number] | undefined>(
+          (best, row) =>
+            !best || row.item_instance_id > best.item_instance_id ? row : best,
+          undefined,
         );
         expect(
           beforeDeath,
@@ -196,7 +206,7 @@ verifies(
 
         const afterDeath = await sqlRows(
           char.token,
-          `SELECT item_instance_id FROM item_instance WHERE item_instance_id = ${beforeDeath.item_instance_id}`,
+          `SELECT item_instance_id FROM item_instance WHERE item_instance_id = ${beforeDeath!.item_instance_id}`,
         );
         expect(
           afterDeath,
