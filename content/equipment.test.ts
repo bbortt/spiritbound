@@ -192,6 +192,17 @@ describe('equipment — intro-tier coverage (levels 1-10)', () => {
     }
   });
 
+  it('keeps the starter weapon a level-1 main_hand weapon', () => {
+    // `startLife` grants and equips worn-dagger on every life, and the only
+    // slot the server reads a weapon out of is main_hand. Reslotting it, or
+    // putting it above level 1, would leave a new life swinging for the
+    // one-damage floor with nothing raising an error.
+    const starter = items.find((i) => i.slug === 'worn-dagger');
+    expect(starter, 'worn-dagger is the granted starter weapon').toBeDefined();
+    expect(starter?.slot).toBe('main_hand');
+    expect(starter?.minLevel).toBe(1);
+  });
+
   it('the intro tier spans level 1 to level 10 with no empty level', () => {
     for (let level = 1; level <= INTRO_MAX_LEVEL; level++) {
       const unlocked = items.filter((i) => i.minLevel === level);

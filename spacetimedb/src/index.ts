@@ -1156,10 +1156,13 @@ export const startLife = realizes(
     // swing substitutes a weaponDamage of 0 for its card power and lands on
     // `resolveHit`'s one-damage floor. The starter weapon is what makes the
     // basic attack do real damage from the first swing.
-    // The slot is read from the definition rather than restated here, so
-    // reslotting the starter weapon stays a content edit. Its level gate is
-    // deliberately not consulted: this is a server-side grant of starter gear,
-    // the same as the tutorial card below, not the player's own equip call.
+    // The slot comes from the definition rather than being restated here, but
+    // it has to be main_hand to be worth anything: that is the only slot a
+    // weapon is read out of. content/equipment.test.ts pins it there, since
+    // nothing here could tell a reslotted starter weapon from a missing one.
+    // The item's own level gate is deliberately not consulted — this is a
+    // server-side grant of starter gear, like the tutorial card below, not the
+    // player's own equip call.
     const starterWeapon = ctx.db.itemDefinition.slug.find('worn-dagger');
     if (newChar && starterWeapon?.slot) {
       const charId = (newChar as any).characterId;
