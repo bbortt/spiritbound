@@ -72,5 +72,6 @@ its own module first where it currently sits inline in a UI class, per
 - [SW-005](../specs/SW-005-paper-doll-grid-fixes-each-slot-to-one-position.md)
 - [SW-006](../specs/SW-006-inventory-click-picks-first-empty-dual-slot-ordinal.md)
 - [SW-055](../specs/SW-055-equip-enforces-the-items-min-level.md)
+- [SW-056](../specs/SW-056-every-life-starts-with-the-starter-weapon-equipped.md)
 - [ARCH-001](../specs/ARCH-001-item-tables-public-with-client-side-ownership-filter.md)
 - [ARCH-002](../specs/ARCH-002-client-effective-stats-is-a-hand-synced-duplicate.md)

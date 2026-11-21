@@ -1090,6 +1090,7 @@ const GRADUATE_START_LEVEL = 8;
 export const startLife = realizes(
   [
     SwTraceables.SW_053_STARTLIFE_COMPUTES_THE_START_ZONE_FROM_TUTORIAL_COMPLETION_NOT_CALLER_INPUT,
+    SwTraceables.SW_056_EVERY_LIFE_STARTS_WITH_THE_STARTER_WEAPON_EQUIPPED,
     ConTraceables.CON_035_A_GRADUATED_ACCOUNT_STARTS_BELOW_ITS_START_ZONES_MAX_LEVEL,
   ] as const,
   db.reducer({ spiritName: t.string() }, (ctx, { spiritName }) => {
@@ -1145,6 +1146,39 @@ export const startLife = realizes(
       lastLevelUpAt: undefined,
     });
 
+    // Query back to get the autoInc ID the grants below hang off.
+    const newChar = [...ctx.db.character.by_account.filter(ctx.sender)].find(
+      (c: any) => c.alive,
+    );
+
+    // Every life, not only the first: an ItemInstance is character-owned, so a
+    // life that follows a death inherits no gear at all, and a bare-handed
+    // swing substitutes a weaponDamage of 0 for its card power and lands on
+    // `resolveHit`'s one-damage floor. The starter weapon is what makes the
+    // basic attack do real damage from the first swing.
+    const starterWeapon = ctx.db.itemDefinition.slug.find('worn-dagger');
+    if (newChar && starterWeapon) {
+      const charId = (newChar as any).characterId;
+      ctx.db.itemInstance.insert({
+        itemInstanceId: 0n,
+        ownerCharacterId: charId,
+        itemDefId: starterWeapon.itemDefId,
+        quantity: 1,
+      });
+      const newItem = [...ctx.db.itemInstance.by_character.filter(charId)].find(
+        (i: any) => i.itemDefId === starterWeapon.itemDefId,
+      );
+      if (newItem) {
+        ctx.db.equippedItem.insert({
+          equippedItemId: 0n,
+          characterId: charId,
+          itemInstanceId: (newItem as any).itemInstanceId,
+          slot: { tag: 'main_hand' },
+          slotOrdinal: 0,
+        });
+      }
+    }
+
     // First-ever life: grant the tutorial starting hand (1 active card, auto-equipped).
     // On subsequent lives the player re-equips surviving attuned cards at a spirit.
     const ownedCards = [...ctx.db.cardInstance.by_owner.filter(ctx.sender)];
@@ -1158,10 +1192,6 @@ export const startLife = realizes(
           mergeLevel: 0,
           attuned: false,
         });
-        // Query back to get the autoInc ID for both the character and card instance.
-        const newChar = [
-          ...ctx.db.character.by_account.filter(ctx.sender),
-        ].find((c: any) => c.alive);
         const newCard = [
           ...ctx.db.cardInstance.by_owner.filter(ctx.sender),
         ].find((ci: any) => ci.cardDefId === emberDef.cardDefId);

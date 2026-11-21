@@ -52,6 +52,8 @@ beforeAll(async () => {
   const seeder = await mintIdentity();
   await callReducer(seeder.token, 'seed_cards', {});
   await callReducer(seeder.token, 'seed_zones', {});
+  // The starting-loadout tests below need the item definitions too.
+  await callReducer(seeder.token, 'seed_items', {});
 }, 30_000);
 
 /** The tutorial zone every fresh life starts in, as the live instance has it. */
@@ -219,6 +221,105 @@ verifies(
           seeded,
           'the chosen start zone must be a seeded one',
         ).toBeTruthy();
+      }, 60_000);
+    });
+  },
+);
+
+/**
+ * The character's equipped starter weapon, as two rows: the instance it owns
+ * and the slot it sits in.
+ *
+ * `sqlRows` only decodes scalar columns, so the slot enum itself is not
+ * readable here (see equipLevelGate.integration.test.ts#wireSlot) — which is
+ * why the test below proves `main_hand` through its effect on a bare swing
+ * instead, the only thing that reads that column server-side.
+ */
+async function readStarterWeapon(char: TestCharacter): Promise<{
+  instances: { item_instance_id: number }[];
+  slotOrdinal: number | undefined;
+}> {
+  const [def] = await sqlRows(
+    char.token,
+    "SELECT item_def_id FROM item_definition WHERE slug = 'worn-dagger'",
+  );
+  if (!def) throw new Error('worn-dagger not seeded on this instance');
+
+  const instances = await sqlRows(
+    char.token,
+    `SELECT item_instance_id FROM item_instance
+       WHERE owner_character_id = ${char.characterId}
+         AND item_def_id = ${def.item_def_id}`,
+  );
+  const equipped = instances.length
+    ? await sqlRows(
+        char.token,
+        `SELECT slot_ordinal FROM equipped_item
+           WHERE character_id = ${char.characterId}
+             AND item_instance_id = ${instances[0].item_instance_id}`,
+      )
+    : [];
+
+  return { instances, slotOrdinal: equipped[0]?.slot_ordinal };
+}
+
+/** Damage one bare right-click swing (cardDefId 0) takes off a fresh enemy. */
+async function bareSwingDamage(char: TestCharacter): Promise<number> {
+  await callReducer(char.token, 'spawn_enemy', {
+    zoneId: 1,
+    x: char.x,
+    y: char.y,
+    level: 2,
+  });
+  const [enemy] = await sqlRows(
+    char.token,
+    `SELECT enemy_id, current_hp FROM enemy
+       WHERE pos_x = ${char.x} AND pos_y = ${char.y} AND alive = true`,
+  );
+  if (!enemy) throw new Error('bareSwingDamage: no enemy spawned');
+
+  await callReducer(char.token, 'damage_enemy', {
+    enemyId: enemy.enemy_id,
+    cardDefId: 0,
+  });
+  const [after] = await sqlRows(
+    char.token,
+    `SELECT current_hp FROM enemy WHERE enemy_id = ${enemy.enemy_id}`,
+  );
+  return enemy.current_hp - (after?.current_hp ?? 0);
+}
+
+verifies(
+  SwTraceables.SW_056_EVERY_LIFE_STARTS_WITH_THE_STARTER_WEAPON_EQUIPPED,
+  () => {
+    describe('a life starts armed', () => {
+      it('grants and equips the worn dagger, and re-grants it on the next life', async () => {
+        const char = await createTestCharacter('ArmedSpirit');
+
+        const first = await readStarterWeapon(char);
+        expect(first.instances).toHaveLength(1);
+        expect(first.slotOrdinal).toBe(0);
+
+        // An ItemInstance is character-owned, so the second life starts from
+        // nothing owned — the point of the spec is that it is armed anyway.
+        await killLethally(char);
+        const next = await restartLife(char, 'ArmedSpirit');
+        const second = await readStarterWeapon(next);
+        expect(second.instances).toHaveLength(1);
+        expect(second.slotOrdinal).toBe(0);
+        expect(second.instances[0].item_instance_id).not.toBe(
+          first.instances[0].item_instance_id,
+        );
+      }, 60_000);
+
+      it('makes a bare swing do real damage instead of the 1-damage floor', async () => {
+        // The only server-side reader of the slot enum is `_findEquippedWeapon`,
+        // and a swing with nothing in main_hand feeds weaponDamage 0 through
+        // `resolveHit` to its one-damage floor. So anything above that floor
+        // proves the dagger is both owned and in the right slot, without
+        // pinning the assertion to a balance number that is meant to be tuned.
+        const char = await createTestCharacter('SwingingSpirit');
+        expect(await bareSwingDamage(char)).toBeGreaterThan(1);
       }, 60_000);
     });
   },
