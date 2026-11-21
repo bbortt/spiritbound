@@ -24,4 +24,7 @@ export default __t.row({
   createdAt: __t.timestamp().name('created_at'),
   diedAt: __t.option(__t.timestamp()).name('died_at'),
   lastLevelUpAt: __t.option(__t.timestamp()).name('last_level_up_at'),
+  lastCombatAt: __t.option(__t.timestamp()).name('last_combat_at'),
+  lastHpRegenAt: __t.timestamp().name('last_hp_regen_at'),
+  lastMpRegenAt: __t.timestamp().name('last_mp_regen_at'),
 });

@@ -33,6 +33,10 @@
     "despawnSeconds": 60,
     "pickupRangePx": 80
   },
+  "regen": {
+    "tickSeconds": 1,
+    "outOfCombatSeconds": 6
+  },
   "enemies": {
     "respawnSeconds": 15,
     "aggroRangePx": 300,
@@ -44,11 +48,26 @@
     "baseDamage": 4,
     "castDamageRatio": 1.875,
     "rarityMultipliers": {
-      "common": { "hp": 1.0, "damage": 1.0 },
-      "uncommon": { "hp": 2.5, "damage": 1.4 },
-      "rare": { "hp": 6.0, "damage": 1.8 },
-      "epic": { "hp": 15.0, "damage": 2.4 },
-      "legendary": { "hp": 40.0, "damage": 3.2 }
+      "common": {
+        "hp": 1.0,
+        "damage": 1.0
+      },
+      "uncommon": {
+        "hp": 2.5,
+        "damage": 1.4
+      },
+      "rare": {
+        "hp": 6.0,
+        "damage": 1.8
+      },
+      "epic": {
+        "hp": 15.0,
+        "damage": 2.4
+      },
+      "legendary": {
+        "hp": 40.0,
+        "damage": 3.2
+      }
     }
   }
 }

@@ -40,6 +40,21 @@ describe('server config — the shipped file', () => {
       config.xp.levelDiffPenalty.zeroXpBeyondLevels,
     );
   });
+
+  it('ships regen dials, and allows a zero out-of-combat delay', () => {
+    expect(config.regen.tickSeconds).toBeGreaterThan(0);
+    expect(config.regen.outOfCombatSeconds).toBeGreaterThanOrEqual(0);
+
+    // Zero is a legitimate tuning position ("recover as soon as damage
+    // stops"), so it must validate; a negative delay must not.
+    const zeroDelay = mutable();
+    zeroDelay.regen.outOfCombatSeconds = 0;
+    expect(validateConfig(zeroDelay).valid).toBe(true);
+
+    const negativeDelay = mutable();
+    negativeDelay.regen.outOfCombatSeconds = -1;
+    expect(validateConfig(negativeDelay).valid).toBe(false);
+  });
 });
 
 /**
@@ -165,6 +180,7 @@ verifies(
         ['enemies.baseHp', (c) => (c.enemies.baseHp = 0)],
         ['enemies.baseDamage', (c) => (c.enemies.baseDamage = -4)],
         ['xp.baseMonsterXp', (c) => (c.xp.baseMonsterXp = 0)],
+        ['regen.tickSeconds', (c) => (c.regen.tickSeconds = 0)],
       ];
 
       for (const [label, breakIt] of NON_POSITIVE) {

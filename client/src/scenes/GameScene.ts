@@ -94,7 +94,6 @@ const ATTACK_COOLDOWN = 500;
 // Card 1 — Ember Strike geometry (fixed; actual power values come from DB)
 const EMBER_RANGE = 320;
 const EMBER_HALF_ANG = (30 * Math.PI) / 180;
-const EMBER_MP_REGEN = 2;
 
 // ── Map layout ────────────────────────────────────────────────────────────────
 
@@ -271,7 +270,6 @@ export class GameScene extends Phaser.Scene {
   private dbEnemies = new Map<bigint, EnemyGfx>();
 
   private lastAttackTime = 0;
-  private clientMp = 0;
 
   private emberCast!: CastController;
   private emberDef: CardDefinition | null = null;
@@ -603,12 +601,6 @@ export class GameScene extends Phaser.Scene {
         this.playerCircle.y + Math.sin(angle) * PLAYER_R,
         4,
       );
-
-      // ── MP regen ────────────────────────────────────────────────────────────
-      this.clientMp = Math.min(
-        this.clientMp + EMBER_MP_REGEN * (delta / 1000),
-        this._localMaxResources().maxMp,
-      );
     }
 
     this._updateHud();
@@ -672,7 +664,6 @@ export class GameScene extends Phaser.Scene {
     if (!row.alive) return;
     if (this._isLocal(row.accountIdentity)) {
       this.localCharacter = row;
-      this.clientMp = row.currentMp;
       this.targetX = row.posX;
       this.targetY = row.posY;
       this.playerCircle.setPosition(row.posX, row.posY);
@@ -1019,10 +1010,12 @@ export class GameScene extends Phaser.Scene {
       slotY: this.slot1Y,
       getPlayerPos: () => ({ x: this.playerCircle.x, y: this.playerCircle.y }),
       isAlive: () => !!this.localCharacter?.alive,
-      hasMp: () => this.clientMp >= this.emberMpCost,
-      spendMp: () => {
-        this.clientMp -= this.emberMpCost;
-      },
+      // Both read the subscribed server row. The client used to keep its own
+      // MP counter, spending and regenerating it locally, which is why the bar
+      // snapped back on reconnect — currentMp is the server's number and the
+      // only one that survives.
+      hasMp: () => (this.localCharacter?.currentMp ?? 0) >= this.emberMpCost,
+      spendMp: () => {},
       onFire: (nx, ny) => this._executeEmberStrike(nx, ny),
     });
   }
@@ -1967,7 +1960,7 @@ export class GameScene extends Phaser.Scene {
 
     if (c) {
       const hp = Math.max(0, c.currentHp);
-      const mp = Math.max(0, Math.floor(this.clientMp));
+      const mp = Math.max(0, c.currentMp);
       const { maxHp: mhp, maxMp: mmp } = this._localMaxResources();
 
       if (hp > 0)
