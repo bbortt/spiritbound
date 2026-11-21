@@ -173,6 +173,18 @@ export const ConfigSchema = concerns(
       despawnSeconds: positive,
       pickupRangePx: positive,
     }),
+    regen: z.object({
+      // The cadence is free to change without retuning a rate, because the
+      // rates are per second and the tick only decides how coarsely that
+      // second is paid out (see docs/BALANCE.md#resource-regeneration). It is
+      // still `positive` rather than `int`: a sub-second tick is a legitimate
+      // smoothness choice, a zero or negative one is a hang.
+      tickSeconds: positive,
+      // Zero is allowed and means "regenerate the moment damage stops", which
+      // is a tuning position an operator may want; a negative delay would
+      // instead read as combat ending before it started.
+      outOfCombatSeconds: z.number().min(0),
+    }),
     enemies: z.object({
       respawnSeconds: positive,
       aggroRangePx: positive,

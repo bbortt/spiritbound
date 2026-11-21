@@ -45,6 +45,7 @@ import MarkPrologueSeenReducer from './mark_prologue_seen_reducer';
 import MoveReducer from './move_reducer';
 import PickupCardReducer from './pickup_card_reducer';
 import PickupItemReducer from './pickup_item_reducer';
+import ResourceRegenReducer from './resource_regen_reducer';
 import RespawnEnemyReducer from './respawn_enemy_reducer';
 import SacrificeCardReducer from './sacrifice_card_reducer';
 import SeedCardsReducer from './seed_cards_reducer';
@@ -74,6 +75,7 @@ import ItemDefinitionRow from './item_definition_table';
 import ItemDropRow from './item_drop_table';
 import ItemInstanceRow from './item_instance_table';
 import PersonalSpiritRow from './personal_spirit_table';
+import ResourceRegenScheduleRow from './resource_regen_schedule_table';
 import ZoneRow from './zone_table';
 
 /** Type-only namespace exports for generated type groups. */
@@ -471,6 +473,27 @@ const tablesSchema = __schema({
     },
     PersonalSpiritRow,
   ),
+  resourceRegenSchedule: __table(
+    {
+      name: 'resource_regen_schedule',
+      indexes: [
+        {
+          accessor: 'scheduledId',
+          name: 'resource_regen_schedule_scheduled_id_idx_btree',
+          algorithm: 'btree',
+          columns: ['scheduledId'],
+        },
+      ],
+      constraints: [
+        {
+          name: 'resource_regen_schedule_scheduled_id_key',
+          constraint: 'unique',
+          columns: ['scheduledId'],
+        },
+      ],
+    },
+    ResourceRegenScheduleRow,
+  ),
   zone: __table(
     {
       name: 'zone',
@@ -503,6 +526,7 @@ const reducersSchema = __reducers(
   __reducerSchema('move', MoveReducer),
   __reducerSchema('pickup_card', PickupCardReducer),
   __reducerSchema('pickup_item', PickupItemReducer),
+  __reducerSchema('resource_regen', ResourceRegenReducer),
   __reducerSchema('respawn_enemy', RespawnEnemyReducer),
   __reducerSchema('sacrifice_card', SacrificeCardReducer),
   __reducerSchema('seed_cards', SeedCardsReducer),

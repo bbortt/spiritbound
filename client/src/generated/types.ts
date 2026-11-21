@@ -110,6 +110,9 @@ export const Character = __t.object('Character', {
   createdAt: __t.timestamp(),
   diedAt: __t.option(__t.timestamp()),
   lastLevelUpAt: __t.option(__t.timestamp()),
+  lastCombatAt: __t.option(__t.timestamp()),
+  lastHpRegenAt: __t.timestamp(),
+  lastMpRegenAt: __t.timestamp(),
 });
 export type Character = __Infer<typeof Character>;
 
@@ -289,6 +292,12 @@ export const Rarity = __t.enum('Rarity', {
   Legendary: __t.unit(),
 });
 export type Rarity = __Infer<typeof Rarity>;
+
+export const ResourceRegenSchedule = __t.object('ResourceRegenSchedule', {
+  scheduledId: __t.u64(),
+  scheduledAt: __t.scheduleAt(),
+});
+export type ResourceRegenSchedule = __Infer<typeof ResourceRegenSchedule>;
 
 // The tagged union or sum type for the algebraic type `ShapeType`.
 export const ShapeType = __t.enum('ShapeType', {

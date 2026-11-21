@@ -18,7 +18,7 @@
 
 import { schema, table, t } from 'spacetimedb/server';
 import { SenderError } from 'spacetimedb/server';
-import { ScheduleAt } from 'spacetimedb';
+import { ScheduleAt, Timestamp } from 'spacetimedb';
 
 // @ts-ignore — JSON import resolved by esbuild; loader.ts (node:fs) is tree-shaken from this bundle
 import cardsJson from '../../content/cards.json';
@@ -55,6 +55,11 @@ import { resolveHit, resolveHeal } from './rules/combat';
 import { EMPTY_STAT_BLOCK, type StatBlock } from './types';
 import { computeEffectiveStats, computeRaceBase } from './rules/stats';
 import { pickLevelAndRarityGated } from './rules/drops';
+import {
+  computeRegenTick,
+  hpWindowStartMicros,
+  nothingToPay,
+} from './rules/regen';
 import {
   distSq,
   findClosestInRange,
@@ -99,6 +104,7 @@ const DROP_DESPAWN_US = BigInt(
 const ENEMY_RESPAWN_US = BigInt(
   Math.round(CONFIG.enemies.respawnSeconds * 1_000_000),
 );
+const REGEN_TICK_US = BigInt(Math.round(CONFIG.regen.tickSeconds * 1_000_000));
 /** Squared pickup range, so the reducers can compare without a square root. */
 const PICKUP_RANGE_SQ = CONFIG.drops.pickupRangePx * CONFIG.drops.pickupRangePx;
 
@@ -347,6 +353,14 @@ const character = table(
     createdAt: t.timestamp(),
     diedAt: t.option(t.timestamp()),
     lastLevelUpAt: t.option(t.timestamp()), // client watches this to trigger the level-up effect
+    // The out-of-combat gate's clock: stamped by damage dealt or taken. Unset
+    // means "has never fought", which counts as out of combat.
+    lastCombatAt: t.option(t.timestamp()),
+    // How far each resource's regeneration has been paid up to. Separate
+    // because the two rates pay for different spans of time, and because HP's
+    // accrual is gated while MP's is not.
+    lastHpRegenAt: t.timestamp(),
+    lastMpRegenAt: t.timestamp(),
   },
 );
 
@@ -525,6 +539,20 @@ const cardDropCleanupSchedule = table(
   cardDropCleanupRow,
 );
 
+// Row schema for the resource-regeneration schedule.
+const resourceRegenRow = t.row({
+  scheduledId: t.u64().primaryKey().autoInc(),
+  scheduledAt: t.scheduleAt(),
+});
+
+// One global repeating schedule — not one per character, and deliberately not
+// folded into enemyTick, whose 500 ms cadence belongs to chase/telegraph AI
+// and whose per-enemy walk would stop healing a zone with nothing in it.
+const resourceRegenSchedule = table(
+  { name: 'resource_regen_schedule', scheduled: () => resourceRegen },
+  resourceRegenRow,
+);
+
 // Row schemas extracted to break the forward/backward type-reference cycle:
 // table references reducer (via thunk), reducer references row schema (explicit).
 // Using the same RowBuilder object for both ensures the SDK deduplicates the type
@@ -649,6 +677,13 @@ export const init = db.init((ctx) => {
   ctx.db.cardDropCleanupSchedule.insert({
     scheduledId: 0n,
     scheduledAt: ScheduleAt.interval(10_000_000n), // fire every 10 s
+  });
+  ctx.db.resourceRegenSchedule.insert({
+    scheduledId: 0n,
+    // From the operator's dial rather than a literal: the rates are per
+    // second, so the tick only decides how coarsely a second is paid out and
+    // can be retuned without touching a single rate.
+    scheduledAt: ScheduleAt.interval(REGEN_TICK_US),
   });
 });
 
@@ -883,6 +918,11 @@ const _withProportionalResourceUpdate = realizes(
       ...fresh,
       currentHp: newHp,
       currentMp: newMp,
+      // Both resources were just re-based against new maxima, so whatever
+      // regen window was open accrued against numbers that no longer exist —
+      // and gear is also what can change the rates themselves.
+      lastHpRegenAt: ctx.timestamp,
+      lastMpRegenAt: ctx.timestamp,
     });
   },
 );
@@ -928,7 +968,16 @@ const _resolveAndApplyDamage = realizes(
     if (newHp <= 0) {
       _handleDeath(ctx, target);
     } else {
-      ctx.db.character.characterId.update({ ...target, currentHp: newHp });
+      // Taking damage is the start of the out-of-combat clock, and it re-bases
+      // HP's accrual: regen is owed from this hit, never from the quiet time
+      // before it. MP's clock is untouched — it keeps accruing through a
+      // fight.
+      ctx.db.character.characterId.update({
+        ...target,
+        currentHp: newHp,
+        lastCombatAt: ctx.timestamp,
+        lastHpRegenAt: ctx.timestamp,
+      });
     }
   },
 );
@@ -970,6 +1019,11 @@ const _grantXp = realizes(
         currentHp,
         currentMp,
         lastLevelUpAt: leveledUp ? ctx.timestamp : char.lastLevelUpAt,
+        // A refill to full re-bases both clocks: the window that was accruing
+        // against the old deficit has been paid in one go, and leaving it open
+        // would hand it out again after the next hit.
+        lastHpRegenAt: leveledUp ? ctx.timestamp : char.lastHpRegenAt,
+        lastMpRegenAt: leveledUp ? ctx.timestamp : char.lastMpRegenAt,
       });
 
       const progress = ctx.db.accountProgress.accountIdentity.find(
@@ -1144,6 +1198,9 @@ export const startLife = realizes(
       createdAt: ctx.timestamp,
       diedAt: undefined,
       lastLevelUpAt: undefined,
+      lastCombatAt: undefined,
+      lastHpRegenAt: ctx.timestamp,
+      lastMpRegenAt: ctx.timestamp,
     });
 
     // Query back to get the autoInc ID the grants below hang off.
@@ -1656,12 +1713,21 @@ export const damageEnemy = realizes(
         if (e.zoneId !== char.zoneId)
           throw new SenderError('Enemy not in same zone');
 
-        const weapon = _findEquippedWeapon(ctx, char.characterId);
+        // Dealing damage is combat, not just taking it — otherwise a ranged
+        // character outside an enemy's aggro range regenerates at full rate
+        // while killing it. Only the combat clock moves: HP's accrual window
+        // is pushed out by the gate reading this stamp, so re-basing
+        // lastHpRegenAt here would double-count. The stamped row replaces the
+        // local one, because _grantXp below writes from what it is handed.
+        const attacker = { ...char, lastCombatAt: ctx.timestamp };
+        ctx.db.character.characterId.update(attacker);
+
+        const weapon = _findEquippedWeapon(ctx, attacker.characterId);
         const weaponSchool = (weapon?.weaponSchool?.tag ?? 'physical') as
           'physical' | 'magical';
         const weaponWidth = weapon?.geometryWidth ?? 0.4;
         const weaponRange = weapon?.geometryRange ?? 150;
-        const attackerStats = buildEffectiveStats(ctx, char);
+        const attackerStats = buildEffectiveStats(ctx, attacker);
 
         let cardBasePower: number;
         let cardSchool: 'physical' | 'magical';
@@ -1688,7 +1754,7 @@ export const damageEnemy = realizes(
           cardMergeLevel: 0,
           cardSchool,
           cardBaseShape,
-          characterLevel: char.level,
+          characterLevel: attacker.level,
           weaponSchool,
           weaponWidth,
           weaponRange,
@@ -1716,14 +1782,14 @@ export const damageEnemy = realizes(
           const xp = computeKillXpReward(
             CONFIG.xp.baseMonsterXp,
             e.level,
-            char.level,
+            attacker.level,
             killZone?.maxLevel,
             CONFIG.xp.levelDiffPenalty,
           );
-          if (xp > 0) _grantXp(ctx, char, BigInt(xp));
+          if (xp > 0) _grantXp(ctx, attacker, BigInt(xp));
           // Independent drop rolls, level-gated + rarity-weighted (see BALANCE.md).
-          _dropCardFromEnemy(ctx, e, char);
-          _dropItemFromEnemy(ctx, e, char);
+          _dropCardFromEnemy(ctx, e, attacker);
+          _dropItemFromEnemy(ctx, e, attacker);
         } else {
           ctx.db.enemy.enemyId.update({ ...e, currentHp: newHp });
         }
@@ -1904,6 +1970,74 @@ export const cardDropCleanup = realizes(
       }
     }
   }),
+);
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// REDUCERS — resource regeneration
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * resourceRegen — one scheduled pass over every alive character, paying each
+ * one's HP and MP from its effective rates.
+ *
+ * Rates come from buildEffectiveStats, not RACE_BASE, so a gear line that
+ * modifies either rate works without this reducer knowing gear exists. The
+ * arithmetic and the gate are pure functions in rules/regen.ts; this reducer
+ * only gathers the row, hands over the numbers, and writes the result — and
+ * only when there is a result to write, so an idle server of full-health
+ * characters produces no subscription traffic at all.
+ */
+export const resourceRegen = concerns(
+  SysTraceables.SYS_016_CHARACTERS_RECOVER_HP_AND_MP_OUT_OF_COMBAT,
+  realizes(
+    [
+      SwTraceables.SW_059_ONE_REGEN_TICK_RESTORES_EVERY_ALIVE_CHARACTERS_HP_AND_MP,
+      ArchTraceables.ARCH_015_REGEN_IS_ONE_GLOBAL_SCHEDULE_SIZED_BY_CONFIG,
+      ConTraceables.CON_037_REGEN_ONLY_ADDS_INSIDE_A_LIVING_CHARACTERS_HEADROOM,
+    ] as const,
+    db.reducer({ scheduleRow: resourceRegenRow }, (ctx, _args: any) => {
+      const now = ctx.timestamp.microsSinceUnixEpoch;
+
+      for (const char of ctx.db.character) {
+        // A dead character's row persists with its diedAt stamp for the death
+        // summary; `alive` is the only thing keeping regen off a corpse.
+        if (!char.alive) continue;
+
+        const stats = buildEffectiveStats(ctx, char);
+
+        const hpInput = {
+          ratePerSecond: stats.hpRegen,
+          windowStartMicros: hpWindowStartMicros(
+            char.lastHpRegenAt.microsSinceUnixEpoch,
+            char.lastCombatAt?.microsSinceUnixEpoch,
+            CONFIG.regen.outOfCombatSeconds,
+          ),
+          nowMicros: now,
+          current: char.currentHp,
+          max: stats.maxHp,
+        };
+        const mpInput = {
+          ratePerSecond: stats.mpRegen,
+          windowStartMicros: char.lastMpRegenAt.microsSinceUnixEpoch,
+          nowMicros: now,
+          current: char.currentMp,
+          max: stats.maxMp,
+        };
+
+        const hp = computeRegenTick(hpInput);
+        const mp = computeRegenTick(mpInput);
+        if (nothingToPay(hpInput, hp) && nothingToPay(mpInput, mp)) continue;
+
+        ctx.db.character.characterId.update({
+          ...char,
+          currentHp: char.currentHp + hp.granted,
+          currentMp: char.currentMp + mp.granted,
+          lastHpRegenAt: new Timestamp(hp.paidUpToMicros),
+          lastMpRegenAt: new Timestamp(mp.paidUpToMicros),
+        });
+      }
+    }),
+  ),
 );
 
 // ─── Chase AI ─────────────────────────────────────────────────────────────────
