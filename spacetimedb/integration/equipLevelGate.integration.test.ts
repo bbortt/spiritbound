@@ -172,6 +172,7 @@ async function farmUnequippableItem(char: TestCharacter, rounds = 40) {
         );
 
       return {
+        itemDefId: drop.item_def_id as number,
         minLevel: def.min_level as number,
         slug: def.slug as string,
         slot: content.slot,
@@ -187,10 +188,20 @@ async function farmUnequippableItem(char: TestCharacter, rounds = 40) {
   );
 }
 
-async function equippedRows(char: TestCharacter) {
+/**
+ * The character's equipped_item rows for one instance.
+ *
+ * Scoped to the instance rather than counting every slot the character has
+ * filled, because a life does not start empty-handed: `startLife` grants and
+ * equips the starter weapon, so "how many rows does this character have" is
+ * not the same question as "is this item equipped".
+ */
+async function equippedRows(char: TestCharacter, itemInstanceId: number) {
   return sqlRows(
     char.token,
-    `SELECT equipped_item_id FROM equipped_item WHERE character_id = ${char.characterId}`,
+    `SELECT equipped_item_id FROM equipped_item
+       WHERE character_id = ${char.characterId}
+         AND item_instance_id = ${itemInstanceId}`,
   );
 }
 
@@ -207,9 +218,15 @@ verifies(SwTraceables.SW_055_EQUIP_ENFORCES_THE_ITEMS_MIN_LEVEL, () => {
       const char = await createTestCharacter('LevelGateSpirit');
       const item = await farmUnequippableItem(char);
 
+      // Scoped to the farmed definition: the character also owns the starter
+      // weapon `startLife` equipped, and an unscoped query can hand back that
+      // one instead — which is equippable at level 1, so the gate under test
+      // would never fire.
       const [inst] = await sqlRows(
         char.token,
-        `SELECT item_instance_id FROM item_instance WHERE owner_character_id = ${char.characterId}`,
+        `SELECT item_instance_id FROM item_instance
+           WHERE owner_character_id = ${char.characterId}
+             AND item_def_id = ${item.itemDefId}`,
       );
       expect(inst, 'pickup must create an item_instance row').toBeTruthy();
 
@@ -236,7 +253,7 @@ verifies(SwTraceables.SW_055_EQUIP_ENFORCES_THE_ITEMS_MIN_LEVEL, () => {
       );
 
       expect(
-        await equippedRows(char),
+        await equippedRows(char, inst.item_instance_id),
         'a refused equip must not write an equipped_item row',
       ).toHaveLength(0);
 
@@ -250,7 +267,7 @@ verifies(SwTraceables.SW_055_EQUIP_ENFORCES_THE_ITEMS_MIN_LEVEL, () => {
 
       await equip();
       expect(
-        await equippedRows(char),
+        await equippedRows(char, inst.item_instance_id),
         'the same equip must succeed once the level requirement is met',
       ).toHaveLength(1);
     }, 120_000);
