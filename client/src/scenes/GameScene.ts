@@ -25,6 +25,7 @@ import { CharacterSheet } from '../ui/CharacterSheet';
 import { computeEffectiveStats } from '../effectiveStats';
 import { xpProgress } from '../levelCurve';
 import { enemyLevelColor } from '../enemyLevelBand';
+import { coneHitsCircle } from '../hitCone';
 import {
   classifyKillXp,
   crossedZoneMastery,
@@ -1330,42 +1331,46 @@ export class GameScene extends Phaser.Scene {
     proj.setPosition(ox, oy);
     proj.setDepth(3);
 
+    // The projectile is decoration. Geometry is confirmed now, against the cone
+    // the player just aimed and the positions they aimed it at — waiting for the
+    // tween's onComplete resolved the hit up to half a second later, by which
+    // time chasing enemies had moved and the answer was about a cone nobody saw.
     this.tweens.add({
       targets: proj,
       x: ox + nx * travelDist,
       y: oy + ny * travelDist,
       duration: (travelDist / 600) * 1000,
       ease: 'Linear',
-      onComplete: () => {
-        proj.destroy();
-        let hitAny = false;
-        for (const [, data] of this.dbEnemies) {
-          if (!data.alive) continue;
-          if (
-            this._inCone(
-              data.x,
-              data.y,
-              ox,
-              oy,
-              nx,
-              ny,
-              ATTACK_RANGE,
-              ATTACK_HALF_ANG,
-            )
-          ) {
-            // cardDefId 0 = bare weapon swing (no card) — server resolves real damage.
-            callReducer('damageEnemy', () =>
-              this.conn.reducers.damageEnemy({
-                enemyId: data.enemyId,
-                cardDefId: 0,
-              }),
-            );
-            hitAny = true;
-          }
-        }
-        if (hitAny) this.cameras.main.shake(100, 0.002);
-      },
+      onComplete: () => proj.destroy(),
     });
+
+    let hitAny = false;
+    for (const [, data] of this.dbEnemies) {
+      if (!data.alive) continue;
+      if (
+        coneHitsCircle(
+          data.x,
+          data.y,
+          ox,
+          oy,
+          nx,
+          ny,
+          ATTACK_RANGE,
+          ATTACK_HALF_ANG,
+          ENEMY_R,
+        )
+      ) {
+        // cardDefId 0 = bare weapon swing (no card) — server resolves real damage.
+        callReducer('damageEnemy', () =>
+          this.conn.reducers.damageEnemy({
+            enemyId: data.enemyId,
+            cardDefId: 0,
+          }),
+        );
+        hitAny = true;
+      }
+    }
+    if (hitAny) this.cameras.main.shake(100, 0.002);
   }
 
   private _executeEmberStrike(nx: number, ny: number) {
@@ -1389,62 +1394,45 @@ export class GameScene extends Phaser.Scene {
     proj.setPosition(ox, oy);
     proj.setDepth(3);
 
+    // Resolved at cast time, for the same reason the basic attack is.
     this.tweens.add({
       targets: proj,
       x: ox + nx * EMBER_RANGE,
       y: oy + ny * EMBER_RANGE,
       duration: (EMBER_RANGE / 400) * 1000,
       ease: 'Linear',
-      onComplete: () => {
-        proj.destroy();
-        let hitAny = false;
-        for (const [, data] of this.dbEnemies) {
-          if (!data.alive) continue;
-          if (
-            this._inCone(
-              data.x,
-              data.y,
-              ox,
-              oy,
-              nx,
-              ny,
-              EMBER_RANGE,
-              EMBER_HALF_ANG,
-            )
-          ) {
-            if (this.emberDef) {
-              callReducer('damageEnemy', () =>
-                this.conn.reducers.damageEnemy({
-                  enemyId: data.enemyId,
-                  cardDefId: this.emberDef!.cardDefId,
-                }),
-              );
-            }
-            this._emberBurnFlash(data);
-            hitAny = true;
-          }
-        }
-        if (hitAny) this.cameras.main.shake(120, 0.003);
-      },
+      onComplete: () => proj.destroy(),
     });
-  }
 
-  private _inCone(
-    ex: number,
-    ey: number,
-    ox: number,
-    oy: number,
-    nx: number,
-    ny: number,
-    range: number,
-    halfAngle: number,
-  ): boolean {
-    const dx = ex - ox;
-    const dy = ey - oy;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    if (dist > range) return false;
-    if (dist === 0) return true;
-    return (dx / dist) * nx + (dy / dist) * ny >= Math.cos(halfAngle);
+    let hitAny = false;
+    for (const [, data] of this.dbEnemies) {
+      if (!data.alive) continue;
+      if (
+        coneHitsCircle(
+          data.x,
+          data.y,
+          ox,
+          oy,
+          nx,
+          ny,
+          EMBER_RANGE,
+          EMBER_HALF_ANG,
+          ENEMY_R,
+        )
+      ) {
+        if (this.emberDef) {
+          callReducer('damageEnemy', () =>
+            this.conn.reducers.damageEnemy({
+              enemyId: data.enemyId,
+              cardDefId: this.emberDef!.cardDefId,
+            }),
+          );
+        }
+        this._emberBurnFlash(data);
+        hitAny = true;
+      }
+    }
+    if (hitAny) this.cameras.main.shake(120, 0.003);
   }
 
   private _emberBurnFlash(data: EnemyGfx) {
