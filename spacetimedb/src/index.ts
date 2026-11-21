@@ -1169,12 +1169,16 @@ export const startLife = realizes(
         (i: any) => i.itemDefId === starterWeapon.itemDefId,
       );
       if (newItem) {
-        ctx.db.equippedItem.insert({
-          equippedItemId: 0n,
-          characterId: charId,
-          itemInstanceId: (newItem as any).itemInstanceId,
-          slot: { tag: 'main_hand' },
-          slotOrdinal: 0,
+        // Through the same rescale `equipItem` uses, so a starter weapon that
+        // ever carries maxHp/maxMp does not spawn the life under full health.
+        _withProportionalResourceUpdate(ctx, newChar, () => {
+          ctx.db.equippedItem.insert({
+            equippedItemId: 0n,
+            characterId: charId,
+            itemInstanceId: (newItem as any).itemInstanceId,
+            slot: { tag: 'main_hand' },
+            slotOrdinal: 0,
+          });
         });
       }
     }
