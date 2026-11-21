@@ -345,7 +345,7 @@ floor before any gear:
 | ----------------------------------------------------- | ----: | --------------- | ----: |
 | power / knowledge / will / agility / precision        |    10 | health          |    12 |
 | maxHp                                                 |   100 | maxMp           |    60 |
-| hpRegen                                               |   0.5 | mpRegen         |   0.3 |
+| hpRegen (per second)                                  |   0.5 | mpRegen (per s) |   0.3 |
 | moveSpeed / attackSpeed / castingSpeed / healingBoost |   1.0 | everything else |     0 |
 
 **Behavior change:** `startLife` used to grant `100 + level*15` HP and
@@ -359,6 +359,43 @@ Character level now only scales card damage
 Flagging
 this since it's a real gameplay-feel change, not just plumbing.
 
+## Resource regeneration
+
+`content/config.json#regen` — operator dials, with the rates themselves coming
+from effective stats (race base above, plus any gear `hpRegen`/`mpRegen` line):
+
+| Dial                       | Value | Meaning                                 |
+| -------------------------- | ----: | --------------------------------------- |
+| `regen.tickSeconds`        |     1 | How often `resourceRegen` fires.        |
+| `regen.outOfCombatSeconds` |     6 | Quiet span before HP starts recovering. |
+
+**The rates are per second, not per tick.** This is the one number in this
+file whose unit changes the mechanic rather than its magnitude: at 0.5 HP/s a
+1 s tick pays 1 HP every _other_ tick, and reading it as per-tick doubles
+every regen rate in the game.
+The tick interval is therefore free to change without retuning a single
+rate — which is the point of making it a dial.
+
+**HP waits for quiet; MP does not.** HP recovers only once
+`outOfCombatSeconds` have passed since the character last dealt or took
+damage; MP recovers continuously, in combat and out.
+The asymmetry is deliberate: nothing in the game restores MP on purpose — no
+potion, no card, no effect — so gating MP would leave an emptied caster with
+no play at all.
+Shipping MP-restoring cards is what would let MP's gate be revisited
+(`STR-016`, Out of scope).
+
+**Fractional rates survive an `i32` column** by carrying the remainder in a
+timestamp rather than a float.
+`character` grows three columns — `lastCombatAt`, `lastHpRegenAt`,
+`lastMpRegenAt` — and each tick grants `floor(rate × windowSeconds)` and
+advances that resource's stamp by exactly the seconds it paid for.
+HP's window starts at
+`max(lastHpRegenAt, lastCombatAt + outOfCombatSeconds)`, so a fight yields a
+zero-length window and there is no backlog to settle on disengage.
+See `SW-057` (the gate), `SW-058` (the carry), `CON-037` (never above the
+effective maximum, never on a corpse).
+
 ## Bare weapon swing (no card)
 
 `spacetimedb/src/index.ts#damageEnemy` — `cardDefId: 0` means a bare weapon
@@ -368,6 +405,13 @@ It's fed through the same
 attacker's `weaponDamage` stat (0 unarmed) instead of a card's `basePower`,
 and `cardSchool`/`cardBaseShape` taken from the equipped main_hand weapon
 (defaults: physical, cone, width 0.4, range 150 if bare-handed).
+
+The bare-handed case is no longer the default state of a new character:
+`startLife` grants and equips the Worn Dagger on every life (`SW-056`), so a
+0-damage swing resolving to `MIN_DAMAGE` is now only reachable by unequipping
+on purpose.
+Before that, it was what every basic attack did — ~100 right-clicks to kill a
+100 HP zone-1 enemy.
 This is a
 judgment call — `resolveHit` itself doesn't consume `weaponDamage` anywhere
 else (card casts still scale off `physicalAttack`/`magicAttack` only, per
@@ -377,8 +421,9 @@ dead stat on every weapon in `equipment.json`.
 ## Starter equipment (vertical slice)
 
 `content/equipment.json` — 6 common/uncommon items seeded via `seedItems`.
-No stat budget table exists yet (no gear drops or equip flow live), so these
-are first-pass numbers, not budget-derived.
+Gear drops, the equip flow and its min-level gate are all live now; what is
+still missing is a stat **budget** table to derive these numbers from, so they
+remain first-pass values rather than budget-derived.
 Validated only against the
 structural rules in `content/validateEquipment.ts` (main_hand needs full
 geometry, armorWeight null on weapons/off_hand, evasion < 0.20, moveSpeed <
@@ -392,6 +437,16 @@ geometry, armorWeight null on weapons/off_hand, evasion < 0.20, moveSpeed <
 | Iron Chestplate   | chest     | common   | plate                        | physicalDef 18, maxHp 30                           |
 | Traveller's Boots | boots     | common   | chain                        | moveSpeed 0.08, evasion 0.03                       |
 | Spirit Focus      | off_hand  | uncommon | —                            | magicDef 10, magicResist 0.05, maxMp 25            |
+
+The Worn Dagger carries a second job: `startLife` grants and equips it on
+every life (`SW-056`), which makes it the only item whose slot and `minLevel`
+are load-bearing.
+It has to stay a level-1 `main_hand` weapon — `main_hand` is the only slot the
+server reads a weapon out of — and `content/equipment.test.ts` pins both, since
+nothing in the grant itself could tell a reslotted starter weapon from a
+missing one.
+Its 12 + 8 stat line is also what sets the opening pace: 21 damage a swing at
+level 1, five hits on a 100 HP zone-1 enemy.
 
 **Power-vs-area rule (main_hand only):** if `geometryWidth > 1.0`, then
 `weaponDamage + physicalAttack + magicAttack` must not exceed 20.
