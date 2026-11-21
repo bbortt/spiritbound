@@ -236,7 +236,7 @@ verifies(
  * instead, the only thing that reads that column server-side.
  */
 async function readStarterWeapon(char: TestCharacter): Promise<{
-  instances: { item_instance_id: number }[];
+  instances: Record<string, any>[];
   slotOrdinal: number | undefined;
 }> {
   const [def] = await sqlRows(
