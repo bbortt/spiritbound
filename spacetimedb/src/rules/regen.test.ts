@@ -131,6 +131,31 @@ verifies(
         expect(result.granted).toBe(3);
       });
 
+      it('discards the surplus window when it fills up, not just the overshoot', () => {
+        // An hour out of combat at 0.5/s earns 1800 but can only be paid 40.
+        // The stamp must jump to now: carrying the other 1760 s would hand a
+        // full heal to the next hit that lands.
+        const filled = computeRegenTick({
+          ratePerSecond: 0.5,
+          windowStartMicros: 0n,
+          nowMicros: 3600n * SECOND,
+          current: 60,
+          max: 100,
+        });
+        expect(filled.granted).toBe(40);
+        expect(filled.paidUpToMicros).toBe(3600n * SECOND);
+
+        // Now take 40 damage and tick two seconds later: 1 HP, not 40.
+        const afterHit = computeRegenTick({
+          ratePerSecond: 0.5,
+          windowStartMicros: filled.paidUpToMicros,
+          nowMicros: 3602n * SECOND,
+          current: 60,
+          max: 100,
+        });
+        expect(afterHit.granted).toBe(1);
+      });
+
       it('leaves the stamp untouched when it can pay nothing, so the tick writes no row', () => {
         // A full character sits out a long quiet spell. The tick must report
         // "nothing happened" rather than advancing the stamp, or an idle

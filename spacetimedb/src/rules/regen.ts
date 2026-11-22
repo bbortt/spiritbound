@@ -89,6 +89,16 @@ export const computeRegenTick = realizes(
     if (earned <= 0) return { granted: 0, paidUpToMicros: windowStartMicros };
 
     const granted = Math.min(earned, headroom);
+    if (granted < earned) {
+      // Filled up with window to spare — which is the normal outcome for
+      // anyone who idles or logs off for a while, not just an exotic case.
+      // The surplus must be discarded rather than carried: a character that
+      // sat out an hour would otherwise hold ~an hour of redeemable regen and
+      // have the next hit healed back on the following tick. This branch
+      // always grants something, so writing the row costs nothing extra.
+      return { granted, paidUpToMicros: nowMicros };
+    }
+
     const paidMicros = BigInt(
       Math.round((granted / ratePerSecond) * MICROS_PER_SECOND),
     );

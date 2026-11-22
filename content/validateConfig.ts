@@ -176,10 +176,13 @@ export const ConfigSchema = concerns(
     regen: z.object({
       // The cadence is free to change without retuning a rate, because the
       // rates are per second and the tick only decides how coarsely that
-      // second is paid out (see docs/BALANCE.md#resource-regeneration). It is
-      // still `positive` rather than `int`: a sub-second tick is a legitimate
-      // smoothness choice, a zero or negative one is a hang.
-      tickSeconds: positive,
+      // second is paid out (see docs/BALANCE.md#resource-regeneration). A
+      // sub-second tick is a legitimate smoothness choice, so this is not an
+      // int — but the floor is a millisecond rather than `positive`, because
+      // the module converts this to whole microseconds and anything under
+      // 0.0000005 s rounds to an interval of zero, which is the hang the
+      // bound exists to prevent.
+      tickSeconds: z.number().min(0.001),
       // Zero is allowed and means "regenerate the moment damage stops", which
       // is a tuning position an operator may want; a negative delay would
       // instead read as combat ending before it started.
