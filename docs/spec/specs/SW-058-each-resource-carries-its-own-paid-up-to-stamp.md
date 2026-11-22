@@ -21,6 +21,11 @@ A tick that can pay nothing — a rate of 0, or a resource with no headroom
 because it is full or a gear change left it above its maximum — grants
 nothing, leaves the stamp exactly where it was, and writes no row at all.
 
+A tick that pays but is **cut short by the headroom** — it fills the resource
+with window left over — discards that surplus and advances the stamp to now.
+Carrying it would leave an idle character holding hours of redeemable regen,
+so the next hit would be healed back on the following tick.
+
 Regen is still not bankable, but the tick is not what prevents it: **every
 path that lowers a resource or re-bases its maximum restamps that resource's
 clock** — damage resolution, the level-up refill, and the proportional gear
@@ -104,3 +109,13 @@ climbs throughout.
   storm `SW-059` rejects.
   Restamping where a resource is already being written costs nothing and
   closes both.
+- **2026-11-21** — Pinned that a tick cut short by the headroom discards its
+  surplus window instead of carrying it.
+  A review of the implementation caught that this is the ordinary outcome for
+  anyone who idles or logs off long enough to reach full, not an edge case:
+  the stamp advanced only by the few seconds it could pay, so a character
+  back from an hour away held an hour of regen and had the next hit healed
+  back on the following tick.
+  It is distinct from the unpayable-tick rule above because this branch does
+  grant something, so the row is written either way and discarding costs
+  nothing.

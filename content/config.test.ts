@@ -181,6 +181,11 @@ verifies(
         ['enemies.baseDamage', (c) => (c.enemies.baseDamage = -4)],
         ['xp.baseMonsterXp', (c) => (c.xp.baseMonsterXp = 0)],
         ['regen.tickSeconds', (c) => (c.regen.tickSeconds = 0)],
+        // Positive, but rounds to a zero-microsecond interval — a hang.
+        [
+          'regen.tickSeconds (sub-microsecond)',
+          (c) => (c.regen.tickSeconds = 1e-7),
+        ],
       ];
 
       for (const [label, breakIt] of NON_POSITIVE) {
