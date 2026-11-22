@@ -133,8 +133,10 @@ verifies(
 
       it('discards the surplus window when it fills up, not just the overshoot', () => {
         // An hour out of combat at 0.5/s earns 1800 but can only be paid 40.
-        // The stamp must jump to now: carrying the other 1760 s would hand a
-        // full heal to the next hit that lands.
+        // The stamp must jump to now: carrying the other 1760 s would leave a
+        // redeemable window for whatever lowers the resource next. Damage
+        // resolution restamps HP itself, so this is the guarantee for the
+        // paths that do not — MP has no spend path yet.
         const filled = computeRegenTick({
           ratePerSecond: 0.5,
           windowStartMicros: 0n,

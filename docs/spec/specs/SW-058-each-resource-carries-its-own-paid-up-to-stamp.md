@@ -23,8 +23,8 @@ nothing, leaves the stamp exactly where it was, and writes no row at all.
 
 A tick that pays but is **cut short by the headroom** — it fills the resource
 with window left over — discards that surplus and advances the stamp to now.
-Carrying it would leave an idle character holding hours of redeemable regen,
-so the next hit would be healed back on the following tick.
+Carrying it would leave an idle character holding hours of redeemable regen
+for whatever lowers the resource next.
 
 Regen is still not bankable, but the tick is not what prevents it: **every
 path that lowers a resource or re-bases its maximum restamps that resource's
@@ -114,8 +114,11 @@ climbs throughout.
   A review of the implementation caught that this is the ordinary outcome for
   anyone who idles or logs off long enough to reach full, not an edge case:
   the stamp advanced only by the few seconds it could pay, so a character
-  back from an hour away held an hour of regen and had the next hit healed
-  back on the following tick.
+  back from an hour away held an hour of redeemable regen.
+  Damage resolution restamps HP before anything can spend that window, so this
+  is not a live HP bug — it moves the no-banking guarantee into the tick
+  instead of resting it on every present and future lowering path, of which MP
+  currently has none.
   It is distinct from the unpayable-tick rule above because this branch does
   grant something, so the row is written either way and discarding costs
   nothing.

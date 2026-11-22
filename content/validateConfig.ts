@@ -181,7 +181,10 @@ export const ConfigSchema = concerns(
       // int — but the floor is a millisecond rather than `positive`, because
       // the module converts this to whole microseconds and anything under
       // 0.0000005 s rounds to an interval of zero, which is the hang the
-      // bound exists to prevent.
+      // bound exists to prevent. A millisecond rather than that rounding
+      // boundary itself: nothing legitimate ticks faster, and this still only
+      // rules out the hang — a 1 ms cadence scans every character a thousand
+      // times a second, and no schema can tell an operator that is unwise.
       tickSeconds: z.number().min(0.001),
       // Zero is allowed and means "regenerate the moment damage stops", which
       // is a tuning position an operator may want; a negative delay would

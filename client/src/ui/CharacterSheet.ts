@@ -108,7 +108,8 @@ const STAT_DESC: Record<keyof StatBlock, string> = {
   agility: 'Primary attribute — feeds Evasion, Parry, Attack Speed.',
   precision: 'Primary attribute — feeds Accuracy, Magic Accuracy, Crit.',
   maxHp: 'Maximum health. At 0 HP you die — permadeath.',
-  hpRegen: 'HP restored per second, once out of combat.',
+  hpRegen:
+    'HP restored per second, a few seconds after you last dealt or took damage.',
   maxMp: 'Maximum mana. Active cards cost MP to cast.',
   mpRegen: 'MP restored per second, in combat or out.',
   moveSpeed: 'Movement speed multiplier (1.0 = base).',
