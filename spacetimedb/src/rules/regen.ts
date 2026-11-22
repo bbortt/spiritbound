@@ -54,12 +54,14 @@ export function nothingToPay(input: RegenInput, result: RegenResult): boolean {
  * for, so 0.5/s pays 1 every two seconds forever instead of rounding to 1 per
  * tick (double rate) or 0 per tick (dead stat).
  *
- * This never resets a stamp to escape a stale window. A resource sitting full
- * for an hour would otherwise have an hour of redeemable regen waiting for the
- * first point of damage — so the paths that *lower* a resource, or re-base its
- * maximum, restamp its clock instead. Doing it there costs no extra write
- * (those paths already update the row) and keeps this tick silent on an idle
- * server, where the alternative was a row update per character per second.
+ * A tick that *pays* never leaves behind window it did not pay for: when the
+ * headroom cuts the payment short, the stamp jumps to now and the surplus is
+ * dropped. A tick that pays nothing cannot do that — a resource sitting full
+ * for an hour keeps its hour-old stamp — so the paths that *lower* a resource,
+ * or re-base its maximum, restamp its clock instead. Doing it there costs no
+ * extra write (those paths already update the row) and keeps this tick silent
+ * on an idle server, where the alternative was a row update per character per
+ * second.
  */
 export const computeRegenTick = realizes(
   [
@@ -92,10 +94,11 @@ export const computeRegenTick = realizes(
     if (granted < earned) {
       // Filled up with window to spare — which is the normal outcome for
       // anyone who idles or logs off for a while, not just an exotic case.
-      // The surplus must be discarded rather than carried: a character that
-      // sat out an hour would otherwise hold ~an hour of redeemable regen and
-      // have the next hit healed back on the following tick. This branch
-      // always grants something, so writing the row costs nothing extra.
+      // Discarding the surplus keeps the no-banking guarantee inside this
+      // function rather than resting entirely on every lowering path
+      // restamping: damage resolution does restamp HP today, but MP has no
+      // spend path yet to get it wrong. This branch always grants something,
+      // so writing the row costs nothing extra.
       return { granted, paidUpToMicros: nowMicros };
     }
 

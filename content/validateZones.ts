@@ -47,7 +47,10 @@ const PopulationSchema = realizes(
 const DirectorSchema = realizes(
   ConTraceables.CON_022_ZONE_DIRECTOR_DEADBAND_AND_MAX_BAND_SHARE_ARE_BOUNDED,
   z.object({
-    tickSeconds: positive,
+    // Millisecond floor for the same reason as `regen.tickSeconds`: once a
+    // director schedule derives an interval from this, a sub-microsecond
+    // value rounds to zero microseconds and hangs.
+    tickSeconds: z.number().min(0.001),
     deadband: z.number().int().min(1),
     maxSpawnsPerTick: positiveInt,
     maxDespawnsPerTick: positiveInt,
