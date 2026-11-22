@@ -600,6 +600,7 @@ const db = schema({
   enemyTickSchedule,
   enemyRespawnSchedule,
   cardDropCleanupSchedule,
+  resourceRegenSchedule,
 });
 
 export default db;
