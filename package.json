@@ -39,7 +39,7 @@
     "commitlint": "21.2.4",
     "esbuild": "0.28.2",
     "husky": "9.1.7",
-    "lint-staged": "17.6.0",
+    "lint-staged": "17.6.1",
     "markdownlint-cli": "0.50.0",
     "markdownlint-sentences-per-line": "0.1.7",
     "npm-check-updates": "23.1.1",
